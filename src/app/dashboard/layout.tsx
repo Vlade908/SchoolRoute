@@ -11,7 +11,7 @@ import {
   UserPlus,
   FileText,
   PanelLeft,
-  Search,
+  Building,
 } from 'lucide-react';
 import { useUser, UserProvider } from '@/contexts/user-context';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,7 @@ function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, minRole: 1 },
     { href: '/dashboard/students', label: 'Alunos', icon: Users, minRole: 1 },
     { href: '/dashboard/schools', label: 'Escolas', icon: SchoolIcon, minRole: 3 },
+    { href: '/dashboard/city-halls', label: 'Prefeituras', icon: Building, minRole: 3 },
     { href: '/dashboard/employees', label: 'Funcionários', icon: UserPlus, minRole: 3 },
     { href: '/dashboard/transport', label: 'Solicitações', icon: Bus, minRole: 3 },
     { href: '/dashboard/orders', label: 'Pedidos', icon: FileText, minRole: 3 },
