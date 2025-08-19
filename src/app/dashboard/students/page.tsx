@@ -49,7 +49,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 
 // Mock data
-const students = Array.from({ length: 25 }, (_, i) => ({
+const initialStudents = Array.from({ length: 25 }, (_, i) => ({
   id: `STU${1001 + i}`,
   name: `Aluno ${1001 + i}`,
   ra: `RA${2024001 + i}`,
@@ -60,14 +60,52 @@ const students = Array.from({ length: 25 }, (_, i) => ({
   class: `Turma ${String.fromCharCode(65 + (i % 4))}`,
   status: i % 5 === 0 ? 'Não Homologado' : 'Homologado',
   enrollmentDate: new Date(2024, 0, 15 + i).toLocaleDateString('pt-BR'),
+  responsibleName: 'Maria da Silva',
+  contactPhone: '(11) 98765-4321',
+  rgIssueDate: '10/05/2010',
 }));
 
-function StudentProfileDialog({ student, isEditing: initialIsEditing = false }: { student: typeof students[0], isEditing?: boolean }) {
+type Student = typeof initialStudents[0];
+
+
+function StudentProfileDialog({ 
+  student, 
+  isEditing: initialIsEditing = false,
+  onSave,
+  onClose,
+}: { 
+  student: Student, 
+  isEditing?: boolean,
+  onSave: (updatedStudent: Student) => void,
+  onClose: () => void,
+}) {
   const [isEditing, setIsEditing] = useState(initialIsEditing);
+  const [editedStudent, setEditedStudent] = useState<Student>({ ...student });
 
   const handleEditClick = () => setIsEditing(true);
-  const handleSaveClick = () => setIsEditing(false); // In a real app, you'd save data here
-  const handleCancelClick = () => setIsEditing(false);
+
+  const handleSaveClick = () => {
+    onSave(editedStudent);
+    setIsEditing(false); 
+    onClose();
+  };
+
+  const handleCancelClick = () => {
+    setIsEditing(false);
+    setEditedStudent({ ...student }); // Reset changes
+    if (initialIsEditing) {
+        onClose();
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setEditedStudent(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleSelectChange = (value: string) => {
+    setEditedStudent(prev => ({ ...prev, status: value }));
+  }
 
 
   return (
@@ -89,10 +127,10 @@ function StudentProfileDialog({ student, isEditing: initialIsEditing = false }: 
                <div className="grid grid-cols-2 gap-4">
                   {isEditing ? (
                     <>
-                      <div><Label htmlFor="student-name">Nome</Label><Input id="student-name" defaultValue={student.name} /></div>
+                      <div><Label htmlFor="name">Nome</Label><Input id="name" value={editedStudent.name} onChange={handleChange} /></div>
                       <div>
                         <Label htmlFor="student-status">Status</Label>
-                          <Select defaultValue={student.status}>
+                          <Select value={editedStudent.status} onValueChange={handleSelectChange}>
                               <SelectTrigger id="student-status">
                                   <SelectValue placeholder="Selecione o status" />
                               </SelectTrigger>
@@ -102,18 +140,18 @@ function StudentProfileDialog({ student, isEditing: initialIsEditing = false }: 
                               </SelectContent>
                           </Select>
                       </div>
-                      <div><Label htmlFor="responsible-name">Responsável</Label><Input id="responsible-name" defaultValue="Maria da Silva" /></div>
-                      <div><Label htmlFor="contact-phone">Contato</Label><Input id="contact-phone" defaultValue="(11) 98765-4321" /></div>
-                      <div><Label htmlFor="school-year">Série/Ano</Label><Input id="school-year" defaultValue={student.schoolYear} /></div>
-                      <div><Label htmlFor="student-class">Classe</Label><Input id="student-class" defaultValue={student.class} /></div>
-                      <div className="col-span-2"><Label htmlFor="school-name">Escola</Label><Input id="school-name" defaultValue={student.school} /></div>
+                      <div><Label htmlFor="responsibleName">Responsável</Label><Input id="responsibleName" value={editedStudent.responsibleName} onChange={handleChange} /></div>
+                      <div><Label htmlFor="contactPhone">Contato</Label><Input id="contactPhone" value={editedStudent.contactPhone} onChange={handleChange} /></div>
+                      <div><Label htmlFor="schoolYear">Série/Ano</Label><Input id="schoolYear" value={editedStudent.schoolYear} onChange={handleChange} /></div>
+                      <div><Label htmlFor="class">Classe</Label><Input id="class" value={editedStudent.class} onChange={handleChange} /></div>
+                      <div className="col-span-2"><Label htmlFor="school">Escola</Label><Input id="school" value={editedStudent.school} onChange={handleChange} /></div>
                     </>
                   ) : (
                     <>
                       <div><span className="font-semibold">Nome:</span> {student.name}</div>
                       <div><span className="font-semibold">Status:</span> <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className={student.status === 'Homologado' ? 'bg-green-600' : ''}>{student.status}</Badge></div>
-                      <div><span className="font-semibold">Responsável:</span> Maria da Silva</div>
-                      <div><span className="font-semibold">Contato:</span> (11) 98765-4321</div>
+                      <div><span className="font-semibold">Responsável:</span> {student.responsibleName}</div>
+                      <div><span className="font-semibold">Contato:</span> {student.contactPhone}</div>
                       <div><span className="font-semibold">Série/Ano:</span> {student.schoolYear}</div>
                       <div><span className="font-semibold">Classe:</span> {student.class}</div>
                       <div className="col-span-2"><span className="font-semibold">Escola:</span> {student.school}</div>
@@ -129,17 +167,17 @@ function StudentProfileDialog({ student, isEditing: initialIsEditing = false }: 
                     <div className="grid grid-cols-2 gap-4">
                         {isEditing ? (
                           <>
-                            <div><Label htmlFor="student-ra">RA</Label><Input id="student-ra" defaultValue={student.ra} /></div>
-                            <div><Label htmlFor="student-cpf">CPF</Label><Input id="student-cpf" defaultValue={student.cpf} /></div>
-                            <div><Label htmlFor="student-rg">RG</Label><Input id="student-rg" defaultValue={student.rg} /></div>
-                            <div><Label htmlFor="rg-issue-date">Emissão RG</Label><Input id="rg-issue-date" defaultValue="10/05/2010" /></div>
+                            <div><Label htmlFor="ra">RA</Label><Input id="ra" value={editedStudent.ra} onChange={handleChange} /></div>
+                            <div><Label htmlFor="cpf">CPF</Label><Input id="cpf" value={editedStudent.cpf} onChange={handleChange} /></div>
+                            <div><Label htmlFor="rg">RG</Label><Input id="rg" value={editedStudent.rg} onChange={handleChange} /></div>
+                            <div><Label htmlFor="rgIssueDate">Emissão RG</Label><Input id="rgIssueDate" value={editedStudent.rgIssueDate} onChange={handleChange} /></div>
                           </>
                         ) : (
                           <>
                             <div><span className="font-semibold">RA:</span> {student.ra}</div>
                             <div><span className="font-semibold">CPF:</span> {student.cpf}</div>
                             <div><span className="font-semibold">RG:</span> {student.rg}</div>
-                            <div><span className="font-semibold">Emissão RG:</span> 10/05/2010</div>
+                            <div><span className="font-semibold">Emissão RG:</span> {student.rgIssueDate}</div>
                            </>
                         )}
                     </div>
@@ -209,9 +247,7 @@ function StudentProfileDialog({ student, isEditing: initialIsEditing = false }: 
                 <Button onClick={handleSaveClick}>Salvar Alterações</Button>
             </>
         ) : (
-            <DialogTrigger asChild>
-              <Button onClick={handleEditClick}>Editar</Button>
-            </DialogTrigger>
+            <Button onClick={handleEditClick}>Editar</Button>
         )}
       </DialogFooter>
     </DialogContent>
@@ -255,6 +291,7 @@ function AddStudentDialog() {
 
 export default function StudentsPage() {
   const { user } = useUser();
+  const [students, setStudents] = useState<Student[]>(initialStudents);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [viewingStudentId, setViewingStudentId] = useState<string | null>(null);
 
@@ -272,6 +309,15 @@ export default function StudentsPage() {
     setEditingStudentId(null);
     setViewingStudentId(null);
   }
+  
+  const handleSaveStudent = (updatedStudent: Student) => {
+    setStudents(prevStudents => 
+        prevStudents.map(student => 
+            student.id === updatedStudent.id ? updatedStudent : student
+        )
+    );
+    closeDialogs();
+  };
   
   const studentToView = students.find(s => s.id === viewingStudentId);
   const studentToEdit = students.find(s => s.id === editingStudentId);
@@ -398,8 +444,14 @@ export default function StudentsPage() {
                                   {user && user.role === 3 && <DropdownMenuItem className="text-red-500">Excluir</DropdownMenuItem>}
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                            {studentToView?.id === student.id && <StudentProfileDialog student={studentToView} />}
-                            {studentToEdit?.id === student.id && <StudentProfileDialog student={studentToEdit} isEditing={true} />}
+                             {(studentToView?.id === student.id || studentToEdit?.id === student.id) && (
+                                <StudentProfileDialog 
+                                    student={studentToEdit || studentToView!}
+                                    isEditing={!!studentToEdit}
+                                    onSave={handleSaveStudent}
+                                    onClose={closeDialogs}
+                                />
+                             )}
                           </Dialog>
                         </TableCell>
                     </TableRow>
