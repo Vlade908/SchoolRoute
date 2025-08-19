@@ -50,8 +50,10 @@ import { MapPlaceholder } from '@/components/map-placeholder';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
+
 
 type Student = {
   id: string; // Firestore document ID
@@ -267,7 +269,6 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
   }
 
   const handleSave = () => {
-    // Basic validation
     for (const key in studentData) {
         if (studentData[key as keyof typeof studentData] === '') {
             alert(`Por favor, preencha o campo: ${key}`);
@@ -333,12 +334,15 @@ export default function StudentsPage() {
     const unsubscribe = onSnapshot(collection(db, "students"), (snapshot) => {
         const studentsData: Student[] = [];
         snapshot.forEach(doc => {
-            const data = doc.data();
-            studentsData.push({
-                id: doc.id,
-                ...data,
-                enrollmentDate: data.enrollmentDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
-            } as Student);
+            const encryptedData = doc.data();
+            const data = decryptObjectValues(encryptedData) as any;
+            if (data) {
+                studentsData.push({
+                    id: doc.id,
+                    ...data,
+                    enrollmentDate: data.enrollmentDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                } as Student);
+            }
         });
         setStudents(studentsData);
     });
@@ -407,7 +411,8 @@ export default function StudentsPage() {
   const handleSaveStudent = async (updatedStudent: Student) => {
     try {
         const { id, ...studentData } = updatedStudent;
-        await updateDoc(doc(db, "students", id), studentData);
+        const encryptedStudent = encryptObjectValues(studentData);
+        await updateDoc(doc(db, "students", id), encryptedStudent);
         toast({ title: "Sucesso!", description: "Aluno atualizado." });
     } catch(error) {
         console.error("Error updating student:", error);
@@ -422,9 +427,10 @@ export default function StudentsPage() {
         const studentToAdd = {
             ...newStudentData,
             status: 'Não Homologado',
-            enrollmentDate: new Date()
+            enrollmentDate: serverTimestamp()
         };
-        await addDoc(collection(db, "students"), studentToAdd);
+        const encryptedStudent = encryptObjectValues(studentToAdd);
+        await addDoc(collection(db, "students"), encryptedStudent);
         toast({ title: "Sucesso!", description: "Aluno cadastrado." });
     } catch(error) {
         console.error("Error adding student:", error);
@@ -645,5 +651,3 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
-
-    

@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
 
 type CityHall = {
@@ -152,7 +153,6 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Omi
 
     const handleSave = () => {
         if (!name || !cnpj || !city || !state || !hash) {
-            // Basic validation
             alert('Por favor, preencha todos os campos e gere uma chave hash.');
             return;
         }
@@ -211,21 +211,25 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
      useEffect(() => {
         if (!cityHall?.hash) return;
         
-        const q = query(collection(db, "users"), where("hash", "==", cityHall.hash));
+        const q = query(collection(db, "users"), where("encryptedData", ">=", ""));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const cityHallEmployees: Employee[] = [];
             querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                cityHallEmployees.push({
-                    id: doc.id,
-                    uid: data.uid,
-                    name: data.name,
-                    email: data.email,
-                    role: data.role,
-                    status: data.status,
-                    hash: data.hash,
-                    creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
-                });
+                const encryptedData = doc.data();
+                const data = decryptObjectValues(encryptedData) as any;
+                
+                if(data && data.hash === cityHall.hash) {
+                    cityHallEmployees.push({
+                        id: doc.id,
+                        uid: data.uid,
+                        name: data.name,
+                        email: data.email,
+                        role: data.role,
+                        status: data.status,
+                        hash: data.hash,
+                        creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                    });
+                }
             });
             setEmployees(cityHallEmployees);
         });
@@ -255,12 +259,26 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
       if (!updatedEmployee.uid) return;
       try {
         const employeeDocRef = doc(db, 'users', updatedEmployee.uid);
+        
+        const currentDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', updatedEmployee.uid)));
+        if (currentDoc.empty) throw new Error("Funcionário não encontrado.");
+        
+        const encryptedData = currentDoc.docs[0].data();
+        const decryptedData = decryptObjectValues(encryptedData);
+        if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
+          
         const roleString = updatedEmployee.role;
         const roleNumber = typeof roleString === 'string' && roleString.startsWith('Nível') ? parseInt(roleString.split(' ')[1], 10) : updatedEmployee.role;
-        await updateDoc(employeeDocRef, {
+        
+        const dataToUpdate = {
+            ...decryptedData,
             status: updatedEmployee.status,
             role: roleNumber,
-        });
+        };
+
+        const encryptedUpdate = encryptObjectValues(dataToUpdate);
+        await updateDoc(employeeDocRef, encryptedUpdate);
+
         toast({ title: 'Sucesso!', description: 'Funcionário atualizado.'});
       } catch(error) {
         console.error("Error updating employee:", error);
@@ -414,16 +432,19 @@ export default function CityHallsPage() {
             return;
         }
 
-        const fetchCityHalls = async () => {
-            const querySnapshot = await getDocs(collection(db, "city-halls"));
+        const unsubscribe = onSnapshot(collection(db, "city-halls"), (snapshot) => {
             const halls: CityHall[] = [];
-            querySnapshot.forEach((doc) => {
-                halls.push({ id: doc.id, ...doc.data() } as CityHall);
+            snapshot.forEach((doc) => {
+                const encryptedData = doc.data();
+                const data = decryptObjectValues(encryptedData) as any;
+                if(data) {
+                    halls.push({ id: doc.id, ...data } as CityHall);
+                }
             });
             setCityHalls(halls);
-        };
-
-        fetchCityHalls();
+        });
+        
+        return () => unsubscribe();
     }, [user, router]);
 
 
@@ -438,7 +459,8 @@ export default function CityHallsPage() {
     
     const handleAddCityHall = async (newCityHallData: Omit<CityHall, 'id'>) => {
         try {
-            const docRef = await addDoc(collection(db, "city-halls"), newCityHallData);
+            const encryptedData = encryptObjectValues(newCityHallData);
+            const docRef = await addDoc(collection(db, "city-halls"), encryptedData);
             const newCityHall = { id: docRef.id, ...newCityHallData };
             setCityHalls(prev => [...prev, newCityHall]);
             setIsAddModalOpen(false);
@@ -520,5 +542,3 @@ export default function CityHallsPage() {
     </>
   );
 }
-
-    

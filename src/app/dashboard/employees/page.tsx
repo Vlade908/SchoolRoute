@@ -59,8 +59,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
 type Employee = {
     id: string; // Firestore document ID
@@ -149,16 +150,20 @@ export default function EmployeesPage() {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
             const usersData: Employee[] = [];
             snapshot.forEach(doc => {
-                const data = doc.data();
-                usersData.push({
-                    id: doc.id,
-                    uid: data.uid,
-                    name: data.name,
-                    email: data.email,
-                    role: data.role,
-                    status: data.status,
-                    schoolName: data.hash.startsWith('pm') ? 'Secretaria' : 'Escola' // simple logic, can be improved
-                });
+                const encryptedData = doc.data();
+                const data = decryptObjectValues(encryptedData) as any;
+
+                if (data) {
+                    usersData.push({
+                        id: doc.id,
+                        uid: data.uid,
+                        name: data.name,
+                        email: data.email,
+                        role: data.role,
+                        status: data.status,
+                        schoolName: data.hash.startsWith('pm') ? 'Secretaria' : 'Escola'
+                    });
+                }
             });
             setEmployees(usersData);
         });
@@ -175,10 +180,23 @@ export default function EmployeesPage() {
         if (!updatedEmployee.uid) return;
         try {
             const employeeDocRef = doc(db, 'users', updatedEmployee.uid);
-            await updateDoc(employeeDocRef, {
+            
+            const currentDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', updatedEmployee.uid)));
+            if (currentDoc.empty) throw new Error("Funcionário não encontrado.");
+            
+            const encryptedData = currentDoc.docs[0].data();
+            const decryptedData = decryptObjectValues(encryptedData);
+            if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
+            
+            const dataToUpdate = {
+                ...decryptedData,
                 status: updatedEmployee.status,
                 role: updatedEmployee.role,
-            });
+            };
+
+            const encryptedUpdate = encryptObjectValues(dataToUpdate);
+            await updateDoc(employeeDocRef, encryptedUpdate);
+            
             toast({ title: "Sucesso!", description: "Funcionário atualizado." });
         } catch (error) {
             console.error("Failed to update employee:", error);
@@ -195,7 +213,17 @@ export default function EmployeesPage() {
 
         try {
             const employeeDocRef = doc(db, 'users', employeeToUpdate.uid);
-            await updateDoc(employeeDocRef, { status: 'Inativo' });
+            const currentDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', employeeToUpdate.uid)));
+            if (currentDoc.empty) throw new Error("Funcionário não encontrado.");
+
+            const encryptedData = currentDoc.docs[0].data();
+            const decryptedData = decryptObjectValues(encryptedData);
+            if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
+            
+            const dataToUpdate = { ...decryptedData, status: 'Inativo' };
+            const encryptedUpdate = encryptObjectValues(dataToUpdate);
+
+            await updateDoc(employeeDocRef, encryptedUpdate);
             toast({ title: "Funcionário Desativado", description: "O acesso do funcionário foi revogado." });
         } catch (error) {
              console.error("Failed to deactivate employee:", error);
@@ -320,5 +348,3 @@ export default function EmployeesPage() {
     </Card>
   );
 }
-
-    

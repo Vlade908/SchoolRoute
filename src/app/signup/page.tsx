@@ -19,6 +19,7 @@ import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
+import { encryptObjectValues } from '@/lib/crypto';
 
 
 export default function SignupPage() {
@@ -50,27 +51,25 @@ export default function SignupPage() {
 
       const isSecretaria = hash.toLowerCase().startsWith('pm');
 
-      // Default role for school employee is 'Pendente' approval. Role 1 is view only, 2 can add students.
-      // A Secretaria user (admin) must approve and set the definitive role.
-      // Secretaria users are auto-approved with role 3.
       const userProfile = {
         uid: user.uid,
         name: name,
         email: email,
         hash: hash,
-        role: isSecretaria ? 3 : 1, // Default to lowest privilege for schools
+        role: isSecretaria ? 3 : 1, 
         status: isSecretaria ? 'Aprovado' : 'Pendente',
         creationDate: serverTimestamp()
       };
       
-      await setDoc(doc(db, "users", user.uid), userProfile);
+      const encryptedProfile = encryptObjectValues(userProfile);
+      
+      await setDoc(doc(db, "users", user.uid), encryptedProfile);
       
       toast({
           title: "Conta Criada!",
           description: "Sua conta foi criada com sucesso. Redirecionando...",
       });
       
-      // onAuthStateChanged in DashboardLayout will handle the session and redirect.
       router.push('/dashboard');
 
     } catch (error: any) {
@@ -166,5 +165,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -22,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { decryptObjectValues } from '@/lib/crypto';
 
 
 type User = {
@@ -141,31 +143,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const userProfile = {
-            uid: firebaseUser.uid,
-            name: userData.name,
-            email: firebaseUser.email,
-            role: userData.role,
-            schoolId: userData.schoolId || null,
-          };
-          setUser(userProfile);
+          const encryptedData = userDoc.data();
+          const userData = decryptObjectValues(encryptedData) as any;
+          if (userData) {
+            const userProfile = {
+              uid: firebaseUser.uid,
+              name: userData.name,
+              email: firebaseUser.email,
+              role: userData.role,
+              schoolId: userData.schoolId || null,
+            };
+            setUser(userProfile);
+          } else {
+             await auth.signOut();
+             setUser(null);
+             router.push('/');
+          }
         } else {
-          // This case might happen if a user is created in Auth but the Firestore doc creation fails.
-          // Or if there's a delay in doc creation. We'll log them out to be safe.
           await auth.signOut();
           setUser(null);
           router.push('/');
         }
       } else {
-        // No user is signed in.
         setUser(null);
         router.push('/');
       }
       setLoading(false);
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [router]);
 
@@ -173,7 +178,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = async () => {
     try {
         await auth.signOut();
-        // The onAuthStateChanged listener will handle setting user to null and redirecting
     } catch (error) {
         console.error("Logout failed:", error);
     }

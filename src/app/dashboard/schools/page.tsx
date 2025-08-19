@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, doc, updateDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
 
 type School = {
@@ -198,21 +199,24 @@ function SchoolDetailsDialog({ school }: { school: School }) {
     useEffect(() => {
         if (!school?.hash) return;
         
-        const q = query(collection(db, "users"), where("hash", "==", school.hash));
+        const q = query(collection(db, "users"), where("encryptedData", ">=", "")); // A dummy where to allow orderBy
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const schoolEmployees: Employee[] = [];
             querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                schoolEmployees.push({
-                    id: doc.id,
-                    uid: data.uid,
-                    name: data.name,
-                    email: data.email,
-                    role: data.role,
-                    status: data.status,
-                    hash: data.hash,
-                    creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
-                });
+                const encryptedData = doc.data();
+                const data = decryptObjectValues(encryptedData) as any;
+                if (data && data.hash === school.hash) {
+                    schoolEmployees.push({
+                        id: doc.id,
+                        uid: data.uid,
+                        name: data.name,
+                        email: data.email,
+                        role: data.role,
+                        status: data.status,
+                        hash: data.hash,
+                        creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                    });
+                }
             });
             setEmployees(schoolEmployees);
         });
@@ -245,10 +249,23 @@ function SchoolDetailsDialog({ school }: { school: School }) {
           const roleString = updatedEmployee.role;
           const roleNumber = typeof roleString === 'string' && roleString.startsWith('Nível') ? parseInt(roleString.split(' ')[1], 10) : updatedEmployee.role;
 
-          await updateDoc(employeeDocRef, {
+          // Fetch current data to merge
+          const currentDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', updatedEmployee.uid)));
+          if (currentDoc.empty) throw new Error("Funcionário não encontrado.");
+          
+          const encryptedData = currentDoc.docs[0].data();
+          const decryptedData = decryptObjectValues(encryptedData);
+          if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
+          
+          const dataToUpdate = {
+              ...decryptedData,
               status: updatedEmployee.status,
               role: roleNumber,
-          });
+          };
+          
+          const encryptedUpdate = encryptObjectValues(dataToUpdate);
+
+          await updateDoc(employeeDocRef, encryptedUpdate);
           toast({ title: 'Sucesso!', description: 'Funcionário atualizado.'});
         } catch(error) {
           console.error("Error updating employee:", error);
@@ -400,15 +417,19 @@ export default function SchoolsPage() {
             return;
         }
 
-        const fetchSchools = async () => {
-            const querySnapshot = await getDocs(collection(db, "schools"));
+        const unsubscribe = onSnapshot(collection(db, "schools"), (snapshot) => {
             const schoolsData: School[] = [];
-            querySnapshot.forEach((doc) => {
-                schoolsData.push({ id: doc.id, ...doc.data() } as School);
+            snapshot.forEach((doc) => {
+                const encryptedData = doc.data();
+                const data = decryptObjectValues(encryptedData) as any;
+                if (data) {
+                    schoolsData.push({ id: doc.id, ...data } as School);
+                }
             });
             setSchools(schoolsData);
-        };
-        fetchSchools();
+        });
+
+        return () => unsubscribe();
     }, [user, router]);
 
 
@@ -423,7 +444,8 @@ export default function SchoolsPage() {
 
     const handleSaveSchool = async (schoolData: Omit<School, 'id'>) => {
         try {
-            const docRef = await addDoc(collection(db, "schools"), schoolData);
+            const encryptedSchool = encryptObjectValues(schoolData);
+            const docRef = await addDoc(collection(db, "schools"), encryptedSchool);
             setSchools(prev => [...prev, { id: docRef.id, ...schoolData }]);
             setAddSchoolModalOpen(false);
             toast({ title: 'Sucesso!', description: 'Escola cadastrada com sucesso.'});
@@ -510,5 +532,3 @@ export default function SchoolsPage() {
     </>
   );
 }
-
-    
