@@ -45,6 +45,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useUser } from '@/contexts/user-context';
 import { MapPlaceholder } from '@/components/map-placeholder';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 // Mock data
 const students = Array.from({ length: 25 }, (_, i) => ({
@@ -88,7 +90,18 @@ function StudentProfileDialog({ student, isEditing: initialIsEditing = false }: 
                   {isEditing ? (
                     <>
                       <div><Label htmlFor="student-name">Nome</Label><Input id="student-name" defaultValue={student.name} /></div>
-                      <div><Label htmlFor="student-status">Status</Label><Input id="student-status" defaultValue={student.status} /></div>
+                      <div>
+                        <Label htmlFor="student-status">Status</Label>
+                          <Select defaultValue={student.status}>
+                              <SelectTrigger id="student-status">
+                                  <SelectValue placeholder="Selecione o status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="Homologado">Homologado</SelectItem>
+                                  <SelectItem value="Não Homologado">Não Homologado</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
                       <div><Label htmlFor="responsible-name">Responsável</Label><Input id="responsible-name" defaultValue="Maria da Silva" /></div>
                       <div><Label htmlFor="contact-phone">Contato</Label><Input id="contact-phone" defaultValue="(11) 98765-4321" /></div>
                       <div><Label htmlFor="school-year">Série/Ano</Label><Input id="school-year" defaultValue={student.schoolYear} /></div>
@@ -196,7 +209,9 @@ function StudentProfileDialog({ student, isEditing: initialIsEditing = false }: 
                 <Button onClick={handleSaveClick}>Salvar Alterações</Button>
             </>
         ) : (
-            <Button onClick={handleEditClick}>Editar</Button>
+            <DialogTrigger asChild>
+              <Button onClick={handleEditClick}>Editar</Button>
+            </DialogTrigger>
         )}
       </DialogFooter>
     </DialogContent>
@@ -240,23 +255,26 @@ function AddStudentDialog() {
 
 export default function StudentsPage() {
   const { user } = useUser();
-  const [editingStudent, setEditingStudent] = useState<typeof students[0] | null>(null);
-  const [viewingStudent, setViewingStudent] = useState<typeof students[0] | null>(null);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [viewingStudentId, setViewingStudentId] = useState<string | null>(null);
 
-  const openDialog = (student: typeof students[0], isEditing: boolean) => {
+  const openDialog = (studentId: string, isEditing: boolean) => {
     if (isEditing) {
-      setEditingStudent(student);
-      setViewingStudent(null);
+      setEditingStudentId(studentId);
+      setViewingStudentId(null);
     } else {
-      setViewingStudent(student);
-      setEditingStudent(null);
+      setViewingStudentId(studentId);
+      setEditingStudentId(null);
     }
   }
 
   const closeDialogs = () => {
-    setEditingStudent(null);
-    setViewingStudent(null);
+    setEditingStudentId(null);
+    setViewingStudentId(null);
   }
+  
+  const studentToView = students.find(s => s.id === viewingStudentId);
+  const studentToEdit = students.find(s => s.id === editingStudentId);
 
   return (
     <Tabs defaultValue="all">
@@ -355,35 +373,39 @@ export default function StudentsPage() {
                         <TableCell className="hidden md:table-cell">{student.schoolYear} / {student.class}</TableCell>
                         <TableCell className="hidden md:table-cell">{student.ra}</TableCell>
                         <TableCell>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                            <Button
-                                aria-haspopup="true"
-                                size="icon"
-                                variant="ghost"
-                            >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                            </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                            <DropdownMenuItem onSelect={() => openDialog(student, false)}>Ver Perfil</DropdownMenuItem>
-                            {user && user.role >= 2 && <DropdownMenuItem onSelect={() => openDialog(student, true)}>Editar</DropdownMenuItem>}
-                            {user && user.role === 3 && <DropdownMenuItem className="text-red-500">Excluir</DropdownMenuItem>}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                          <Dialog onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                <Button
+                                    aria-haspopup="true"
+                                    size="icon"
+                                    variant="ghost"
+                                >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Toggle menu</span>
+                                </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                  <DialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={() => openDialog(student.id, false)}>Ver Perfil</DropdownMenuItem>
+                                  </DialogTrigger>
+                                  {user && user.role >= 2 && 
+                                    <DialogTrigger asChild>
+                                      <DropdownMenuItem onSelect={() => openDialog(student.id, true)}>Editar</DropdownMenuItem>
+                                    </DialogTrigger>
+                                  }
+                                  {user && user.role === 3 && <DropdownMenuItem className="text-red-500">Excluir</DropdownMenuItem>}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            {studentToView?.id === student.id && <StudentProfileDialog student={studentToView} />}
+                            {studentToEdit?.id === student.id && <StudentProfileDialog student={studentToEdit} isEditing={true} />}
+                          </Dialog>
                         </TableCell>
                     </TableRow>
                 ))}
               </TableBody>
             </Table>
-            <Dialog open={!!editingStudent} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
-              {editingStudent && <StudentProfileDialog student={editingStudent} isEditing={true} />}
-            </Dialog>
-            <Dialog open={!!viewingStudent} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
-              {viewingStudent && <StudentProfileDialog student={viewingStudent} />}
-            </Dialog>
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
