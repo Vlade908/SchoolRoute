@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   File,
   ListFilter,
@@ -70,7 +70,7 @@ type Student = typeof initialStudents[0];
 
 function StudentProfileDialog({ 
   student, 
-  isEditing: initialIsEditing = false,
+  isEditing = false,
   onSave,
   onClose,
 }: { 
@@ -79,10 +79,16 @@ function StudentProfileDialog({
   onSave: (updatedStudent: Student) => void,
   onClose: () => void,
 }) {
-  const [isEditing, setIsEditing] = useState(initialIsEditing);
   const [editedStudent, setEditedStudent] = useState<Student>({ ...student });
+  const [currentIsEditing, setCurrentIsEditing] = useState(isEditing);
 
-  const handleEditClick = () => setIsEditing(true);
+  useEffect(() => {
+    setEditedStudent({ ...student });
+    setCurrentIsEditing(isEditing);
+  }, [student, isEditing]);
+
+
+  const handleEditClick = () => setCurrentIsEditing(true);
 
   const handleSaveClick = () => {
     onSave(editedStudent);
@@ -90,10 +96,10 @@ function StudentProfileDialog({
   };
 
   const handleCancelClick = () => {
-    if (initialIsEditing) {
+    if (isEditing) { // If it was opened in edit mode initially
         onClose();
     } else {
-        setIsEditing(false);
+        setCurrentIsEditing(false);
         setEditedStudent({ ...student }); // Reset changes
     }
   };
@@ -111,7 +117,7 @@ function StudentProfileDialog({
   return (
     <DialogContent className="sm:max-w-[800px]">
       <DialogHeader>
-        <DialogTitle>{isEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
+        <DialogTitle>{currentIsEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
         <DialogDescription>{student.name} - {student.ra}</DialogDescription>
       </DialogHeader>
       <Tabs defaultValue="data">
@@ -125,7 +131,7 @@ function StudentProfileDialog({
           <Card>
             <CardContent className="space-y-4 pt-6">
                <div className="grid grid-cols-2 gap-4">
-                  {isEditing ? (
+                  {currentIsEditing ? (
                     <>
                       <div><Label htmlFor="name">Nome</Label><Input id="name" value={editedStudent.name} onChange={handleChange} /></div>
                       <div>
@@ -165,7 +171,7 @@ function StudentProfileDialog({
             <Card>
                 <CardContent className="space-y-4 pt-6">
                     <div className="grid grid-cols-2 gap-4">
-                        {isEditing ? (
+                        {currentIsEditing ? (
                           <>
                             <div><Label htmlFor="ra">RA</Label><Input id="ra" value={editedStudent.ra} onChange={handleChange} /></div>
                             <div><Label htmlFor="cpf">CPF</Label><Input id="cpf" value={editedStudent.cpf} onChange={handleChange} /></div>
@@ -241,7 +247,7 @@ function StudentProfileDialog({
         </TabsContent>
       </Tabs>
       <DialogFooter>
-        {isEditing ? (
+        {currentIsEditing ? (
             <>
                 <Button variant="outline" onClick={handleCancelClick}>Cancelar</Button>
                 <Button onClick={handleSaveClick}>Salvar Alterações</Button>
@@ -293,6 +299,41 @@ export default function StudentsPage() {
   const { user } = useUser();
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [activeStudent, setActiveStudent] = useState<{student: Student, isEditing: boolean} | null>(null);
+
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [schoolTypeFilter, setSchoolTypeFilter] = useState({
+    estaduais: true,
+    municipais: true,
+  });
+
+  const filteredStudents = useMemo(() => {
+    return students.filter(student => {
+      // Status filter (Tabs)
+      if (activeTab === 'active' && student.status !== 'Homologado') return false;
+      if (activeTab === 'draft' && student.status !== 'Não Homologado') return false;
+
+      // School Type filter (Dropdown)
+      const isEstadual = student.school.toLowerCase().includes('estadual');
+      const isMunicipal = student.school.toLowerCase().includes('municipal');
+      if (!schoolTypeFilter.estaduais && isEstadual) return false;
+      if (!schoolTypeFilter.municipais && isMunicipal) return false;
+      if (!schoolTypeFilter.municipais && !schoolTypeFilter.estaduais && (isEstadual || isMunicipal)) return false;
+
+
+      // Search term filter
+      if (searchTerm) {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        return (
+          student.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+          student.ra.toLowerCase().includes(lowerCaseSearchTerm) ||
+          student.cpf.toLowerCase().includes(lowerCaseSearchTerm)
+        );
+      }
+
+      return true;
+    });
+  }, [students, activeTab, searchTerm, schoolTypeFilter]);
  
   const handleOpenDialog = (student: Student, isEditing: boolean) => {
     setActiveStudent({ student, isEditing });
@@ -311,13 +352,17 @@ export default function StudentsPage() {
     handleCloseDialog();
   };
 
+  const handleSchoolTypeChange = (type: 'estaduais' | 'municipais', checked: boolean) => {
+    setSchoolTypeFilter(prev => ({ ...prev, [type]: checked }));
+  }
+
   return (
-    <Tabs defaultValue="all">
+    <Tabs defaultValue="all" onValueChange={setActiveTab}>
       <div className="flex items-center">
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
-          <TabsTrigger value="active" className="text-green-600">Homologados</TabsTrigger>
-          <TabsTrigger value="draft" className="text-orange-500">Não Homologados</TabsTrigger>
+          <TabsTrigger value="active" >Homologados</TabsTrigger>
+          <TabsTrigger value="draft" >Não Homologados</TabsTrigger>
         </TabsList>
         <div className="ml-auto flex items-center gap-2">
            <div className="relative ml-auto flex-1 md:grow-0">
@@ -326,6 +371,8 @@ export default function StudentsPage() {
               type="search"
               placeholder="Buscar por RA, CPF, Nome..."
               className="w-full rounded-lg bg-card pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <DropdownMenu>
@@ -338,12 +385,20 @@ export default function StudentsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
+              <DropdownMenuLabel>Filtrar por tipo de escola</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem checked>
+              <DropdownMenuCheckboxItem 
+                checked={schoolTypeFilter.estaduais}
+                onCheckedChange={(checked) => handleSchoolTypeChange('estaduais', !!checked)}
+              >
                 Estaduais
               </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem>Municipais</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem 
+                checked={schoolTypeFilter.municipais}
+                onCheckedChange={(checked) => handleSchoolTypeChange('municipais', !!checked)}
+              >
+                Municipais
+              </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button size="sm" variant="outline" className="h-10 gap-1">
@@ -367,7 +422,7 @@ export default function StudentsPage() {
           )}
         </div>
       </div>
-      <TabsContent value="all">
+      <TabsContent value={activeTab}>
         <Card>
           <CardHeader>
             <CardTitle>Alunos</CardTitle>
@@ -394,7 +449,7 @@ export default function StudentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {students.map((student) => (
+                {filteredStudents.map((student) => (
                     <TableRow key={student.id}>
                         <TableCell className="font-medium">{student.name}</TableCell>
                         <TableCell>
@@ -436,7 +491,7 @@ export default function StudentsPage() {
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
-              Mostrando <strong>1-10</strong> de <strong>32</strong> produtos
+              Mostrando <strong>{filteredStudents.length}</strong> de <strong>{students.length}</strong> alunos.
             </div>
           </CardFooter>
         </Card>
