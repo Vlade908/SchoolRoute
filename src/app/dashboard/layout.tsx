@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   Bus,
@@ -30,6 +30,8 @@ type User = {
 
 function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
   const { user } = useUser();
+  const pathname = usePathname();
+
   if (!user) return null;
 
   const navLinks = [
@@ -44,12 +46,17 @@ function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
   return (
     <nav className={cn('flex flex-col gap-2', className)}>
       {navLinks.map(({ href, label, icon: Icon }) => (
-        <Link key={href} href={href}>
-          <Button variant="ghost" className="w-full justify-start gap-2">
+        <Button
+          key={href}
+          asChild
+          variant={pathname === href ? 'default' : 'ghost'}
+          className="w-full justify-start gap-2"
+        >
+          <Link href={href}>
             <Icon className="h-4 w-4" />
             {label}
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       ))}
     </nav>
   );
