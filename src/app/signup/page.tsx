@@ -14,35 +14,60 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { auth, db } from '@/lib/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from "firebase/firestore"; 
+import { useToast } from '@/hooks/use-toast';
+
 
 export default function SignupPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [name, setName] = useState('');
   const [hash, setHash] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    // This is a mock signup. In a real app, you would send this to your server
-    // to create a new user account, which would likely start in a 'Pendente' state.
-    console.log({ name, hash, email, password });
+    setLoading(true);
     
-    // For demo purposes, we'll create a new user and log them in directly.
-    // This new user will have a 'pending' status and need approval from an admin.
-    const newUser = {
-      name: name,
-      email: email,
-      role: 1, // Lowest level, needs approval
-      schoolId: null, // This would be determined by the hash on the backend
-    };
-    
-    // In a real app, you wouldn't log the user in directly. 
-    // You'd probably show a message saying their account is pending approval.
-    // But for the demo, we'll log them in to show the flow.
-    localStorage.setItem('schoolRouteUser', JSON.stringify(newUser));
-    router.push('/dashboard');
-    // You might want to use a toast notification here to inform the user.
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const isSecretaria = email.toLowerCase().includes('secretaria') || hash.toLowerCase().startsWith('pm');
+
+      // Store additional user info in Firestore
+      const userProfile = {
+        uid: user.uid,
+        name: name,
+        email: email,
+        hash: hash,
+        role: isSecretaria ? 3 : 1, // 3 for Secretaria, 1 for school employee (pending)
+        status: 'Pendente' // All new accounts are pending
+      };
+      
+      await setDoc(doc(db, "users", user.uid), userProfile);
+      
+      toast({
+          title: "Conta Criada!",
+          description: "Sua conta foi criada e está pendente de aprovação.",
+      });
+
+      router.push('/');
+
+    } catch (error: any) {
+       console.error("Signup failed:", error);
+       toast({
+          variant: "destructive",
+          title: "Erro no Cadastro",
+          description: error.message || "Não foi possível criar a conta. Verifique os dados.",
+       });
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
@@ -67,15 +92,17 @@ export default function SignupPage() {
                 required 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="hash">Chave da Escola (Hash)</Label>
+              <Label htmlFor="hash">Chave da Escola ou Prefeitura (Hash)</Label>
               <Input 
                 id="hash" 
                 required 
                 value={hash}
                 onChange={(e) => setHash(e.target.value)}
+                disabled={loading}
                 />
             </div>
             <div className="space-y-2">
@@ -87,6 +114,7 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -97,11 +125,11 @@ export default function SignupPage() {
                 required 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
               />
             </div>
-            <Button type="submit" className="w-full">
-              <UserPlus className="mr-2 h-4 w-4" />
-              Criar Conta
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Criando conta..." : <><UserPlus className="mr-2 h-4 w-4" /> Criar Conta</>}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

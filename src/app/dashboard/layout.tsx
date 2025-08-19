@@ -15,15 +15,19 @@ import {
 } from 'lucide-react';
 import { useUser, UserProvider } from '@/contexts/user-context';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { UserNav } from '@/components/user-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
+import { auth, db } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+
 
 type User = {
+  uid: string;
   name: string;
-  email: string;
+  email: string | null;
   role: number;
   schoolId: string | null;
 };
@@ -130,19 +134,49 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('schoolRouteUser');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    } else {
-      router.push('/');
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const userProfile = {
+            uid: firebaseUser.uid,
+            name: userData.name,
+            email: firebaseUser.email,
+            role: userData.role,
+            schoolId: userData.schoolId || null,
+          };
+          setUser(userProfile);
+          localStorage.setItem('schoolRouteUser', JSON.stringify(userProfile));
+        } else {
+          // User exists in Auth but not in Firestore, log them out.
+          await auth.signOut();
+          setUser(null);
+          localStorage.removeItem('schoolRouteUser');
+          router.push('/');
+        }
+      } else {
+        setUser(null);
+        localStorage.removeItem('schoolRouteUser');
+        router.push('/');
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('schoolRouteUser');
-    setUser(null);
-    router.push('/');
+
+  const handleLogout = async () => {
+    try {
+        await auth.signOut();
+        localStorage.removeItem('schoolRouteUser');
+        setUser(null);
+        router.push('/');
+    } catch (error) {
+        console.error("Logout failed:", error);
+    }
   };
 
   if (loading) {

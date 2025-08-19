@@ -2,35 +2,60 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bus, KeyRound, LogIn } from 'lucide-react';
+import { Bus, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { auth, db } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // This is a mock login. In a real app, you would validate credentials against a server.
-    // For this demo, we'll log in as 'Secretaria' if the email contains 'secretaria',
-    // otherwise, we log in as a standard school employee.
-    
-    const isSecretaria = email.toLowerCase().includes('secretaria');
+    setLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-    const user = {
-      name: isSecretaria ? 'Usuário Secretaria' : 'Funcionário Escola',
-      email: email,
-      role: isSecretaria ? 3 : 2, // 3 for Secretaria, 2 for school employee
-      schoolId: isSecretaria ? null : 'school-123',
-    };
-    
-    localStorage.setItem('schoolRouteUser', JSON.stringify(user));
-    router.push('/dashboard');
+      // Get user profile from Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const userProfile = {
+          uid: user.uid,
+          name: userData.name,
+          email: user.email,
+          role: userData.role,
+          schoolId: userData.schoolId,
+          hash: userData.hash,
+        };
+        localStorage.setItem('schoolRouteUser', JSON.stringify(userProfile));
+        router.push('/dashboard');
+      } else {
+         throw new Error("User profile not found.");
+      }
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro de Login",
+        description: error.message || "Ocorreu um erro. Por favor, tente novamente.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -57,6 +82,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -67,11 +93,11 @@ export default function LoginPage() {
                 required 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
               />
             </div>
-            <Button type="submit" className="w-full">
-              <LogIn className="mr-2 h-4 w-4" />
-              Entrar
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Entrando..." : <><LogIn className="mr-2 h-4 w-4" /> Entrar</>}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
@@ -82,9 +108,6 @@ export default function LoginPage() {
           </div>
         </CardContent>
       </Card>
-       <footer className="mt-8 text-sm text-muted-foreground">
-        <p>Este é um ambiente de demonstração. Use qualquer e-mail/senha para logar.</p>
-      </footer>
     </div>
   );
 }

@@ -3,8 +3,9 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 
 type User = {
+  uid: string;
   name: string;
-  email: string;
+  email: string | null;
   role: number;
   schoolId: string | null;
 };
