@@ -41,9 +41,10 @@ import {
 } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { useUser } from '@/contexts/user-context';
 import { MapPlaceholder } from '@/components/map-placeholder';
+import { Label } from '@/components/ui/label';
 
 // Mock data
 const students = Array.from({ length: 25 }, (_, i) => ({
@@ -59,11 +60,18 @@ const students = Array.from({ length: 25 }, (_, i) => ({
   enrollmentDate: new Date(2024, 0, 15 + i).toLocaleDateString('pt-BR'),
 }));
 
-function StudentProfileDialog({ student }: { student: typeof students[0] }) {
+function StudentProfileDialog({ student, isEditing: initialIsEditing = false }: { student: typeof students[0], isEditing?: boolean }) {
+  const [isEditing, setIsEditing] = useState(initialIsEditing);
+
+  const handleEditClick = () => setIsEditing(true);
+  const handleSaveClick = () => setIsEditing(false); // In a real app, you'd save data here
+  const handleCancelClick = () => setIsEditing(false);
+
+
   return (
     <DialogContent className="sm:max-w-[800px]">
       <DialogHeader>
-        <DialogTitle>Perfil do Aluno</DialogTitle>
+        <DialogTitle>{isEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
         <DialogDescription>{student.name} - {student.ra}</DialogDescription>
       </DialogHeader>
       <Tabs defaultValue="data">
@@ -76,15 +84,29 @@ function StudentProfileDialog({ student }: { student: typeof students[0] }) {
         <TabsContent value="data" className="pt-4">
           <Card>
             <CardContent className="space-y-4 pt-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div><span className="font-semibold">Nome:</span> {student.name}</div>
-                <div><span className="font-semibold">Status:</span> <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className="bg-green-600">{student.status}</Badge></div>
-                <div><span className="font-semibold">Responsável:</span> Maria da Silva</div>
-                <div><span className="font-semibold">Contato:</span> (11) 98765-4321</div>
-                <div><span className="font-semibold">Série/Ano:</span> {student.schoolYear}</div>
-                <div><span className="font-semibold">Classe:</span> {student.class}</div>
-                <div className="col-span-2"><span className="font-semibold">Escola:</span> {student.school}</div>
-              </div>
+               <div className="grid grid-cols-2 gap-4">
+                  {isEditing ? (
+                    <>
+                      <div><Label htmlFor="student-name">Nome</Label><Input id="student-name" defaultValue={student.name} /></div>
+                      <div><Label htmlFor="student-status">Status</Label><Input id="student-status" defaultValue={student.status} /></div>
+                      <div><Label htmlFor="responsible-name">Responsável</Label><Input id="responsible-name" defaultValue="Maria da Silva" /></div>
+                      <div><Label htmlFor="contact-phone">Contato</Label><Input id="contact-phone" defaultValue="(11) 98765-4321" /></div>
+                      <div><Label htmlFor="school-year">Série/Ano</Label><Input id="school-year" defaultValue={student.schoolYear} /></div>
+                      <div><Label htmlFor="student-class">Classe</Label><Input id="student-class" defaultValue={student.class} /></div>
+                      <div className="col-span-2"><Label htmlFor="school-name">Escola</Label><Input id="school-name" defaultValue={student.school} /></div>
+                    </>
+                  ) : (
+                    <>
+                      <div><span className="font-semibold">Nome:</span> {student.name}</div>
+                      <div><span className="font-semibold">Status:</span> <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className={student.status === 'Homologado' ? 'bg-green-600' : ''}>{student.status}</Badge></div>
+                      <div><span className="font-semibold">Responsável:</span> Maria da Silva</div>
+                      <div><span className="font-semibold">Contato:</span> (11) 98765-4321</div>
+                      <div><span className="font-semibold">Série/Ano:</span> {student.schoolYear}</div>
+                      <div><span className="font-semibold">Classe:</span> {student.class}</div>
+                      <div className="col-span-2"><span className="font-semibold">Escola:</span> {student.school}</div>
+                    </>
+                  )}
+               </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -92,10 +114,21 @@ function StudentProfileDialog({ student }: { student: typeof students[0] }) {
             <Card>
                 <CardContent className="space-y-4 pt-6">
                     <div className="grid grid-cols-2 gap-4">
-                        <div><span className="font-semibold">RA:</span> {student.ra}</div>
-                        <div><span className="font-semibold">CPF:</span> {student.cpf}</div>
-                        <div><span className="font-semibold">RG:</span> {student.rg}</div>
-                        <div><span className="font-semibold">Emissão RG:</span> 10/05/2010</div>
+                        {isEditing ? (
+                          <>
+                            <div><Label htmlFor="student-ra">RA</Label><Input id="student-ra" defaultValue={student.ra} /></div>
+                            <div><Label htmlFor="student-cpf">CPF</Label><Input id="student-cpf" defaultValue={student.cpf} /></div>
+                            <div><Label htmlFor="student-rg">RG</Label><Input id="student-rg" defaultValue={student.rg} /></div>
+                            <div><Label htmlFor="rg-issue-date">Emissão RG</Label><Input id="rg-issue-date" defaultValue="10/05/2010" /></div>
+                          </>
+                        ) : (
+                          <>
+                            <div><span className="font-semibold">RA:</span> {student.ra}</div>
+                            <div><span className="font-semibold">CPF:</span> {student.cpf}</div>
+                            <div><span className="font-semibold">RG:</span> {student.rg}</div>
+                            <div><span className="font-semibold">Emissão RG:</span> 10/05/2010</div>
+                           </>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -156,6 +189,16 @@ function StudentProfileDialog({ student }: { student: typeof students[0] }) {
             </Card>
         </TabsContent>
       </Tabs>
+      <DialogFooter>
+        {isEditing ? (
+            <>
+                <Button variant="outline" onClick={handleCancelClick}>Cancelar</Button>
+                <Button onClick={handleSaveClick}>Salvar Alterações</Button>
+            </>
+        ) : (
+            <Button onClick={handleEditClick}>Editar</Button>
+        )}
+      </DialogFooter>
     </DialogContent>
   );
 }
@@ -197,6 +240,23 @@ function AddStudentDialog() {
 
 export default function StudentsPage() {
   const { user } = useUser();
+  const [editingStudent, setEditingStudent] = useState<typeof students[0] | null>(null);
+  const [viewingStudent, setViewingStudent] = useState<typeof students[0] | null>(null);
+
+  const openDialog = (student: typeof students[0], isEditing: boolean) => {
+    if (isEditing) {
+      setEditingStudent(student);
+      setViewingStudent(null);
+    } else {
+      setViewingStudent(student);
+      setEditingStudent(null);
+    }
+  }
+
+  const closeDialogs = () => {
+    setEditingStudent(null);
+    setViewingStudent(null);
+  }
 
   return (
     <Tabs defaultValue="all">
@@ -282,8 +342,7 @@ export default function StudentsPage() {
               </TableHeader>
               <TableBody>
                 {students.map((student) => (
-                   <Dialog key={student.id}>
-                    <TableRow>
+                    <TableRow key={student.id}>
                         <TableCell className="font-medium">{student.name}</TableCell>
                         <TableCell>
                         <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className={student.status === 'Homologado' ? 'bg-green-600' : ''}>
@@ -309,18 +368,22 @@ export default function StudentsPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                            <DialogTrigger asChild><DropdownMenuItem>Ver Perfil</DropdownMenuItem></DialogTrigger>
-                            {user && user.role >= 2 && <DialogTrigger asChild><DropdownMenuItem>Editar</DropdownMenuItem></DialogTrigger>}
+                            <DropdownMenuItem onSelect={() => openDialog(student, false)}>Ver Perfil</DropdownMenuItem>
+                            {user && user.role >= 2 && <DropdownMenuItem onSelect={() => openDialog(student, true)}>Editar</DropdownMenuItem>}
                             {user && user.role === 3 && <DropdownMenuItem className="text-red-500">Excluir</DropdownMenuItem>}
                             </DropdownMenuContent>
                         </DropdownMenu>
                         </TableCell>
                     </TableRow>
-                    <StudentProfileDialog student={student} />
-                   </Dialog>
                 ))}
               </TableBody>
             </Table>
+            <Dialog open={!!editingStudent} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
+              {editingStudent && <StudentProfileDialog student={editingStudent} isEditing={true} />}
+            </Dialog>
+            <Dialog open={!!viewingStudent} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
+              {viewingStudent && <StudentProfileDialog student={viewingStudent} />}
+            </Dialog>
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
