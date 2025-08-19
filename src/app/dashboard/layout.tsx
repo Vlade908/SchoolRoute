@@ -73,9 +73,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
 
   if (!user) {
+    // This will be shown briefly while the UserProvider figures out the auth state.
+    // The actual redirect is handled in the DashboardLayout's useEffect.
     return (
       <div className="flex h-screen items-center justify-center">
-        <p>Redirecionando para o login...</p>
+        <p>Verificando autenticação...</p>
       </div>
     );
   }
@@ -148,22 +150,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             schoolId: userData.schoolId || null,
           };
           setUser(userProfile);
-          localStorage.setItem('schoolRouteUser', JSON.stringify(userProfile));
         } else {
-          // User exists in Auth but not in Firestore, log them out.
+          // This case might happen if a user is created in Auth but the Firestore doc creation fails.
+          // Or if there's a delay in doc creation. We'll log them out to be safe.
           await auth.signOut();
           setUser(null);
-          localStorage.removeItem('schoolRouteUser');
           router.push('/');
         }
       } else {
+        // No user is signed in.
         setUser(null);
-        localStorage.removeItem('schoolRouteUser');
         router.push('/');
       }
       setLoading(false);
     });
 
+    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [router]);
 
@@ -171,9 +173,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = async () => {
     try {
         await auth.signOut();
-        localStorage.removeItem('schoolRouteUser');
-        setUser(null);
-        router.push('/');
+        // The onAuthStateChanged listener will handle setting user to null and redirecting
     } catch (error) {
         console.error("Logout failed:", error);
     }

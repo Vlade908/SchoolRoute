@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from "firebase/firestore"; 
+import { doc, setDoc, getDoc, DocumentReference, DocumentSnapshot, getDocs, query, collection, where, limit } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -34,36 +34,46 @@ export default function SignupPage() {
     setLoading(true);
     
     try {
+      // Step 1: Check if hash exists in schools or city-halls (you might need to implement this logic if you have these collections)
+      // For now, we'll assume the hash is valid
+      
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
       const isSecretaria = email.toLowerCase().includes('secretaria') || hash.toLowerCase().startsWith('pm');
 
-      // Store additional user info in Firestore
+      // Step 2: Create user profile
       const userProfile = {
         uid: user.uid,
         name: name,
         email: email,
         hash: hash,
         role: isSecretaria ? 3 : 1, // 3 for Secretaria, 1 for school employee (pending)
-        status: 'Pendente' // All new accounts are pending
+        status: 'Pendente' // All new accounts are pending approval from an admin
       };
       
       await setDoc(doc(db, "users", user.uid), userProfile);
       
       toast({
           title: "Conta Criada!",
-          description: "Sua conta foi criada e está pendente de aprovação.",
+          description: "Sua conta foi criada e está pendente de aprovação. Redirecionando...",
       });
-
-      router.push('/');
+      
+      // onAuthStateChanged in DashboardLayout will handle the session and redirect.
+      router.push('/dashboard');
 
     } catch (error: any) {
        console.error("Signup failed:", error);
+       let description = "Não foi possível criar a conta. Verifique os dados.";
+       if (error.code === 'auth/email-already-in-use') {
+           description = "Este e-mail já está em uso.";
+       } else if (error.code === 'auth/weak-password') {
+           description = "A senha é muito fraca. Use pelo menos 6 caracteres.";
+       }
        toast({
           variant: "destructive",
           title: "Erro no Cadastro",
-          description: error.message || "Não foi possível criar a conta. Verifique os dados.",
+          description: description,
        });
     } finally {
         setLoading(false);

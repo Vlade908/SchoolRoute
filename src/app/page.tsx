@@ -24,34 +24,19 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // Get user profile from Firestore
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const userProfile = {
-          uid: user.uid,
-          name: userData.name,
-          email: user.email,
-          role: userData.role,
-          schoolId: userData.schoolId,
-          hash: userData.hash,
-        };
-        localStorage.setItem('schoolRouteUser', JSON.stringify(userProfile));
-        router.push('/dashboard');
-      } else {
-         throw new Error("User profile not found.");
-      }
+      await signInWithEmailAndPassword(auth, email, password);
+      // onAuthStateChanged in DashboardLayout will handle the redirect
+      router.push('/dashboard');
     } catch (error: any) {
       console.error("Login failed:", error);
+      let description = "Ocorreu um erro. Por favor, tente novamente.";
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        description = "E-mail ou senha inválidos.";
+      }
       toast({
         variant: "destructive",
         title: "Erro de Login",
-        description: error.message || "Ocorreu um erro. Por favor, tente novamente.",
+        description: description,
       });
     } finally {
       setLoading(false);
