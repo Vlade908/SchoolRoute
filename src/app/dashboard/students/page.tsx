@@ -6,6 +6,8 @@ import {
   MoreHorizontal,
   PlusCircle,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -74,50 +76,40 @@ function StudentProfileDialog({
   onSave,
   onClose,
 }: { 
-  student: Student, 
+  student: Student | null, 
   isEditing?: boolean,
   onSave: (updatedStudent: Student) => void,
   onClose: () => void,
 }) {
-  const [editedStudent, setEditedStudent] = useState<Student>({ ...student });
-  const [currentIsEditing, setCurrentIsEditing] = useState(isEditing);
-
+  const [editedStudent, setEditedStudent] = useState<Student | null>(student);
+  
   useEffect(() => {
-    setEditedStudent({ ...student });
-    setCurrentIsEditing(isEditing);
-  }, [student, isEditing]);
+    setEditedStudent(student);
+  }, [student]);
 
-
-  const handleEditClick = () => setCurrentIsEditing(true);
+  if (!student || !editedStudent) {
+    return null;
+  }
 
   const handleSaveClick = () => {
     onSave(editedStudent);
     onClose();
   };
 
-  const handleCancelClick = () => {
-    if (isEditing) { // If it was opened in edit mode initially
-        onClose();
-    } else {
-        setCurrentIsEditing(false);
-        setEditedStudent({ ...student }); // Reset changes
-    }
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    setEditedStudent(prev => ({ ...prev, [id]: value }));
+    setEditedStudent(prev => prev ? ({ ...prev, [id]: value }) : null);
   };
 
   const handleSelectChange = (value: string) => {
-    setEditedStudent(prev => ({ ...prev, status: value }));
+    setEditedStudent(prev => prev ? ({ ...prev, status: value }) : null);
   }
 
 
   return (
     <DialogContent className="sm:max-w-[800px]">
       <DialogHeader>
-        <DialogTitle>{currentIsEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
+        <DialogTitle>{isEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
         <DialogDescription>{student.name} - {student.ra}</DialogDescription>
       </DialogHeader>
       <Tabs defaultValue="data">
@@ -131,7 +123,7 @@ function StudentProfileDialog({
           <Card>
             <CardContent className="space-y-4 pt-6">
                <div className="grid grid-cols-2 gap-4">
-                  {currentIsEditing ? (
+                  {isEditing ? (
                     <>
                       <div><Label htmlFor="name">Nome</Label><Input id="name" value={editedStudent.name} onChange={handleChange} /></div>
                       <div>
@@ -171,7 +163,7 @@ function StudentProfileDialog({
             <Card>
                 <CardContent className="space-y-4 pt-6">
                     <div className="grid grid-cols-2 gap-4">
-                        {currentIsEditing ? (
+                        {isEditing ? (
                           <>
                             <div><Label htmlFor="ra">RA</Label><Input id="ra" value={editedStudent.ra} onChange={handleChange} /></div>
                             <div><Label htmlFor="cpf">CPF</Label><Input id="cpf" value={editedStudent.cpf} onChange={handleChange} /></div>
@@ -247,13 +239,13 @@ function StudentProfileDialog({
         </TabsContent>
       </Tabs>
       <DialogFooter>
-        {currentIsEditing ? (
+        {isEditing ? (
             <>
-                <Button variant="outline" onClick={handleCancelClick}>Cancelar</Button>
+                <Button variant="outline" onClick={onClose}>Cancelar</Button>
                 <Button onClick={handleSaveClick}>Salvar Alterações</Button>
             </>
         ) : (
-            <Button onClick={handleEditClick}>Editar</Button>
+            <Button variant="outline" onClick={onClose}>Fechar</Button>
         )}
       </DialogFooter>
     </DialogContent>
@@ -298,7 +290,9 @@ function AddStudentDialog() {
 export default function StudentsPage() {
   const { user } = useUser();
   const [students, setStudents] = useState<Student[]>(initialStudents);
-  const [activeStudent, setActiveStudent] = useState<{student: Student, isEditing: boolean} | null>(null);
+  const [activeStudent, setActiveStudent] = useState<Student | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -306,41 +300,65 @@ export default function StudentsPage() {
     estaduais: true,
     municipais: true,
   });
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const filteredStudents = useMemo(() => {
-    return students.filter(student => {
-      // Status filter (Tabs)
-      if (activeTab === 'active' && student.status !== 'Homologado') return false;
-      if (activeTab === 'draft' && student.status !== 'Não Homologado') return false;
+    let filtered = students;
 
-      // School Type filter (Dropdown)
-      const isEstadual = student.school.toLowerCase().includes('estadual');
-      const isMunicipal = student.school.toLowerCase().includes('municipal');
-      if (!schoolTypeFilter.estaduais && isEstadual) return false;
-      if (!schoolTypeFilter.municipais && isMunicipal) return false;
-      if (!schoolTypeFilter.municipais && !schoolTypeFilter.estaduais && (isEstadual || isMunicipal)) return false;
+    // Status filter (Tabs)
+    if (activeTab === 'active') {
+      filtered = filtered.filter(student => student.status === 'Homologado');
+    } else if (activeTab === 'draft') {
+      filtered = filtered.filter(student => student.status !== 'Homologado');
+    }
 
+    // School Type filter (Dropdown)
+    const isEstadual = (school: string) => school.toLowerCase().includes('estadual');
+    const isMunicipal = (school: string) => school.toLowerCase().includes('municipal');
 
-      // Search term filter
-      if (searchTerm) {
-        const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        return (
-          student.name.toLowerCase().includes(lowerCaseSearchTerm) ||
-          student.ra.toLowerCase().includes(lowerCaseSearchTerm) ||
-          student.cpf.toLowerCase().includes(lowerCaseSearchTerm)
-        );
-      }
+    if (!schoolTypeFilter.estaduais || !schoolTypeFilter.municipais) {
+        filtered = filtered.filter(student => {
+            const isEst = isEstadual(student.school);
+            const isMun = isMunicipal(student.school);
+            if (schoolTypeFilter.estaduais && isEst) return true;
+            if (schoolTypeFilter.municipais && isMun) return true;
+            return false;
+        });
+    }
 
-      return true;
-    });
+    // Search term filter
+    if (searchTerm) {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(student =>
+        student.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+        student.ra.toLowerCase().includes(lowerCaseSearchTerm) ||
+        student.cpf.toLowerCase().includes(lowerCaseSearchTerm)
+      );
+    }
+    
+    return filtered;
   }, [students, activeTab, searchTerm, schoolTypeFilter]);
  
-  const handleOpenDialog = (student: Student, isEditing: boolean) => {
-    setActiveStudent({ student, isEditing });
+  const paginatedStudents = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredStudents.slice(startIndex, endIndex);
+  }, [filteredStudents, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+
+  const handleOpenDialog = (student: Student, editMode: boolean) => {
+    setActiveStudent(student);
+    setIsEditing(editMode);
+    setIsDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
+    setIsDialogOpen(false);
     setActiveStudent(null);
+    setIsEditing(false);
   };
   
   const handleSaveStudent = (updatedStudent: Student) => {
@@ -354,10 +372,33 @@ export default function StudentsPage() {
 
   const handleSchoolTypeChange = (type: 'estaduais' | 'municipais', checked: boolean) => {
     setSchoolTypeFilter(prev => ({ ...prev, [type]: checked }));
+    setCurrentPage(1); // Reset to first page on filter change
+  }
+  
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setCurrentPage(1); // Reset to first page on tab change
+  }
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page on search change
+  };
+  
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+    }
+  }
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
   }
 
   return (
-    <Tabs defaultValue="all" onValueChange={setActiveTab}>
+    <Tabs defaultValue="all" value={activeTab} onValueChange={handleTabChange}>
       <div className="flex items-center">
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
@@ -372,7 +413,7 @@ export default function StudentsPage() {
               placeholder="Buscar por RA, CPF, Nome..."
               className="w-full rounded-lg bg-card pl-8 md:w-[200px] lg:w-[320px]"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
             />
           </div>
           <DropdownMenu>
@@ -449,7 +490,7 @@ export default function StudentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
+                {paginatedStudents.map((student) => (
                     <TableRow key={student.id}>
                         <TableCell className="font-medium">{student.name}</TableCell>
                         <TableCell>
@@ -491,21 +532,44 @@ export default function StudentsPage() {
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
-              Mostrando <strong>{filteredStudents.length}</strong> de <strong>{students.length}</strong> alunos.
+                Mostrando <strong>{paginatedStudents.length}</strong> de <strong>{filteredStudents.length}</strong> alunos.
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                >
+                    Próxima
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
             </div>
           </CardFooter>
         </Card>
       </TabsContent>
-        <Dialog open={!!activeStudent} onOpenChange={(isOpen) => !isOpen && handleCloseDialog()}>
-            {activeStudent && (
-                <StudentProfileDialog 
-                    student={activeStudent.student}
-                    isEditing={activeStudent.isEditing}
-                    onSave={handleSaveStudent}
-                    onClose={handleCloseDialog}
-                />
-            )}
-        </Dialog>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <StudentProfileDialog 
+            student={activeStudent}
+            isEditing={isEditing}
+            onSave={handleSaveStudent}
+            onClose={handleCloseDialog}
+        />
+      </Dialog>
     </Tabs>
   );
 }
+
+    
