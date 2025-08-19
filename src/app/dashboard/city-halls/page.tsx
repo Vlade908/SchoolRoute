@@ -41,11 +41,70 @@ const cityHalls = [
     { id: 'PM003', name: 'Prefeitura de Salvador', cnpj: '13.927.801/0001-49', city: 'Salvador', state: 'BA', hash: 'pmssa7e8f9' },
 ];
 
-const allEmployees = [
-    { id: 'EMP003', name: 'Carlos Pereira', email: 'carlos.p@secretaria.gov', cityHallId: 'PM001', status: 'Ativo', creationDate: '2023-01-10' },
-    { id: 'EMP008', name: 'Julia Lima', email: 'julia.l@secretaria.gov', cityHallId: 'PM001', status: 'Ativo', creationDate: '2023-06-15' },
-    { id: 'EMP009', name: 'Roberto Almeida', email: 'roberto.a@secretaria.rj', cityHallId: 'PM002', status: 'Inativo', creationDate: '2022-12-01' },
+const allEmployeesData = [
+    { id: 'EMP003', name: 'Carlos Pereira', email: 'carlos.p@secretaria.gov', cityHallId: 'PM001', status: 'Ativo', creationDate: '2023-01-10', role: 'Nível 3' },
+    { id: 'EMP008', name: 'Julia Lima', email: 'julia.l@secretaria.gov', cityHallId: 'PM001', status: 'Ativo', creationDate: '2023-06-15', role: 'Nível 3' },
+    { id: 'EMP009', name: 'Roberto Almeida', email: 'roberto.a@secretaria.rj', cityHallId: 'PM002', status: 'Inativo', creationDate: '2022-12-01', role: 'Nível 3' },
 ];
+
+type Employee = typeof allEmployeesData[0];
+
+function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Employee, onSave: (employee: Employee) => void, onOpenChange: (open: boolean) => void }) {
+  const [currentEmployee, setCurrentEmployee] = useState(employee);
+
+  const handleSave = () => {
+    onSave(currentEmployee);
+    onOpenChange(false);
+  }
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Gerenciar Funcionário</DialogTitle>
+        <DialogDescription>Edite as permissões para {employee.name}.</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <p><strong>Nome:</strong> {employee.name}</p>
+        <p><strong>Email:</strong> {employee.email}</p>
+        <div className="flex items-center gap-4">
+          <Label htmlFor="role" className="whitespace-nowrap">Nível de Privilégio</Label>
+          <Select 
+            value={currentEmployee.role.split(' ')[1]}
+            onValueChange={(value) => setCurrentEmployee(e => ({...e, role: `Nível ${value}`}))}
+          >
+            <SelectTrigger id="role">
+              <SelectValue placeholder="Selecione o nível" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Nível 1 (Visualizar)</SelectItem>
+              <SelectItem value="2">Nível 2 (Cadastrar Alunos)</SelectItem>
+              <SelectItem value="3">Nível 3 (Admin)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-4">
+            <Label htmlFor="status" className="whitespace-nowrap">Status</Label>
+             <Select
+                value={currentEmployee.status}
+                onValueChange={(value) => setCurrentEmployee(e => ({...e, status: value as 'Ativo' | 'Inativo' }))}
+             >
+                <SelectTrigger id="status">
+                    <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="Ativo">Ativo</SelectItem>
+                    <SelectItem value="Inativo">Inativo</SelectItem>
+                </SelectContent>
+             </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+        <Button onClick={handleSave}>Salvar</Button>
+      </DialogFooter>
+    </DialogContent>
+  )
+}
 
 function AddCityHallDialog() {
     const [hash, setHash] = useState('');
@@ -101,8 +160,10 @@ function AddCityHallDialog() {
 }
 
 function CityHallDetailsDialog({ cityHall }: { cityHall: typeof cityHalls[0] }) {
+    const [allEmployees, setAllEmployees] = useState(allEmployeesData);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
+    const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
     const cityHallEmployees = useMemo(() => {
         let employees = allEmployees.filter(emp => emp.cityHallId === cityHall.id);
@@ -120,7 +181,13 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: typeof cityHalls[0] }) 
         }
 
         return employees;
-    }, [cityHall.id, searchTerm, statusFilter]);
+    }, [cityHall.id, searchTerm, statusFilter, allEmployees]);
+
+    const handleSaveEmployee = (updatedEmployee: Employee) => {
+        setAllEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
+        setEditingEmployee(null);
+    }
+
 
     return (
         <DialogContent className="sm:max-w-4xl">
@@ -176,34 +243,56 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: typeof cityHalls[0] }) 
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Nome</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Data de Criação</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {cityHallEmployees.length > 0 ? cityHallEmployees.map(employee => (
-                                        <TableRow key={employee.id}>
-                                            <TableCell className="font-medium">{employee.name}</TableCell>
-                                            <TableCell>{employee.email}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={employee.status === 'Ativo' ? 'default' : 'secondary'} className={employee.status === 'Ativo' ? 'bg-green-600' : 'bg-red-600'}>
-                                                    {employee.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>{new Date(employee.creationDate).toLocaleDateString('pt-BR')}</TableCell>
-                                        </TableRow>
-                                    )) : (
+                             <Dialog open={!!editingEmployee} onOpenChange={(isOpen) => !isOpen && setEditingEmployee(null)}>
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={4} className="text-center">Nenhum funcionário encontrado.</TableCell>
+                                            <TableHead>Nome</TableHead>
+                                            <TableHead>Email</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Nível</TableHead>
+                                            <TableHead>Data de Criação</TableHead>
+                                            <TableHead><span className="sr-only">Ações</span></TableHead>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {cityHallEmployees.length > 0 ? cityHallEmployees.map(employee => (
+                                            <TableRow key={employee.id}>
+                                                <TableCell className="font-medium">{employee.name}</TableCell>
+                                                <TableCell>{employee.email}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={employee.status === 'Ativo' ? 'default' : 'secondary'} className={employee.status === 'Ativo' ? 'bg-green-600' : 'bg-red-600'}>
+                                                        {employee.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>{employee.role}</TableCell>
+                                                <TableCell>{new Date(employee.creationDate).toLocaleDateString('pt-BR')}</TableCell>
+                                                <TableCell>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                                <span className="sr-only">Toggle menu</span>
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                            <DialogTrigger asChild>
+                                                              <DropdownMenuItem onSelect={() => setEditingEmployee(employee)}>Editar</DropdownMenuItem>
+                                                            </DialogTrigger>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="text-center">Nenhum funcionário encontrado.</TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                                {editingEmployee && <ManageEmployeeDialog employee={editingEmployee} onSave={handleSaveEmployee} onOpenChange={(isOpen) => !isOpen && setEditingEmployee(null)}/>}
+                            </Dialog>
                         </CardContent>
                     </Card>
                 </TabsContent>

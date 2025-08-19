@@ -1,5 +1,6 @@
+
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MoreHorizontal, PlusCircle, Copy, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +25,6 @@ import { Label } from '@/components/ui/label';
 import { MapPlaceholder } from '@/components/map-placeholder';
 import { useUser } from '@/contexts/user-context';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -36,15 +36,72 @@ const schools = [
   { id: 'SCH003', name: 'Escola Municipalizada C', address: 'Praça da Sé, 789, Salvador, BA', hash: 'q7r8s9t0u1v2w3x4' },
 ];
 
-const allEmployees = [
-    { id: 'EMP001', name: 'João da Silva', email: 'joao.silva@escola-a.com', schoolId: 'SCH001', status: 'Ativo', creationDate: '2023-01-15' },
-    { id: 'EMP005', name: 'Ana Oliveira', email: 'ana.o@escola-a.com', schoolId: 'SCH001', status: 'Ativo', creationDate: '2023-03-20' },
-    { id: 'EMP006', name: 'Pedro Martins', email: 'pedro.m@escola-a.com', schoolId: 'SCH001', status: 'Inativo', creationDate: '2022-11-10' },
-    { id: 'EMP002', name: 'Maria Oliveira', email: 'maria.o@escola-b.com', schoolId: 'SCH002', status: 'Ativo', creationDate: '2023-02-01' },
-    { id: 'EMP007', name: 'Luiza Pereira', email: 'luiza.p@escola-b.com', schoolId: 'SCH002', status: 'Ativo', creationDate: '2023-05-05' },
-    { id: 'EMP004', name: 'Ana Costa', email: 'ana.costa@escola-c.com', schoolId: 'SCH003', status: 'Ativo', creationDate: '2023-04-12' },
+const allEmployeesData = [
+    { id: 'EMP001', name: 'João da Silva', email: 'joao.silva@escola-a.com', schoolId: 'SCH001', status: 'Ativo', creationDate: '2023-01-15', role: 'Nível 2' },
+    { id: 'EMP005', name: 'Ana Oliveira', email: 'ana.o@escola-a.com', schoolId: 'SCH001', status: 'Ativo', creationDate: '2023-03-20', role: 'Nível 1' },
+    { id: 'EMP006', name: 'Pedro Martins', email: 'pedro.m@escola-a.com', schoolId: 'SCH001', status: 'Inativo', creationDate: '2022-11-10', role: 'Nível 1' },
+    { id: 'EMP002', name: 'Maria Oliveira', email: 'maria.o@escola-b.com', schoolId: 'SCH002', status: 'Ativo', creationDate: '2023-02-01', role: 'Nível 1' },
+    { id: 'EMP007', name: 'Luiza Pereira', email: 'luiza.p@escola-b.com', schoolId: 'SCH002', status: 'Ativo', creationDate: '2023-05-05', role: 'Nível 1' },
+    { id: 'EMP004', name: 'Ana Costa', email: 'ana.costa@escola-c.com', schoolId: 'SCH003', status: 'Ativo', creationDate: '2023-04-12', role: 'Aguardando' },
 ];
 
+type Employee = typeof allEmployeesData[0];
+
+function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Employee, onSave: (employee: Employee) => void, onOpenChange: (open: boolean) => void }) {
+  const [currentEmployee, setCurrentEmployee] = useState(employee);
+
+  const handleSave = () => {
+    onSave(currentEmployee);
+    onOpenChange(false);
+  }
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Gerenciar Funcionário</DialogTitle>
+        <DialogDescription>Edite as permissões para {employee.name}.</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <p><strong>Nome:</strong> {employee.name}</p>
+        <p><strong>Email:</strong> {employee.email}</p>
+        <div className="flex items-center gap-4">
+          <Label htmlFor="role" className="whitespace-nowrap">Nível de Privilégio</Label>
+          <Select 
+            value={currentEmployee.role.startsWith('Nível') ? currentEmployee.role.split(' ')[1] : undefined}
+            onValueChange={(value) => setCurrentEmployee(e => ({...e, role: `Nível ${value}`}))}
+          >
+            <SelectTrigger id="role">
+              <SelectValue placeholder="Selecione o nível" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Nível 1 (Visualizar)</SelectItem>
+              <SelectItem value="2">Nível 2 (Cadastrar Alunos)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-4">
+            <Label htmlFor="status" className="whitespace-nowrap">Status</Label>
+             <Select
+                value={currentEmployee.status}
+                onValueChange={(value) => setCurrentEmployee(e => ({...e, status: value as 'Ativo' | 'Inativo' }))}
+             >
+                <SelectTrigger id="status">
+                    <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="Ativo">Ativo</SelectItem>
+                    <SelectItem value="Inativo">Inativo</SelectItem>
+                </SelectContent>
+             </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+        <Button onClick={handleSave}>Salvar</Button>
+      </DialogFooter>
+    </DialogContent>
+  )
+}
 
 function AddSchoolDialog() {
   const [hash, setHash] = useState('');
@@ -104,8 +161,10 @@ function AddSchoolDialog() {
 }
 
 function SchoolDetailsDialog({ school }: { school: typeof schools[0] }) {
+    const [allEmployees, setAllEmployees] = useState(allEmployeesData);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
+    const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
     const schoolEmployees = useMemo(() => {
         let employees = allEmployees.filter(emp => emp.schoolId === school.id);
@@ -123,7 +182,12 @@ function SchoolDetailsDialog({ school }: { school: typeof schools[0] }) {
         }
 
         return employees;
-    }, [school.id, searchTerm, statusFilter]);
+    }, [school.id, searchTerm, statusFilter, allEmployees]);
+
+    const handleSaveEmployee = (updatedEmployee: Employee) => {
+        setAllEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
+        setEditingEmployee(null);
+    }
 
     return (
         <DialogContent className="sm:max-w-4xl">
@@ -179,34 +243,56 @@ function SchoolDetailsDialog({ school }: { school: typeof schools[0] }) {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Nome</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Data de Criação</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {schoolEmployees.length > 0 ? schoolEmployees.map(employee => (
-                                        <TableRow key={employee.id}>
-                                            <TableCell className="font-medium">{employee.name}</TableCell>
-                                            <TableCell>{employee.email}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={employee.status === 'Ativo' ? 'default' : 'secondary'} className={employee.status === 'Ativo' ? 'bg-green-600' : 'bg-red-600'}>
-                                                    {employee.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>{new Date(employee.creationDate).toLocaleDateString('pt-BR')}</TableCell>
-                                        </TableRow>
-                                    )) : (
+                             <Dialog open={!!editingEmployee} onOpenChange={(isOpen) => !isOpen && setEditingEmployee(null)}>
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={4} className="text-center">Nenhum funcionário encontrado.</TableCell>
+                                            <TableHead>Nome</TableHead>
+                                            <TableHead>Email</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Nível</TableHead>
+                                            <TableHead>Data de Criação</TableHead>
+                                            <TableHead><span className="sr-only">Ações</span></TableHead>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {schoolEmployees.length > 0 ? schoolEmployees.map(employee => (
+                                            <TableRow key={employee.id}>
+                                                <TableCell className="font-medium">{employee.name}</TableCell>
+                                                <TableCell>{employee.email}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={employee.status === 'Ativo' ? 'default' : 'secondary'} className={employee.status === 'Ativo' ? 'bg-green-600' : 'bg-red-600'}>
+                                                        {employee.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>{employee.role}</TableCell>
+                                                <TableCell>{new Date(employee.creationDate).toLocaleDateString('pt-BR')}</TableCell>
+                                                <TableCell>
+                                                     <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                                <span className="sr-only">Toggle menu</span>
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                            <DialogTrigger asChild>
+                                                                <DropdownMenuItem onSelect={() => setEditingEmployee(employee)}>Editar</DropdownMenuItem>
+                                                            </DialogTrigger>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="text-center">Nenhum funcionário encontrado.</TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                                {editingEmployee && <ManageEmployeeDialog employee={editingEmployee} onSave={handleSaveEmployee} onOpenChange={(isOpen) => !isOpen && setEditingEmployee(null)}/>}
+                            </Dialog>
                         </CardContent>
                     </Card>
                 </TabsContent>
