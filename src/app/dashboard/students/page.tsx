@@ -292,26 +292,15 @@ function AddStudentDialog() {
 export default function StudentsPage() {
   const { user } = useUser();
   const [students, setStudents] = useState<Student[]>(initialStudents);
-  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
-  const [viewingStudentId, setViewingStudentId] = useState<string | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeStudent, setActiveStudent] = useState<{student: Student, isEditing: boolean} | null>(null);
+ 
+  const handleOpenDialog = (student: Student, isEditing: boolean) => {
+    setActiveStudent({ student, isEditing });
+  };
 
-  const openDialog = (studentId: string, isEditing: boolean) => {
-    if (isEditing) {
-      setEditingStudentId(studentId);
-      setViewingStudentId(null);
-    } else {
-      setViewingStudentId(studentId);
-      setEditingStudentId(null);
-    }
-    setIsDialogOpen(true);
-  }
-
-  const closeDialogs = () => {
-    setEditingStudentId(null);
-    setViewingStudentId(null);
-    setIsDialogOpen(false);
-  }
+  const handleCloseDialog = () => {
+    setActiveStudent(null);
+  };
   
   const handleSaveStudent = (updatedStudent: Student) => {
     setStudents(prevStudents => 
@@ -319,11 +308,8 @@ export default function StudentsPage() {
             student.id === updatedStudent.id ? updatedStudent : student
         )
     );
-    closeDialogs();
+    handleCloseDialog();
   };
-  
-  const studentToView = students.find(s => s.id === viewingStudentId);
-  const studentToEdit = students.find(s => s.id === editingStudentId);
 
   return (
     <Tabs defaultValue="all">
@@ -422,34 +408,26 @@ export default function StudentsPage() {
                         <TableCell className="hidden md:table-cell">{student.schoolYear} / {student.class}</TableCell>
                         <TableCell className="hidden md:table-cell">{student.ra}</TableCell>
                         <TableCell>
-                          <Dialog open={isDialogOpen && (student.id === viewingStudentId || student.id === editingStudentId)} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                <Button
-                                    aria-haspopup="true"
-                                    size="icon"
-                                    variant="ghost"
-                                >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                    <span className="sr-only">Toggle menu</span>
-                                </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                  <DropdownMenuItem onSelect={() => openDialog(student.id, false)}>Ver Perfil</DropdownMenuItem>
-                                  {user && user.role >= 2 && 
-                                      <DropdownMenuItem onSelect={() => openDialog(student.id, true)}>Editar</DropdownMenuItem>
-                                  }
-                                  {user && user.role === 3 && <DropdownMenuItem className="text-red-500">Excluir</DropdownMenuItem>}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                            <StudentProfileDialog 
-                                student={studentToEdit || studentToView!}
-                                isEditing={!!studentToEdit}
-                                onSave={handleSaveStudent}
-                                onClose={closeDialogs}
-                            />
-                          </Dialog>
+                          <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                              <Button
+                                  aria-haspopup="true"
+                                  size="icon"
+                                  variant="ghost"
+                              >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Toggle menu</span>
+                              </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                <DropdownMenuItem onSelect={() => handleOpenDialog(student, false)}>Ver Perfil</DropdownMenuItem>
+                                {user && user.role >= 2 && 
+                                    <DropdownMenuItem onSelect={() => handleOpenDialog(student, true)}>Editar</DropdownMenuItem>
+                                }
+                                {user && user.role === 3 && <DropdownMenuItem className="text-red-500">Excluir</DropdownMenuItem>}
+                              </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                     </TableRow>
                 ))}
@@ -463,6 +441,16 @@ export default function StudentsPage() {
           </CardFooter>
         </Card>
       </TabsContent>
+        <Dialog open={!!activeStudent} onOpenChange={(isOpen) => !isOpen && handleCloseDialog()}>
+            {activeStudent && (
+                <StudentProfileDialog 
+                    student={activeStudent.student}
+                    isEditing={activeStudent.isEditing}
+                    onSave={handleSaveStudent}
+                    onClose={handleCloseDialog}
+                />
+            )}
+        </Dialog>
     </Tabs>
   );
 }
