@@ -35,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 
 
-const cityHalls = [
+const initialCityHalls = [
     { id: 'PM001', name: 'Prefeitura de São Paulo', cnpj: '46.392.130/0001-22', city: 'São Paulo', state: 'SP', hash: 'pmspa1b2c3' },
     { id: 'PM002', name: 'Prefeitura do Rio de Janeiro', cnpj: '42.498.717/0001-20', city: 'Rio de Janeiro', state: 'RJ', hash: 'pmrjb4c5d6' },
     { id: 'PM003', name: 'Prefeitura de Salvador', cnpj: '13.927.801/0001-49', city: 'Salvador', state: 'BA', hash: 'pmssa7e8f9' },
@@ -47,6 +47,7 @@ const allEmployeesData = [
     { id: 'EMP009', name: 'Roberto Almeida', email: 'roberto.a@secretaria.rj', cityHallId: 'PM002', status: 'Inativo', creationDate: '2022-12-01', role: 'Nível 3' },
 ];
 
+type CityHall = typeof initialCityHalls[0];
 type Employee = typeof allEmployeesData[0];
 
 function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Employee, onSave: (employee: Employee) => void, onOpenChange: (open: boolean) => void }) {
@@ -106,7 +107,11 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
   )
 }
 
-function AddCityHallDialog() {
+function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: CityHall) => void, onOpenChange: (open: boolean) => void }) {
+    const [name, setName] = useState('');
+    const [cnpj, setCnpj] = useState('');
+    const [city, setCity] = useState('');
+    const [state, setUf] = useState('');
     const [hash, setHash] = useState('');
 
     const generateHash = () => {
@@ -116,6 +121,24 @@ function AddCityHallDialog() {
     
     const copyToClipboard = () => {
         navigator.clipboard.writeText(hash);
+    }
+
+    const handleSave = () => {
+        if (!name || !cnpj || !city || !state || !hash) {
+            // Basic validation
+            alert('Por favor, preencha todos os campos e gere uma chave hash.');
+            return;
+        }
+        const newCityHall: CityHall = {
+            id: `PM${Math.floor(Math.random() * 1000)}`, // Simple ID generation
+            name,
+            cnpj,
+            city,
+            state,
+            hash,
+        };
+        onSave(newCityHall);
+        onOpenChange(false);
     }
 
     return (
@@ -129,19 +152,19 @@ function AddCityHallDialog() {
             <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="name" className="text-right">Nome</Label>
-                    <Input id="name" className="col-span-3" placeholder="Nome da Prefeitura" />
+                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" placeholder="Nome da Prefeitura" />
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="cnpj" className="text-right">CNPJ</Label>
-                    <Input id="cnpj" className="col-span-3" placeholder="00.000.000/0001-00" />
+                    <Input id="cnpj" value={cnpj} onChange={(e) => setCnpj(e.target.value)} className="col-span-3" placeholder="00.000.000/0001-00" />
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="city" className="text-right">Cidade</Label>
-                    <Input id="city" className="col-span-3" placeholder="Cidade" />
+                    <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} className="col-span-3" placeholder="Cidade" />
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="state" className="text-right">Estado</Label>
-                    <Input id="state" className="col-span-3" placeholder="UF" />
+                    <Input id="state" value={state} onChange={(e) => setUf(e.target.value)} className="col-span-3" placeholder="UF" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="hash" className="text-right">Chave Hash</Label>
@@ -153,13 +176,13 @@ function AddCityHallDialog() {
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={generateHash}>Gerar Chave</Button>
-                <Button type="submit">Salvar Prefeitura</Button>
+                <Button onClick={handleSave}>Salvar Prefeitura</Button>
             </DialogFooter>
         </DialogContent>
     );
 }
 
-function CityHallDetailsDialog({ cityHall }: { cityHall: typeof cityHalls[0] }) {
+function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
     const [allEmployees, setAllEmployees] = useState(allEmployeesData);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
@@ -305,8 +328,10 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: typeof cityHalls[0] }) 
 export default function CityHallsPage() {
     const { user } = useUser();
     const router = useRouter();
+    const [cityHalls, setCityHalls] = useState<CityHall[]>(initialCityHalls);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-    const [selectedCityHall, setSelectedCityHall] = useState<(typeof cityHalls[0]) | null>(null);
+    const [selectedCityHall, setSelectedCityHall] = useState<CityHall | null>(null);
 
     useEffect(() => {
         if (!user || user.role < 3) {
@@ -319,9 +344,13 @@ export default function CityHallsPage() {
       return <p>Acesso negado.</p>;
     }
     
-    const handleCityHallClick = (cityHall: typeof cityHalls[0]) => {
+    const handleCityHallClick = (cityHall: CityHall) => {
         setSelectedCityHall(cityHall);
         setIsDetailsModalOpen(true);
+    }
+    
+    const handleAddCityHall = (newCityHall: CityHall) => {
+        setCityHalls(prev => [...prev, newCityHall]);
     }
 
   return (
@@ -333,14 +362,14 @@ export default function CityHallsPage() {
                 <CardTitle>Prefeituras</CardTitle>
                 <CardDescription>Gerencie as prefeituras conveniadas.</CardDescription>
             </div>
-            <Dialog>
+            <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                 <DialogTrigger asChild>
                     <Button size="sm" className="gap-1">
                         <PlusCircle className="h-3.5 w-3.5" />
                         Nova Prefeitura
                     </Button>
                 </DialogTrigger>
-                <AddCityHallDialog />
+                <AddCityHallDialog onSave={handleAddCityHall} onOpenChange={setIsAddModalOpen} />
             </Dialog>
         </div>
       </CardHeader>
