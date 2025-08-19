@@ -58,20 +58,26 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { db } from '@/lib/firebase';
+import { collection, doc, getDocs, onSnapshot, updateDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
+type Employee = {
+    id: string; // Firestore document ID
+    uid: string;
+    name: string;
+    email: string;
+    role: number;
+    status: 'Aprovado' | 'Pendente' | 'Inativo';
+    schoolName?: string; // Might need to fetch this based on hash
+};
 
-const initialEmployees = [
-  { id: 'EMP001', name: 'João da Silva', email: 'joao.silva@escola-a.com', school: 'Escola Estadual A', role: 'Nível 2', status: 'Aprovado' },
-  { id: 'EMP002', name: 'Maria Oliveira', email: 'maria.o@escola-b.com', school: 'Escola Municipal B', role: 'Nível 1', status: 'Aprovado' },
-  { id: 'EMP003', name: 'Carlos Pereira', email: 'carlos.p@secretaria.gov', school: 'Secretaria de Educação', role: 'Nível 3', status: 'Aprovado' },
-  { id: 'EMP004', name: 'Ana Costa', email: 'ana.costa@escola-c.com', school: 'Escola Municipalizada C', role: 'Aguardando', status: 'Pendente' },
-];
-
-function ManageEmployeeDialog({ employee, onSave }: { employee: typeof initialEmployees[0], onSave: (employee: typeof initialEmployees[0]) => void }) {
+function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Employee, onSave: (employee: Employee) => void, onOpenChange: (open:boolean) => void }) {
   const [currentEmployee, setCurrentEmployee] = useState(employee);
 
   const handleSave = () => {
     onSave(currentEmployee);
+    onOpenChange(false);
   }
 
   return (
@@ -83,12 +89,12 @@ function ManageEmployeeDialog({ employee, onSave }: { employee: typeof initialEm
       <div className="grid gap-4 py-4">
         <p><strong>Nome:</strong> {employee.name}</p>
         <p><strong>Email:</strong> {employee.email}</p>
-        <p><strong>Escola/Secretaria:</strong> {employee.school}</p>
+        <p><strong>Escola/Secretaria:</strong> {employee.schoolName || 'N/A'}</p>
         <div className="flex items-center gap-4">
           <Label htmlFor="role" className="whitespace-nowrap">Nível de Privilégio</Label>
           <Select 
-            defaultValue={employee.status === 'Pendente' ? undefined : employee.role.split(' ')[1]}
-            onValueChange={(value) => setCurrentEmployee(e => ({...e, role: `Nível ${value}`}))}
+            value={currentEmployee.role.toString()}
+            onValueChange={(value) => setCurrentEmployee(e => ({...e, role: parseInt(value, 10)}))}
           >
             <SelectTrigger id="role">
               <SelectValue placeholder="Selecione o nível" />
@@ -100,10 +106,26 @@ function ManageEmployeeDialog({ employee, onSave }: { employee: typeof initialEm
             </SelectContent>
           </Select>
         </div>
+        <div className="flex items-center gap-4">
+          <Label htmlFor="status">Status</Label>
+           <Select 
+            value={currentEmployee.status}
+            onValueChange={(value) => setCurrentEmployee(e => ({...e, status: value as Employee['status']}))}
+          >
+            <SelectTrigger id="status">
+              <SelectValue placeholder="Selecione o status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Aprovado">Aprovado</SelectItem>
+              <SelectItem value="Pendente">Pendente</SelectItem>
+              <SelectItem value="Inativo">Inativo</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <DialogFooter>
-        <Button variant="destructive">Rejeitar</Button>
-        <Button onClick={handleSave}>Aprovar e Salvar</Button>
+        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+        <Button onClick={handleSave}>Salvar Alterações</Button>
       </DialogFooter>
     </DialogContent>
   )
@@ -112,34 +134,87 @@ function ManageEmployeeDialog({ employee, onSave }: { employee: typeof initialEm
 export default function EmployeesPage() {
     const { user } = useUser();
     const router = useRouter();
-    const [employees, setEmployees] = useState(initialEmployees);
-    const [selectedEmployee, setSelectedEmployee] = useState<typeof initialEmployees[0] | null>(null);
+    const { toast } = useToast();
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
     const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
 
 
     useEffect(() => {
         if (!user || user.role < 3) {
             router.push('/dashboard');
+            return;
         }
+
+        const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
+            const usersData: Employee[] = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                usersData.push({
+                    id: doc.id,
+                    uid: data.uid,
+                    name: data.name,
+                    email: data.email,
+                    role: data.role,
+                    status: data.status,
+                    schoolName: data.hash.startsWith('pm') ? 'Secretaria' : 'Escola' // simple logic, can be improved
+                });
+            });
+            setEmployees(usersData);
+        });
+
+        return () => unsubscribe();
+
     }, [user, router]);
 
     if (!user || user.role < 3) {
       return <p>Acesso negado.</p>;
     }
     
-    const handleSaveEmployee = (updatedEmployee: typeof initialEmployees[0]) => {
-      setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? { ...updatedEmployee, status: 'Aprovado' } : emp));
-      setIsManageDialogOpen(false);
-      setSelectedEmployee(null);
+    const handleSaveEmployee = async (updatedEmployee: Employee) => {
+        if (!updatedEmployee.uid) return;
+        try {
+            const employeeDocRef = doc(db, 'users', updatedEmployee.uid);
+            await updateDoc(employeeDocRef, {
+                status: updatedEmployee.status,
+                role: updatedEmployee.role,
+            });
+            toast({ title: "Sucesso!", description: "Funcionário atualizado." });
+        } catch (error) {
+            console.error("Failed to update employee:", error);
+            toast({ variant: 'destructive', title: "Erro!", description: "Não foi possível atualizar o funcionário." });
+        } finally {
+            setIsManageDialogOpen(false);
+            setSelectedEmployee(null);
+        }
     }
     
-    const handleDeactivate = (employeeId: string) => {
-        setEmployees(prev => prev.map(emp => emp.id === employeeId ? {...emp, status: 'Inativo'} : emp));
+    const handleDeactivate = async (employeeId: string) => {
+        const employeeToUpdate = employees.find(emp => emp.id === employeeId);
+        if (!employeeToUpdate?.uid) return;
+
+        try {
+            const employeeDocRef = doc(db, 'users', employeeToUpdate.uid);
+            await updateDoc(employeeDocRef, { status: 'Inativo' });
+            toast({ title: "Funcionário Desativado", description: "O acesso do funcionário foi revogado." });
+        } catch (error) {
+             console.error("Failed to deactivate employee:", error);
+             toast({ variant: 'destructive', title: "Erro!", description: "Não foi possível desativar o funcionário." });
+        }
     }
     
-    const openManageDialog = (employee: typeof initialEmployees[0]) => {
+    const openManageDialog = (employee: Employee) => {
       setSelectedEmployee(employee);
       setIsManageDialogOpen(true);
+    }
+    
+    const getRoleName = (role: number) => {
+      switch(role) {
+        case 1: return "Nível 1";
+        case 2: return "Nível 2";
+        case 3: return "Nível 3";
+        default: return "Pendente";
+      }
     }
 
 
@@ -153,10 +228,6 @@ export default function EmployeesPage() {
                 Gerencie funcionários e aprove novos cadastros.
                 </CardDescription>
             </div>
-            <Button size="sm" className="gap-1">
-                <PlusCircle className="h-3.5 w-3.5" />
-                Novo Funcionário
-            </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -186,13 +257,15 @@ export default function EmployeesPage() {
                     {employee.status}
                   </Badge>
                 </TableCell>
-                <TableCell>{employee.school}</TableCell>
-                <TableCell>{employee.role}</TableCell>
+                <TableCell>{employee.schoolName}</TableCell>
+                <TableCell>{getRoleName(employee.role)}</TableCell>
                 <TableCell>
                  <Dialog open={isManageDialogOpen && selectedEmployee?.id === employee.id} onOpenChange={(isOpen) => {
                      if(!isOpen) {
                          setSelectedEmployee(null);
                          setIsManageDialogOpen(false);
+                     } else {
+                         openManageDialog(employee)
                      }
                  }}>
                     <AlertDialog>
@@ -206,7 +279,7 @@ export default function EmployeesPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
                             <DialogTrigger asChild>
-                              <DropdownMenuItem onSelect={() => openManageDialog(employee)}>
+                              <DropdownMenuItem>
                                 {employee.status === 'Pendente' ? 'Aprovar/Rejeitar' : 'Editar Permissões'}
                               </DropdownMenuItem>
                             </DialogTrigger>
@@ -236,7 +309,7 @@ export default function EmployeesPage() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
-                    {selectedEmployee && <ManageEmployeeDialog employee={selectedEmployee} onSave={handleSaveEmployee} />}
+                    {selectedEmployee && <ManageEmployeeDialog employee={selectedEmployee} onSave={handleSaveEmployee} onOpenChange={setIsManageDialogOpen} />}
                   </Dialog>
                 </TableCell>
               </TableRow>
@@ -247,3 +320,5 @@ export default function EmployeesPage() {
     </Card>
   );
 }
+
+    

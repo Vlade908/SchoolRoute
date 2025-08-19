@@ -33,22 +33,32 @@ import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, query, where, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 
-const initialCityHalls = [
-    { id: 'PM001', name: 'Prefeitura de São Paulo', cnpj: '46.392.130/0001-22', city: 'São Paulo', state: 'SP', hash: 'pmspa1b2c3' },
-    { id: 'PM002', name: 'Prefeitura do Rio de Janeiro', cnpj: '42.498.717/0001-20', city: 'Rio de Janeiro', state: 'RJ', hash: 'pmrjb4c5d6' },
-    { id: 'PM003', name: 'Prefeitura de Salvador', cnpj: '13.927.801/0001-49', city: 'Salvador', state: 'BA', hash: 'pmssa7e8f9' },
-];
+type CityHall = {
+    id: string;
+    name: string;
+    cnpj: string;
+    city: string;
+    state: string;
+    hash: string;
+};
 
-const allEmployeesData = [
-    { id: 'EMP003', name: 'Carlos Pereira', email: 'carlos.p@secretaria.gov', cityHallId: 'PM001', status: 'Ativo', creationDate: '2023-01-10', role: 'Nível 3' },
-    { id: 'EMP008', name: 'Julia Lima', email: 'julia.l@secretaria.gov', cityHallId: 'PM001', status: 'Ativo', creationDate: '2023-06-15', role: 'Nível 3' },
-    { id: 'EMP009', name: 'Roberto Almeida', email: 'roberto.a@secretaria.rj', cityHallId: 'PM002', status: 'Inativo', creationDate: '2022-12-01', role: 'Nível 3' },
-];
+type Employee = {
+    id: string;
+    name: string;
+    email: string;
+    hash: string;
+    role: number | string;
+    status: string;
+    uid: string;
+    creationDate?: string;
+    cityHallId?: string;
+};
 
-type CityHall = typeof initialCityHalls[0];
-type Employee = typeof allEmployeesData[0];
 
 function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Employee, onSave: (employee: Employee) => void, onOpenChange: (open: boolean) => void }) {
   const [currentEmployee, setCurrentEmployee] = useState(employee);
@@ -56,6 +66,19 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
   const handleSave = () => {
     onSave(currentEmployee);
     onOpenChange(false);
+  }
+
+  const getRoleValue = (role: number | string) => {
+    if (typeof role === 'number') return role.toString();
+    if (typeof role === 'string' && role.startsWith('Nível')) {
+      return role.split(' ')[1];
+    }
+    return role;
+  }
+  
+  const setRoleValue = (value: string) => {
+    const numericValue = parseInt(value, 10);
+    setCurrentEmployee(e => ({...e, role: `Nível ${numericValue}`}));
   }
 
   return (
@@ -70,8 +93,8 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
         <div className="flex items-center gap-4">
           <Label htmlFor="role" className="whitespace-nowrap">Nível de Privilégio</Label>
           <Select 
-            value={currentEmployee.role.split(' ')[1]}
-            onValueChange={(value) => setCurrentEmployee(e => ({...e, role: `Nível ${value}`}))}
+            value={getRoleValue(currentEmployee.role)}
+            onValueChange={setRoleValue}
           >
             <SelectTrigger id="role">
               <SelectValue placeholder="Selecione o nível" />
@@ -87,7 +110,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
             <Label htmlFor="status" className="whitespace-nowrap">Status</Label>
              <Select
                 value={currentEmployee.status}
-                onValueChange={(value) => setCurrentEmployee(e => ({...e, status: value as 'Ativo' | 'Inativo' }))}
+                onValueChange={(value) => setCurrentEmployee(e => ({...e, status: value as 'Ativo' | 'Inativo' | 'Pendente' }))}
              >
                 <SelectTrigger id="status">
                     <SelectValue placeholder="Selecione o status" />
@@ -95,6 +118,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
                 <SelectContent>
                     <SelectItem value="Ativo">Ativo</SelectItem>
                     <SelectItem value="Inativo">Inativo</SelectItem>
+                    <SelectItem value="Pendente">Pendente</SelectItem>
                 </SelectContent>
              </Select>
         </div>
@@ -107,12 +131,13 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
   )
 }
 
-function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: CityHall) => void, onOpenChange: (open: boolean) => void }) {
+function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Omit<CityHall, 'id'>) => void, onOpenChange: (open: boolean) => void }) {
     const [name, setName] = useState('');
     const [cnpj, setCnpj] = useState('');
     const [city, setCity] = useState('');
     const [state, setUf] = useState('');
     const [hash, setHash] = useState('');
+    const { toast } = useToast();
 
     const generateHash = () => {
         const newHash = 'pm' + Array(8).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -120,7 +145,9 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Cit
     };
     
     const copyToClipboard = () => {
+        if(!hash) return;
         navigator.clipboard.writeText(hash);
+        toast({ title: 'Copiado!', description: 'Chave hash copiada para a área de transferência.'});
     }
 
     const handleSave = () => {
@@ -129,16 +156,8 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Cit
             alert('Por favor, preencha todos os campos e gere uma chave hash.');
             return;
         }
-        const newCityHall: CityHall = {
-            id: `PM${Math.floor(Math.random() * 1000)}`, // Simple ID generation
-            name,
-            cnpj,
-            city,
-            state,
-            hash,
-        };
+        const newCityHall = { name, cnpj, city, state, hash };
         onSave(newCityHall);
-        onOpenChange(false);
     }
 
     return (
@@ -183,32 +202,81 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Cit
 }
 
 function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
-    const [allEmployees, setAllEmployees] = useState(allEmployeesData);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+    const { toast } = useToast();
 
-    const cityHallEmployees = useMemo(() => {
-        let employees = allEmployees.filter(emp => emp.cityHallId === cityHall.id);
+     useEffect(() => {
+        if (!cityHall?.hash) return;
+        
+        const q = query(collection(db, "users"), where("hash", "==", cityHall.hash));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const cityHallEmployees: Employee[] = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                cityHallEmployees.push({
+                    id: doc.id,
+                    uid: data.uid,
+                    name: data.name,
+                    email: data.email,
+                    role: data.role,
+                    status: data.status,
+                    hash: data.hash,
+                    creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                });
+            });
+            setEmployees(cityHallEmployees);
+        });
+
+        return () => unsubscribe();
+    }, [cityHall]);
+
+    const filteredEmployees = useMemo(() => {
+        let filtered = employees;
 
         if (statusFilter !== 'todos') {
-            employees = employees.filter(emp => emp.status.toLowerCase() === statusFilter);
+            filtered = filtered.filter(emp => emp.status.toLowerCase() === statusFilter);
         }
 
         if (searchTerm) {
             const lowerCaseSearch = searchTerm.toLowerCase();
-            employees = employees.filter(emp =>
+            filtered = filtered.filter(emp =>
                 emp.name.toLowerCase().includes(lowerCaseSearch) ||
                 emp.email.toLowerCase().includes(lowerCaseSearch)
             );
         }
 
-        return employees;
-    }, [cityHall.id, searchTerm, statusFilter, allEmployees]);
+        return filtered;
+    }, [employees, searchTerm, statusFilter]);
 
-    const handleSaveEmployee = (updatedEmployee: Employee) => {
-        setAllEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
-        setEditingEmployee(null);
+    const handleSaveEmployee = async (updatedEmployee: Employee) => {
+      if (!updatedEmployee.uid) return;
+      try {
+        const employeeDocRef = doc(db, 'users', updatedEmployee.uid);
+        const roleString = updatedEmployee.role;
+        const roleNumber = typeof roleString === 'string' && roleString.startsWith('Nível') ? parseInt(roleString.split(' ')[1], 10) : updatedEmployee.role;
+        await updateDoc(employeeDocRef, {
+            status: updatedEmployee.status,
+            role: roleNumber,
+        });
+        toast({ title: 'Sucesso!', description: 'Funcionário atualizado.'});
+      } catch(error) {
+        console.error("Error updating employee:", error);
+        toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível atualizar o funcionário.'});
+      }
+      setEditingEmployee(null);
+    }
+    
+    const getRoleName = (role: number | string) => {
+        if (typeof role === 'string' && role.startsWith('Nível')) return role;
+        switch(role) {
+            case 1: return 'Nível 1';
+            case 2: return 'Nível 2';
+            case 3: return 'Nível 3';
+            default: return 'Pendente';
+        }
     }
 
 
@@ -259,8 +327,9 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="todos">Todos</SelectItem>
-                                        <SelectItem value="ativo">Ativos</SelectItem>
-                                        <SelectItem value="inativo">Inativos</SelectItem>
+                                        <SelectItem value="Ativo">Ativos</SelectItem>
+                                        <SelectItem value="Inativo">Inativos</SelectItem>
+                                        <SelectItem value="Pendente">Pendentes</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -279,17 +348,22 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {cityHallEmployees.length > 0 ? cityHallEmployees.map(employee => (
+                                        {filteredEmployees.length > 0 ? filteredEmployees.map(employee => (
                                             <TableRow key={employee.id}>
                                                 <TableCell className="font-medium">{employee.name}</TableCell>
                                                 <TableCell>{employee.email}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant={employee.status === 'Ativo' ? 'default' : 'secondary'} className={employee.status === 'Ativo' ? 'bg-green-600' : 'bg-red-600'}>
+                                                    <Badge variant={employee.status === 'Ativo' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
+                                                         className={
+                                                            employee.status === 'Ativo' ? 'bg-green-600' : 
+                                                            employee.status === 'Pendente' ? 'bg-orange-500' :
+                                                            'bg-red-600'
+                                                         }>
                                                         {employee.status}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell>{employee.role}</TableCell>
-                                                <TableCell>{new Date(employee.creationDate).toLocaleDateString('pt-BR')}</TableCell>
+                                                <TableCell>{getRoleName(employee.role)}</TableCell>
+                                                <TableCell>{employee.creationDate}</TableCell>
                                                 <TableCell>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
@@ -328,7 +402,8 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
 export default function CityHallsPage() {
     const { user } = useUser();
     const router = useRouter();
-    const [cityHalls, setCityHalls] = useState<CityHall[]>(initialCityHalls);
+    const { toast } = useToast();
+    const [cityHalls, setCityHalls] = useState<CityHall[]>([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [selectedCityHall, setSelectedCityHall] = useState<CityHall | null>(null);
@@ -336,7 +411,19 @@ export default function CityHallsPage() {
     useEffect(() => {
         if (!user || user.role < 3) {
             router.push('/dashboard');
+            return;
         }
+
+        const fetchCityHalls = async () => {
+            const querySnapshot = await getDocs(collection(db, "city-halls"));
+            const halls: CityHall[] = [];
+            querySnapshot.forEach((doc) => {
+                halls.push({ id: doc.id, ...doc.data() } as CityHall);
+            });
+            setCityHalls(halls);
+        };
+
+        fetchCityHalls();
     }, [user, router]);
 
 
@@ -349,8 +436,17 @@ export default function CityHallsPage() {
         setIsDetailsModalOpen(true);
     }
     
-    const handleAddCityHall = (newCityHall: CityHall) => {
-        setCityHalls(prev => [...prev, newCityHall]);
+    const handleAddCityHall = async (newCityHallData: Omit<CityHall, 'id'>) => {
+        try {
+            const docRef = await addDoc(collection(db, "city-halls"), newCityHallData);
+            const newCityHall = { id: docRef.id, ...newCityHallData };
+            setCityHalls(prev => [...prev, newCityHall]);
+            setIsAddModalOpen(false);
+            toast({ title: 'Sucesso!', description: 'Prefeitura cadastrada com sucesso.'});
+        } catch (error) {
+            console.error("Error adding city hall: ", error);
+            toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível cadastrar a prefeitura.'});
+        }
     }
 
   return (
@@ -407,8 +503,7 @@ export default function CityHallsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuItem>Editar</DropdownMenuItem>
-                      <DropdownMenuItem>Ver Convênios</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handleCityHallClick(cityHall)}>Ver Detalhes</DropdownMenuItem>
                       <DropdownMenuItem className="text-red-500">Desativar</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -425,3 +520,5 @@ export default function CityHallsPage() {
     </>
   );
 }
+
+    

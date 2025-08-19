@@ -28,24 +28,28 @@ import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, doc, updateDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 
-const schools = [
-  { id: 'SCH001', name: 'Escola Estadual A', address: 'Rua das Flores, 123, São Paulo, SP', hash: 'a1b2c3d4e5f6g7h8' },
-  { id: 'SCH002', name: 'Escola Municipal B', address: 'Avenida Brasil, 456, Rio de Janeiro, RJ', hash: 'i9j0k1l2m3n4o5p6' },
-  { id: 'SCH003', name: 'Escola Municipalizada C', address: 'Praça da Sé, 789, Salvador, BA', hash: 'q7r8s9t0u1v2w3x4' },
-];
+type School = {
+  id: string;
+  name: string;
+  address: string;
+  hash: string;
+};
 
-const allEmployeesData = [
-    { id: 'EMP001', name: 'João da Silva', email: 'joao.silva@escola-a.com', schoolId: 'SCH001', status: 'Ativo', creationDate: '2023-01-15', role: 'Nível 2' },
-    { id: 'EMP005', name: 'Ana Oliveira', email: 'ana.o@escola-a.com', schoolId: 'SCH001', status: 'Ativo', creationDate: '2023-03-20', role: 'Nível 1' },
-    { id: 'EMP006', name: 'Pedro Martins', email: 'pedro.m@escola-a.com', schoolId: 'SCH001', status: 'Inativo', creationDate: '2022-11-10', role: 'Nível 1' },
-    { id: 'EMP002', name: 'Maria Oliveira', email: 'maria.o@escola-b.com', schoolId: 'SCH002', status: 'Ativo', creationDate: '2023-02-01', role: 'Nível 1' },
-    { id: 'EMP007', name: 'Luiza Pereira', email: 'luiza.p@escola-b.com', schoolId: 'SCH002', status: 'Ativo', creationDate: '2023-05-05', role: 'Nível 1' },
-    { id: 'EMP004', name: 'Ana Costa', email: 'ana.costa@escola-c.com', schoolId: 'SCH003', status: 'Ativo', creationDate: '2023-04-12', role: 'Aguardando' },
-];
-
-type Employee = typeof allEmployeesData[0];
+type Employee = {
+    id: string;
+    uid: string;
+    name: string;
+    email: string;
+    hash: string;
+    role: number | string; // Can be number (1, 2) or string 'Aguardando'
+    status: string;
+    creationDate?: string;
+};
 
 function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Employee, onSave: (employee: Employee) => void, onOpenChange: (open: boolean) => void }) {
   const [currentEmployee, setCurrentEmployee] = useState(employee);
@@ -53,6 +57,19 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
   const handleSave = () => {
     onSave(currentEmployee);
     onOpenChange(false);
+  }
+  
+  const getRoleValue = (role: number | string) => {
+    if (typeof role === 'number') return role.toString();
+    if (typeof role === 'string' && role.startsWith('Nível')) {
+        return role.split(' ')[1];
+    }
+    return role;
+  }
+
+  const setRoleValue = (value: string) => {
+      const numericValue = parseInt(value, 10);
+      setCurrentEmployee(e => ({...e, role: `Nível ${numericValue}`}));
   }
 
   return (
@@ -67,8 +84,8 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
         <div className="flex items-center gap-4">
           <Label htmlFor="role" className="whitespace-nowrap">Nível de Privilégio</Label>
           <Select 
-            value={currentEmployee.role.startsWith('Nível') ? currentEmployee.role.split(' ')[1] : undefined}
-            onValueChange={(value) => setCurrentEmployee(e => ({...e, role: `Nível ${value}`}))}
+            value={getRoleValue(currentEmployee.role)}
+            onValueChange={setRoleValue}
           >
             <SelectTrigger id="role">
               <SelectValue placeholder="Selecione o nível" />
@@ -91,6 +108,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
                 <SelectContent>
                     <SelectItem value="Ativo">Ativo</SelectItem>
                     <SelectItem value="Inativo">Inativo</SelectItem>
+                    <SelectItem value="Pendente">Pendente</SelectItem>
                 </SelectContent>
              </Select>
         </div>
@@ -103,19 +121,29 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
   )
 }
 
-function AddSchoolDialog() {
+function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<School, 'id'>) => void, onOpenChange: (open:boolean)=>void}) {
   const [hash, setHash] = useState('');
   const [schoolName, setSchoolName] = useState('');
+  const [address, setAddress] = useState('');
+  const { toast } = useToast();
 
   const generateHash = () => {
-    // In a real app, this would be generated securely on the server
     const newHash = Array(16).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
     setHash(newHash);
   };
   
   const copyToClipboard = () => {
+    if(!hash) return;
     navigator.clipboard.writeText(hash);
-    // Add toast notification here
+    toast({ title: 'Copiado!', description: 'Chave hash copiada para a área de transferência.'});
+  }
+
+  const handleSave = () => {
+    if (!schoolName || !address || !hash) {
+      alert("Por favor, preencha todos os campos.");
+      return;
+    }
+    onSave({ name: schoolName, address, hash });
   }
 
   return (
@@ -138,7 +166,7 @@ function AddSchoolDialog() {
             Endereço
           </Label>
           <div className="col-span-3 space-y-2">
-            <Input id="address" placeholder="Busque o endereço ou preencha manualmente" />
+            <Input id="address" placeholder="Busque o endereço ou preencha manualmente" value={address} onChange={(e) => setAddress(e.target.value)} />
             <MapPlaceholder />
           </div>
         </div>
@@ -154,39 +182,89 @@ function AddSchoolDialog() {
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={generateHash}>Gerar Chave</Button>
-        <Button type="submit">Salvar Escola</Button>
+        <Button type="submit" onClick={handleSave}>Salvar Escola</Button>
       </DialogFooter>
     </DialogContent>
   );
 }
 
-function SchoolDetailsDialog({ school }: { school: typeof schools[0] }) {
-    const [allEmployees, setAllEmployees] = useState(allEmployeesData);
+function SchoolDetailsDialog({ school }: { school: School }) {
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+    const { toast } = useToast();
 
-    const schoolEmployees = useMemo(() => {
-        let employees = allEmployees.filter(emp => emp.schoolId === school.id);
+    useEffect(() => {
+        if (!school?.hash) return;
+        
+        const q = query(collection(db, "users"), where("hash", "==", school.hash));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const schoolEmployees: Employee[] = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                schoolEmployees.push({
+                    id: doc.id,
+                    uid: data.uid,
+                    name: data.name,
+                    email: data.email,
+                    role: data.role,
+                    status: data.status,
+                    hash: data.hash,
+                    creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                });
+            });
+            setEmployees(schoolEmployees);
+        });
+
+        return () => unsubscribe();
+    }, [school]);
+
+    const filteredEmployees = useMemo(() => {
+        let filtered = employees;
 
         if (statusFilter !== 'todos') {
-            employees = employees.filter(emp => emp.status.toLowerCase() === statusFilter);
+            filtered = filtered.filter(emp => emp.status.toLowerCase() === statusFilter);
         }
 
         if (searchTerm) {
             const lowerCaseSearch = searchTerm.toLowerCase();
-            employees = employees.filter(emp =>
+            filtered = filtered.filter(emp =>
                 emp.name.toLowerCase().includes(lowerCaseSearch) ||
                 emp.email.toLowerCase().includes(lowerCaseSearch)
             );
         }
 
-        return employees;
-    }, [school.id, searchTerm, statusFilter, allEmployees]);
+        return filtered;
+    }, [employees, searchTerm, statusFilter]);
 
-    const handleSaveEmployee = (updatedEmployee: Employee) => {
-        setAllEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
+    const handleSaveEmployee = async (updatedEmployee: Employee) => {
+        if (!updatedEmployee.uid) return;
+        try {
+          const employeeDocRef = doc(db, 'users', updatedEmployee.uid);
+          const roleString = updatedEmployee.role;
+          const roleNumber = typeof roleString === 'string' && roleString.startsWith('Nível') ? parseInt(roleString.split(' ')[1], 10) : updatedEmployee.role;
+
+          await updateDoc(employeeDocRef, {
+              status: updatedEmployee.status,
+              role: roleNumber,
+          });
+          toast({ title: 'Sucesso!', description: 'Funcionário atualizado.'});
+        } catch(error) {
+          console.error("Error updating employee:", error);
+          toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível atualizar o funcionário.'});
+        }
         setEditingEmployee(null);
+    }
+    
+    const getRoleName = (role: number | string) => {
+        if (typeof role === 'string' && role.startsWith('Nível')) return role;
+        if (role === 'Aguardando') return 'Aguardando';
+        switch(role) {
+            case 1: return 'Nível 1';
+            case 2: return 'Nível 2';
+            default: return 'Pendente';
+        }
     }
 
     return (
@@ -236,8 +314,9 @@ function SchoolDetailsDialog({ school }: { school: typeof schools[0] }) {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="todos">Todos</SelectItem>
-                                        <SelectItem value="ativo">Ativos</SelectItem>
-                                        <SelectItem value="inativo">Inativos</SelectItem>
+                                        <SelectItem value="Ativo">Ativos</SelectItem>
+                                        <SelectItem value="Inativo">Inativos</SelectItem>
+                                        <SelectItem value="Pendente">Pendentes</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -256,17 +335,22 @@ function SchoolDetailsDialog({ school }: { school: typeof schools[0] }) {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {schoolEmployees.length > 0 ? schoolEmployees.map(employee => (
+                                        {filteredEmployees.length > 0 ? filteredEmployees.map(employee => (
                                             <TableRow key={employee.id}>
                                                 <TableCell className="font-medium">{employee.name}</TableCell>
                                                 <TableCell>{employee.email}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant={employee.status === 'Ativo' ? 'default' : 'secondary'} className={employee.status === 'Ativo' ? 'bg-green-600' : 'bg-red-600'}>
+                                                     <Badge variant={employee.status === 'Ativo' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
+                                                         className={
+                                                            employee.status === 'Ativo' ? 'bg-green-600' : 
+                                                            employee.status === 'Pendente' ? 'bg-orange-500' :
+                                                            'bg-red-600'
+                                                         }>
                                                         {employee.status}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell>{employee.role}</TableCell>
-                                                <TableCell>{new Date(employee.creationDate).toLocaleDateString('pt-BR')}</TableCell>
+                                                <TableCell>{getRoleName(employee.role)}</TableCell>
+                                                <TableCell>{employee.creationDate}</TableCell>
                                                 <TableCell>
                                                      <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
@@ -304,13 +388,27 @@ function SchoolDetailsDialog({ school }: { school: typeof schools[0] }) {
 export default function SchoolsPage() {
     const { user } = useUser();
     const router = useRouter();
+    const { toast } = useToast();
+    const [schools, setSchools] = useState<School[]>([]);
+    const [isAddSchoolModalOpen, setAddSchoolModalOpen] = useState(false);
     const [isSchoolModalOpen, setIsSchoolModalOpen] = useState(false);
-    const [selectedSchool, setSelectedSchool] = useState<(typeof schools[0]) | null>(null);
+    const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
 
     useEffect(() => {
         if (!user || user.role < 3) {
             router.push('/dashboard');
+            return;
         }
+
+        const fetchSchools = async () => {
+            const querySnapshot = await getDocs(collection(db, "schools"));
+            const schoolsData: School[] = [];
+            querySnapshot.forEach((doc) => {
+                schoolsData.push({ id: doc.id, ...doc.data() } as School);
+            });
+            setSchools(schoolsData);
+        };
+        fetchSchools();
     }, [user, router]);
 
 
@@ -318,9 +416,21 @@ export default function SchoolsPage() {
       return <p>Acesso negado.</p>;
     }
     
-    const handleSchoolClick = (school: typeof schools[0]) => {
+    const handleSchoolClick = (school: School) => {
         setSelectedSchool(school);
         setIsSchoolModalOpen(true);
+    }
+
+    const handleSaveSchool = async (schoolData: Omit<School, 'id'>) => {
+        try {
+            const docRef = await addDoc(collection(db, "schools"), schoolData);
+            setSchools(prev => [...prev, { id: docRef.id, ...schoolData }]);
+            setAddSchoolModalOpen(false);
+            toast({ title: 'Sucesso!', description: 'Escola cadastrada com sucesso.'});
+        } catch (error) {
+            console.error("Error adding document: ", error);
+            toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível cadastrar a escola.'});
+        }
     }
 
 
@@ -333,14 +443,14 @@ export default function SchoolsPage() {
                 <CardTitle>Escolas</CardTitle>
                 <CardDescription>Gerencie as escolas cadastradas no sistema.</CardDescription>
             </div>
-             <Dialog>
+             <Dialog open={isAddSchoolModalOpen} onOpenChange={setAddSchoolModalOpen}>
                 <DialogTrigger asChild>
                     <Button size="sm" className="gap-1">
                         <PlusCircle className="h-3.5 w-3.5" />
                         Nova Escola
                     </Button>
                 </DialogTrigger>
-                <AddSchoolDialog />
+                <AddSchoolDialog onSave={handleSaveSchool} onOpenChange={setAddSchoolModalOpen} />
             </Dialog>
         </div>
       </CardHeader>
@@ -383,7 +493,7 @@ export default function SchoolsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuItem>Editar</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handleSchoolClick(school)}>Ver Detalhes</DropdownMenuItem>
                       <DropdownMenuItem className="text-red-500">Desativar</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -400,3 +510,5 @@ export default function SchoolsPage() {
     </>
   );
 }
+
+    

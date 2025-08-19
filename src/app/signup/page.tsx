@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -16,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, getDoc, DocumentReference, DocumentSnapshot, getDocs, query, collection, where, limit } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -33,30 +34,40 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     
+    if (password.length < 6) {
+        toast({
+            variant: "destructive",
+            title: "Senha Fraca",
+            description: "A senha deve ter pelo menos 6 caracteres.",
+        });
+        setLoading(false);
+        return;
+    }
+    
     try {
-      // Step 1: Check if hash exists in schools or city-halls (you might need to implement this logic if you have these collections)
-      // For now, we'll assume the hash is valid
-      
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      const isSecretaria = email.toLowerCase().includes('secretaria') || hash.toLowerCase().startsWith('pm');
+      const isSecretaria = hash.toLowerCase().startsWith('pm');
 
-      // Step 2: Create user profile
+      // Default role for school employee is 'Pendente' approval. Role 1 is view only, 2 can add students.
+      // A Secretaria user (admin) must approve and set the definitive role.
+      // Secretaria users are auto-approved with role 3.
       const userProfile = {
         uid: user.uid,
         name: name,
         email: email,
         hash: hash,
-        role: isSecretaria ? 3 : 1, // 3 for Secretaria, 1 for school employee (pending)
-        status: 'Pendente' // All new accounts are pending approval from an admin
+        role: isSecretaria ? 3 : 1, // Default to lowest privilege for schools
+        status: isSecretaria ? 'Aprovado' : 'Pendente',
+        creationDate: serverTimestamp()
       };
       
       await setDoc(doc(db, "users", user.uid), userProfile);
       
       toast({
           title: "Conta Criada!",
-          description: "Sua conta foi criada e está pendente de aprovação. Redirecionando...",
+          description: "Sua conta foi criada com sucesso. Redirecionando...",
       });
       
       // onAuthStateChanged in DashboardLayout will handle the session and redirect.
@@ -69,6 +80,8 @@ export default function SignupPage() {
            description = "Este e-mail já está em uso.";
        } else if (error.code === 'auth/weak-password') {
            description = "A senha é muito fraca. Use pelo menos 6 caracteres.";
+       } else if (error.code === 'auth/invalid-email') {
+           description = "O e-mail fornecido não é válido.";
        }
        toast({
           variant: "destructive",
@@ -153,3 +166,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    

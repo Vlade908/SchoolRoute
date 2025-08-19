@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import {
@@ -48,26 +49,27 @@ import { useUser } from '@/contexts/user-context';
 import { MapPlaceholder } from '@/components/map-placeholder';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
-
-// Mock data
-const initialStudents = Array.from({ length: 25 }, (_, i) => ({
-  id: `STU${1001 + i}`,
-  name: `Aluno ${1001 + i}`,
-  ra: `RA${2024001 + i}`,
-  cpf: `123.456.789-${10 + i}`,
-  rg: `12.345.678-${i}`,
-  school: i % 3 === 0 ? 'Escola Estadual A' : i % 3 === 1 ? 'Escola Municipal B' : 'Escola Municipalizada C',
-  schoolYear: `${(i % 5) + 5}º Ano`,
-  class: `Turma ${String.fromCharCode(65 + (i % 4))}`,
-  status: i % 5 === 0 ? 'Não Homologado' : 'Homologado',
-  enrollmentDate: new Date(2024, 0, 15 + i).toLocaleDateString('pt-BR'),
-  responsibleName: 'Maria da Silva',
-  contactPhone: '(11) 98765-4321',
-  rgIssueDate: '10/05/2010',
-}));
-
-type Student = typeof initialStudents[0];
+type Student = {
+  id: string; // Firestore document ID
+  name: string;
+  ra: string;
+  cpf: string;
+  rg: string;
+  school: string;
+  schoolYear: string;
+  class: string;
+  status: string;
+  enrollmentDate: string; // Should be a Timestamp in Firestore, converted to string for display
+  responsibleName: string;
+  contactPhone: string;
+  rgIssueDate: string;
+  address?: string;
+  contactEmail?: string;
+};
 
 
 function StudentProfileDialog({ 
@@ -93,7 +95,6 @@ function StudentProfileDialog({
 
   const handleSaveClick = () => {
     onSave(editedStudent);
-    onClose();
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -252,9 +253,29 @@ function StudentProfileDialog({
   );
 }
 
-function AddStudentDialog() {
+function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Student, 'id' | 'enrollmentDate' | 'status'>) => void, onOpenChange: (open: boolean) => void }) {
   const { user } = useUser();
+  const [studentData, setStudentData] = useState({
+    name: '', cpf: '', ra: '', rg: '', schoolYear: '', class: '', responsibleName: '', contactEmail: '', contactPhone: '', address: '', school: '', rgIssueDate: ''
+  });
+
   if (!user || user.role < 2) return null;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setStudentData(prev => ({...prev, [id]: value}));
+  }
+
+  const handleSave = () => {
+    // Basic validation
+    for (const key in studentData) {
+        if (studentData[key as keyof typeof studentData] === '') {
+            alert(`Por favor, preencha o campo: ${key}`);
+            return;
+        }
+    }
+    onSave(studentData);
+  }
 
   return (
     <DialogContent className="sm:max-w-[900px]">
@@ -264,24 +285,26 @@ function AddStudentDialog() {
       </DialogHeader>
       <div className="grid gap-4 py-4 md:grid-cols-2">
         <div className="space-y-4">
-            <Input id="name" placeholder="Nome Completo" />
-            <Input id="cpf" placeholder="CPF" />
-            <Input id="ra" placeholder="RA (Registro do Aluno)" />
-            <Input id="rg" placeholder="RG" />
+            <Input id="name" placeholder="Nome Completo" value={studentData.name} onChange={handleChange}/>
+            <Input id="cpf" placeholder="CPF" value={studentData.cpf} onChange={handleChange}/>
+            <Input id="ra" placeholder="RA (Registro do Aluno)" value={studentData.ra} onChange={handleChange}/>
+            <Input id="rg" placeholder="RG" value={studentData.rg} onChange={handleChange}/>
+             <Input id="rgIssueDate" placeholder="Data de Emissão RG" value={studentData.rgIssueDate} onChange={handleChange}/>
             <div className="grid grid-cols-2 gap-4">
-                <Input id="schoolYear" placeholder="Ano Escolar" />
-                <Input id="class" placeholder="Classe" />
+                <Input id="schoolYear" placeholder="Ano Escolar" value={studentData.schoolYear} onChange={handleChange}/>
+                <Input id="class" placeholder="Classe" value={studentData.class} onChange={handleChange}/>
             </div>
-             <Input id="responsavel" placeholder="Nome do Responsável" />
-             <Input id="email" type="email" placeholder="Email de Contato" />
-             <Input id="phone" type="tel" placeholder="Telefone de Contato" />
+             <Input id="responsibleName" placeholder="Nome do Responsável" value={studentData.responsibleName} onChange={handleChange}/>
+             <Input id="contactEmail" type="email" placeholder="Email de Contato" value={studentData.contactEmail} onChange={handleChange}/>
+             <Input id="contactPhone" type="tel" placeholder="Telefone de Contato" value={studentData.contactPhone} onChange={handleChange}/>
         </div>
          <div className="space-y-4">
-            <Input id="address" placeholder="Endereço (Rua, Número, Bairro...)" />
+             <Input id="school" placeholder="Escola" value={studentData.school} onChange={handleChange}/>
+            <Input id="address" placeholder="Endereço (Rua, Número, Bairro...)" value={studentData.address} onChange={handleChange}/>
             <MapPlaceholder />
          </div>
       </div>
-       <Button type="submit" className="w-full">Salvar Aluno</Button>
+       <Button type="submit" className="w-full" onClick={handleSave}>Salvar Aluno</Button>
     </DialogContent>
   );
 }
@@ -289,10 +312,12 @@ function AddStudentDialog() {
 
 export default function StudentsPage() {
   const { user } = useUser();
-  const [students, setStudents] = useState<Student[]>(initialStudents);
+  const { toast } = useToast();
+  const [students, setStudents] = useState<Student[]>([]);
   const [activeStudent, setActiveStudent] = useState<Student | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isProfileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -303,6 +328,23 @@ export default function StudentsPage() {
   
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "students"), (snapshot) => {
+        const studentsData: Student[] = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            studentsData.push({
+                id: doc.id,
+                ...data,
+                enrollmentDate: data.enrollmentDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+            } as Student);
+        });
+        setStudents(studentsData);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const filteredStudents = useMemo(() => {
     let filtered = students;
@@ -320,6 +362,7 @@ export default function StudentsPage() {
 
     if (!schoolTypeFilter.estaduais || !schoolTypeFilter.municipais) {
         filtered = filtered.filter(student => {
+            if (!student.school) return false;
             const isEst = isEstadual(student.school);
             const isMun = isMunicipal(student.school);
             if (schoolTypeFilter.estaduais && isEst) return true;
@@ -349,26 +392,57 @@ export default function StudentsPage() {
 
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
 
-  const handleOpenDialog = (student: Student, editMode: boolean) => {
+  const handleOpenProfileDialog = (student: Student, editMode: boolean) => {
     setActiveStudent(student);
     setIsEditing(editMode);
-    setIsDialogOpen(true);
+    setProfileDialogOpen(true);
   };
 
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
+  const handleCloseProfileDialog = () => {
+    setProfileDialogOpen(false);
     setActiveStudent(null);
     setIsEditing(false);
   };
   
-  const handleSaveStudent = (updatedStudent: Student) => {
-    setStudents(prevStudents => 
-        prevStudents.map(student => 
-            student.id === updatedStudent.id ? updatedStudent : student
-        )
-    );
-    handleCloseDialog();
+  const handleSaveStudent = async (updatedStudent: Student) => {
+    try {
+        const { id, ...studentData } = updatedStudent;
+        await updateDoc(doc(db, "students", id), studentData);
+        toast({ title: "Sucesso!", description: "Aluno atualizado." });
+    } catch(error) {
+        console.error("Error updating student:", error);
+        toast({ variant: 'destructive', title: "Erro!", description: "Não foi possível atualizar o aluno." });
+    } finally {
+        handleCloseProfileDialog();
+    }
   };
+  
+  const handleAddStudent = async (newStudentData: Omit<Student, 'id' | 'enrollmentDate' | 'status'>) => {
+    try {
+        const studentToAdd = {
+            ...newStudentData,
+            status: 'Não Homologado',
+            enrollmentDate: new Date()
+        };
+        await addDoc(collection(db, "students"), studentToAdd);
+        toast({ title: "Sucesso!", description: "Aluno cadastrado." });
+    } catch(error) {
+        console.error("Error adding student:", error);
+        toast({ variant: 'destructive', title: "Erro!", description: "Não foi possível cadastrar o aluno." });
+    } finally {
+        setAddDialogOpen(false);
+    }
+  }
+  
+  const handleDeleteStudent = async (studentId: string) => {
+    try {
+      await deleteDoc(doc(db, "students", studentId));
+      toast({ title: "Sucesso!", description: "Aluno excluído." });
+    } catch (error) {
+      console.error("Error deleting student: ", error);
+      toast({ variant: "destructive", title: "Erro!", description: "Não foi possível excluir o aluno." });
+    }
+  }
 
   const handleSchoolTypeChange = (type: 'estaduais' | 'municipais', checked: boolean) => {
     setSchoolTypeFilter(prev => ({ ...prev, [type]: checked }));
@@ -449,7 +523,7 @@ export default function StudentsPage() {
             </span>
           </Button>
           {user && user.role >= 2 && (
-             <Dialog>
+             <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="h-10 gap-1">
                     <PlusCircle className="h-3.5 w-3.5" />
@@ -458,7 +532,7 @@ export default function StudentsPage() {
                     </span>
                   </Button>
                 </DialogTrigger>
-                <AddStudentDialog />
+                <AddStudentDialog onSave={handleAddStudent} onOpenChange={setAddDialogOpen} />
               </Dialog>
           )}
         </div>
@@ -517,11 +591,11 @@ export default function StudentsPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                <DropdownMenuItem onSelect={() => handleOpenDialog(student, false)}>Ver Perfil</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => handleOpenProfileDialog(student, false)}>Ver Perfil</DropdownMenuItem>
                                 {user && user.role >= 2 && 
-                                    <DropdownMenuItem onSelect={() => handleOpenDialog(student, true)}>Editar</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleOpenProfileDialog(student, true)}>Editar</DropdownMenuItem>
                                 }
-                                {user && user.role === 3 && <DropdownMenuItem className="text-red-500">Excluir</DropdownMenuItem>}
+                                {user && user.role === 3 && <DropdownMenuItem className="text-red-500" onClick={() => handleDeleteStudent(student.id)}>Excluir</DropdownMenuItem>}
                               </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -560,12 +634,12 @@ export default function StudentsPage() {
           </CardFooter>
         </Card>
       </TabsContent>
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isProfileDialogOpen} onOpenChange={setProfileDialogOpen}>
         <StudentProfileDialog 
             student={activeStudent}
             isEditing={isEditing}
             onSave={handleSaveStudent}
-            onClose={handleCloseDialog}
+            onClose={handleCloseProfileDialog}
         />
       </Dialog>
     </Tabs>
