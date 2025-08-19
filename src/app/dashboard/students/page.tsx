@@ -86,15 +86,15 @@ function StudentProfileDialog({
 
   const handleSaveClick = () => {
     onSave(editedStudent);
-    setIsEditing(false); 
     onClose();
   };
 
   const handleCancelClick = () => {
-    setIsEditing(false);
-    setEditedStudent({ ...student }); // Reset changes
     if (initialIsEditing) {
         onClose();
+    } else {
+        setIsEditing(false);
+        setEditedStudent({ ...student }); // Reset changes
     }
   };
 
@@ -294,6 +294,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [viewingStudentId, setViewingStudentId] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const openDialog = (studentId: string, isEditing: boolean) => {
     if (isEditing) {
@@ -303,11 +304,13 @@ export default function StudentsPage() {
       setViewingStudentId(studentId);
       setEditingStudentId(null);
     }
+    setIsDialogOpen(true);
   }
 
   const closeDialogs = () => {
     setEditingStudentId(null);
     setViewingStudentId(null);
+    setIsDialogOpen(false);
   }
   
   const handleSaveStudent = (updatedStudent: Student) => {
@@ -419,7 +422,7 @@ export default function StudentsPage() {
                         <TableCell className="hidden md:table-cell">{student.schoolYear} / {student.class}</TableCell>
                         <TableCell className="hidden md:table-cell">{student.ra}</TableCell>
                         <TableCell>
-                          <Dialog onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
+                          <Dialog open={isDialogOpen && (student.id === viewingStudentId || student.id === editingStudentId)} onOpenChange={(isOpen) => !isOpen && closeDialogs()}>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                 <Button
@@ -433,25 +436,19 @@ export default function StudentsPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                  <DialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={() => openDialog(student.id, false)}>Ver Perfil</DropdownMenuItem>
-                                  </DialogTrigger>
+                                  <DropdownMenuItem onSelect={() => openDialog(student.id, false)}>Ver Perfil</DropdownMenuItem>
                                   {user && user.role >= 2 && 
-                                    <DialogTrigger asChild>
                                       <DropdownMenuItem onSelect={() => openDialog(student.id, true)}>Editar</DropdownMenuItem>
-                                    </DialogTrigger>
                                   }
                                   {user && user.role === 3 && <DropdownMenuItem className="text-red-500">Excluir</DropdownMenuItem>}
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                             {(studentToView?.id === student.id || studentToEdit?.id === student.id) && (
-                                <StudentProfileDialog 
-                                    student={studentToEdit || studentToView!}
-                                    isEditing={!!studentToEdit}
-                                    onSave={handleSaveStudent}
-                                    onClose={closeDialogs}
-                                />
-                             )}
+                            <StudentProfileDialog 
+                                student={studentToEdit || studentToView!}
+                                isEditing={!!studentToEdit}
+                                onSave={handleSaveStudent}
+                                onClose={closeDialogs}
+                            />
                           </Dialog>
                         </TableCell>
                     </TableRow>
