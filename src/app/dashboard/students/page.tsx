@@ -310,7 +310,7 @@ export default function StudentsPage() {
                             <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
                             <DialogTrigger asChild><DropdownMenuItem>Ver Perfil</DropdownMenuItem></DialogTrigger>
-                            {user && user.role >= 2 && <DropdownMenuItem>Editar</DropdownMenuItem>}
+                            {user && user.role >= 2 && <DialogTrigger asChild><DropdownMenuItem>Editar</DropdownMenuItem></DialogTrigger>}
                             {user && user.role === 3 && <DropdownMenuItem className="text-red-500">Excluir</DropdownMenuItem>}
                             </DropdownMenuContent>
                         </DropdownMenu>
