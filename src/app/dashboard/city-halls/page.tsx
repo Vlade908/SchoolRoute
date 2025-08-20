@@ -91,7 +91,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
       <div className="grid gap-4 py-4">
         <p><strong>Nome:</strong> {employee.name}</p>
         <p><strong>Email:</strong> {employee.email}</p>
-        <div className="flex items-center gap-4">
+        <div className="grid md:grid-cols-2 gap-4 items-center">
           <Label htmlFor="role" className="whitespace-nowrap">Nível de Privilégio</Label>
           <Select 
             value={getRoleValue(currentEmployee.role)}
@@ -107,7 +107,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="grid md:grid-cols-2 gap-4 items-center">
             <Label htmlFor="status" className="whitespace-nowrap">Status</Label>
              <Select
                 value={currentEmployee.status}
@@ -193,9 +193,9 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Omi
                     </div>
                 </div>
             </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={generateHash}>Gerar Chave</Button>
-                <Button onClick={handleSave}>Salvar Prefeitura</Button>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={generateHash} className="w-full sm:w-auto">Gerar Chave</Button>
+                <Button onClick={handleSave} className="w-full sm:w-auto">Salvar Prefeitura</Button>
             </DialogFooter>
         </DialogContent>
     );
@@ -316,7 +316,7 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
                             <p><span className="font-semibold">Nome:</span> {cityHall.name}</p>
                             <p><span className="font-semibold">CNPJ:</span> {cityHall.cnpj}</p>
                             <p><span className="font-semibold">Cidade/UF:</span> {cityHall.city}/{cityHall.state}</p>
-                            <p className="flex items-center gap-2"><span className="font-semibold">Chave Hash:</span> <span className="font-mono text-muted-foreground">{cityHall.hash}</span>
+                            <p className="flex items-center gap-2"><span className="font-semibold">Chave Hash:</span> <span className="font-mono text-muted-foreground break-all">{cityHall.hash}</span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigator.clipboard.writeText(cityHall.hash)}>
                                     <Copy className="h-3 w-3" />
                                 </Button>
@@ -329,8 +329,8 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
                         <CardHeader>
                             <CardTitle>Funcionários</CardTitle>
                             <CardDescription>Lista de funcionários da secretaria cadastrados nesta prefeitura.</CardDescription>
-                            <div className="flex items-center gap-2 pt-2">
-                                <div className="relative flex-1">
+                            <div className="flex flex-col md:flex-row items-center gap-2 pt-2">
+                                <div className="relative flex-1 w-full">
                                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input 
                                         placeholder="Buscar por nome ou e-mail..."
@@ -340,7 +340,7 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
                                     />
                                 </div>
                                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger className="w-[180px]">
+                                    <SelectTrigger className="w-full md:w-[180px]">
                                         <SelectValue placeholder="Filtrar por status" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -354,58 +354,60 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
                         </CardHeader>
                         <CardContent>
                              <Dialog open={!!editingEmployee} onOpenChange={(isOpen) => !isOpen && setEditingEmployee(null)}>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Nome</TableHead>
-                                            <TableHead>Email</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Nível</TableHead>
-                                            <TableHead>Data de Criação</TableHead>
-                                            <TableHead><span className="sr-only">Ações</span></TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {filteredEmployees.length > 0 ? filteredEmployees.map(employee => (
-                                            <TableRow key={employee.id}>
-                                                <TableCell className="font-medium">{employee.name}</TableCell>
-                                                <TableCell>{employee.email}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant={employee.status === 'Ativo' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
-                                                         className={
-                                                            employee.status === 'Ativo' ? 'bg-green-600' : 
-                                                            employee.status === 'Pendente' ? 'bg-orange-500' :
-                                                            'bg-red-600'
-                                                         }>
-                                                        {employee.status}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>{getRoleName(employee.role)}</TableCell>
-                                                <TableCell>{employee.creationDate}</TableCell>
-                                                <TableCell>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                                <span className="sr-only">Toggle menu</span>
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                            <DialogTrigger asChild>
-                                                              <DropdownMenuItem onSelect={() => setEditingEmployee(employee)}>Editar</DropdownMenuItem>
-                                                            </DialogTrigger>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        )) : (
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
                                             <TableRow>
-                                                <TableCell colSpan={6} className="text-center">Nenhum funcionário encontrado.</TableCell>
+                                                <TableHead>Nome</TableHead>
+                                                <TableHead className="hidden sm:table-cell">Email</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="hidden md:table-cell">Nível</TableHead>
+                                                <TableHead className="hidden lg:table-cell">Data de Criação</TableHead>
+                                                <TableHead><span className="sr-only">Ações</span></TableHead>
                                             </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredEmployees.length > 0 ? filteredEmployees.map(employee => (
+                                                <TableRow key={employee.id}>
+                                                    <TableCell className="font-medium">{employee.name}</TableCell>
+                                                    <TableCell className="hidden sm:table-cell">{employee.email}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={employee.status === 'Ativo' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
+                                                             className={
+                                                                employee.status === 'Ativo' ? 'bg-green-600' : 
+                                                                employee.status === 'Pendente' ? 'bg-orange-500' :
+                                                                'bg-red-600'
+                                                             }>
+                                                            {employee.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="hidden md:table-cell">{getRoleName(employee.role)}</TableCell>
+                                                    <TableCell className="hidden lg:table-cell">{employee.creationDate}</TableCell>
+                                                    <TableCell>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                    <span className="sr-only">Toggle menu</span>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                                <DialogTrigger asChild>
+                                                                  <DropdownMenuItem onSelect={() => setEditingEmployee(employee)}>Editar</DropdownMenuItem>
+                                                                </DialogTrigger>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center">Nenhum funcionário encontrado.</TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
                                 {editingEmployee && <ManageEmployeeDialog employee={editingEmployee} onSave={handleSaveEmployee} onOpenChange={(isOpen) => !isOpen && setEditingEmployee(null)}/>}
                             </Dialog>
                         </CardContent>
@@ -473,14 +475,14 @@ export default function CityHallsPage() {
     <>
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-start">
-            <div>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex-1">
                 <CardTitle>Prefeituras</CardTitle>
                 <CardDescription>Gerencie as prefeituras conveniadas.</CardDescription>
             </div>
             <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                 <DialogTrigger asChild>
-                    <Button size="sm" className="gap-1">
+                    <Button size="sm" className="gap-1 w-full sm:w-auto">
                         <PlusCircle className="h-3.5 w-3.5" />
                         Nova Prefeitura
                     </Button>
@@ -490,46 +492,48 @@ export default function CityHallsPage() {
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>CNPJ</TableHead>
-              <TableHead>Cidade</TableHead>
-              <TableHead>
-                <span className="sr-only">Ações</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {cityHalls.map((cityHall) => (
-              <TableRow key={cityHall.id}>
-                <TableCell className="font-medium">
-                    <button onClick={() => handleCityHallClick(cityHall)} className="hover:underline text-primary">
-                        {cityHall.name}
-                    </button>
-                </TableCell>
-                <TableCell>{cityHall.cnpj}</TableCell>
-                <TableCell>{cityHall.city}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button aria-haspopup="true" size="icon" variant="ghost">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Toggle menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuItem onSelect={() => handleCityHallClick(cityHall)}>Ver Detalhes</DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-500">Desativar</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead className="hidden md:table-cell">CNPJ</TableHead>
+                  <TableHead>Cidade</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Ações</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cityHalls.map((cityHall) => (
+                  <TableRow key={cityHall.id}>
+                    <TableCell className="font-medium">
+                        <button onClick={() => handleCityHallClick(cityHall)} className="hover:underline text-primary">
+                            {cityHall.name}
+                        </button>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{cityHall.cnpj}</TableCell>
+                    <TableCell>{cityHall.city}</TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button aria-haspopup="true" size="icon" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Toggle menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                          <DropdownMenuItem onSelect={() => handleCityHallClick(cityHall)}>Ver Detalhes</DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-500">Desativar</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+        </div>
       </CardContent>
     </Card>
     <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
@@ -538,3 +542,5 @@ export default function CityHallsPage() {
     </>
   );
 }
+
+    

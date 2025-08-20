@@ -105,7 +105,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
       <div className="grid gap-4 py-4">
         <p><strong>Nome:</strong> {employee.name}</p>
         <p><strong>Email:</strong> {employee.email}</p>
-        <div className="flex items-center gap-4">
+        <div className="grid md:grid-cols-2 gap-4 items-center">
           <Label htmlFor="role" className="whitespace-nowrap">Nível de Privilégio</Label>
           <Select 
             value={getRoleValue(currentEmployee.role)}
@@ -120,7 +120,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="grid md:grid-cols-2 gap-4 items-center">
             <Label htmlFor="status" className="whitespace-nowrap">Status</Label>
              <Select
                 value={currentEmployee.status}
@@ -220,9 +220,9 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
           </div>
         </div>
       </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={generateHash}>Gerar Chave</Button>
-        <Button type="submit" onClick={handleSave}>Salvar Escola</Button>
+      <DialogFooter className="flex-col sm:flex-row gap-2">
+        <Button variant="outline" onClick={generateHash} className="w-full sm:w-auto">Gerar Chave</Button>
+        <Button type="submit" onClick={handleSave} className="w-full sm:w-auto">Salvar Escola</Button>
       </DialogFooter>
     </DialogContent>
   );
@@ -290,13 +290,14 @@ function GradesAndClassesManager({ school, onUpdate, isEditing, onViewClass }: {
       </CardHeader>
       <CardContent>
         {isEditing && (
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex flex-col sm:flex-row items-center gap-2 mb-4">
             <Input 
               placeholder="Nome da nova série (ex: 1º Ano)"
               value={newGradeName}
               onChange={(e) => setNewGradeName(e.target.value)}
+              className="flex-grow"
             />
-            <Button onClick={handleAddGrade}><PlusCircle className="mr-2 h-4 w-4"/> Adicionar Série</Button>
+            <Button onClick={handleAddGrade} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4"/> Adicionar Série</Button>
           </div>
         )}
         <Accordion type="multiple" className="w-full">
@@ -325,37 +326,39 @@ function GradesAndClassesManager({ school, onUpdate, isEditing, onViewClass }: {
                                </div>
                            </AccordionTrigger>
                            <AccordionContent className="pb-2">
-                                <Table>
-                                <TableBody>
-                                  {classesForPeriod.map((cls, classIndex) => (
-                                    <TableRow key={classIndex}>
-                                      <TableCell className="py-1">
-                                         <button 
-                                            disabled={isEditing} 
-                                            className="disabled:no-underline disabled:cursor-default hover:underline"
-                                            onClick={() => !isEditing && onViewClass(grade.name, cls.name)}
-                                          >
-                                            {cls.name}
-                                          </button>
-                                      </TableCell>
-                                      {isEditing && (
-                                        <TableCell className="text-right py-1">
-                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveClass(gradeIndex, grade.classes.indexOf(cls))}>
-                                            <Trash2 className="h-3 w-3 text-red-500"/>
-                                          </Button>
-                                        </TableCell>
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                    <TableBody>
+                                      {classesForPeriod.map((cls, classIndex) => (
+                                        <TableRow key={classIndex}>
+                                          <TableCell className="py-1">
+                                             <button 
+                                                disabled={isEditing} 
+                                                className="disabled:no-underline disabled:cursor-default hover:underline"
+                                                onClick={() => !isEditing && onViewClass(grade.name, cls.name)}
+                                              >
+                                                {cls.name}
+                                              </button>
+                                          </TableCell>
+                                          {isEditing && (
+                                            <TableCell className="text-right py-1">
+                                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveClass(gradeIndex, grade.classes.indexOf(cls))}>
+                                                <Trash2 className="h-3 w-3 text-red-500"/>
+                                              </Button>
+                                            </TableCell>
+                                          )}
+                                        </TableRow>
+                                      ))}
+                                      {classesForPeriod.length === 0 && isEditing && (
+                                        <TableRow>
+                                          <TableCell colSpan={2} className="text-xs text-muted-foreground text-center py-2">
+                                            Nenhuma turma cadastrada para este período.
+                                          </TableCell>
+                                        </TableRow>
                                       )}
-                                    </TableRow>
-                                  ))}
-                                  {classesForPeriod.length === 0 && isEditing && (
-                                    <TableRow>
-                                      <TableCell colSpan={2} className="text-xs text-muted-foreground text-center py-2">
-                                        Nenhuma turma cadastrada para este período.
-                                      </TableCell>
-                                    </TableRow>
-                                  )}
-                                </TableBody>
-                              </Table>
+                                    </TableBody>
+                                  </Table>
+                                </div>
                            </AccordionContent>
                        </AccordionItem>
                     )})}
@@ -663,11 +666,11 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                               </div>
                             ) : (
                                 <>
-                                    <p><span className="font-semibold">ID:</span> {school.id}</p>
+                                    <p><span className="font-semibold">ID:</span> <span className="text-sm text-muted-foreground">{school.id}</span></p>
                                     <p><span className="font-semibold">Nome:</span> {school.name}</p>
                                     <p><span className="font-semibold">Tipo:</span> {school.schoolType}</p>
                                     <p><span className="font-semibold">Endereço:</span> {school.address}</p>
-                                    <p className="flex items-center gap-2"><span className="font-semibold">Chave Hash:</span> <span className="font-mono text-muted-foreground">{school.hash}</span>
+                                    <p className="flex items-center gap-2"><span className="font-semibold">Chave Hash:</span> <span className="font-mono text-muted-foreground break-all">{school.hash}</span>
                                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigator.clipboard.writeText(school.hash)}>
                                             <Copy className="h-3 w-3" />
                                         </Button>
@@ -691,8 +694,8 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                         <CardHeader>
                             <CardTitle>Funcionários</CardTitle>
                             <CardDescription>Lista de funcionários cadastrados nesta escola.</CardDescription>
-                            <div className="flex items-center gap-2 pt-2">
-                                <div className="relative flex-1">
+                            <div className="flex flex-col md:flex-row items-center gap-2 pt-2">
+                                <div className="relative flex-1 w-full">
                                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input 
                                         placeholder="Buscar por nome ou e-mail..."
@@ -702,7 +705,7 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                                     />
                                 </div>
                                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger className="w-[180px]">
+                                    <SelectTrigger className="w-full md:w-[180px]">
                                         <SelectValue placeholder="Filtrar por status" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -716,14 +719,15 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                         </CardHeader>
                         <CardContent>
                              <Dialog open={!!editingEmployee} onOpenChange={(isOpen) => !isOpen && setEditingEmployee(null)}>
+                                <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Nome</TableHead>
-                                            <TableHead>Email</TableHead>
+                                            <TableHead className="hidden sm:table-cell">Email</TableHead>
                                             <TableHead>Status</TableHead>
-                                            <TableHead>Nível</TableHead>
-                                            <TableHead>Data de Criação</TableHead>
+                                            <TableHead className="hidden md:table-cell">Nível</TableHead>
+                                            <TableHead className="hidden lg:table-cell">Data de Criação</TableHead>
                                             <TableHead><span className="sr-only">Ações</span></TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -731,7 +735,7 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                                         {filteredEmployees.length > 0 ? filteredEmployees.map(employee => (
                                             <TableRow key={employee.id}>
                                                 <TableCell className="font-medium">{employee.name}</TableCell>
-                                                <TableCell>{employee.email}</TableCell>
+                                                <TableCell className="hidden sm:table-cell">{employee.email}</TableCell>
                                                 <TableCell>
                                                      <Badge variant={employee.status === 'Ativo' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
                                                          className={
@@ -742,8 +746,8 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                                                         {employee.status}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell>{getRoleName(employee.role)}</TableCell>
-                                                <TableCell>{employee.creationDate}</TableCell>
+                                                <TableCell className="hidden md:table-cell">{getRoleName(employee.role)}</TableCell>
+                                                <TableCell className="hidden lg:table-cell">{employee.creationDate}</TableCell>
                                                 <TableCell>
                                                      <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
@@ -768,6 +772,7 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                                         )}
                                     </TableBody>
                                 </Table>
+                                </div>
                                 {editingEmployee && <ManageEmployeeDialog employee={editingEmployee} onSave={handleSaveEmployee} onOpenChange={(isOpen) => !isOpen && setEditingEmployee(null)}/>}
                             </Dialog>
                         </CardContent>
@@ -910,7 +915,7 @@ export default function SchoolsPage() {
             const schoolsData: School[] = [];
             snapshot.forEach((doc) => {
                 const encryptedData = doc.data();
-                const data = decryptObjectValues(encryptedData) as any;
+                const data = decryptObjectValues(data as any);
                 if (data) {
                     schoolsData.push({ 
                         id: doc.id,
@@ -962,14 +967,14 @@ export default function SchoolsPage() {
     <>
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-start">
-            <div>
+        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <div className="flex-1">
                 <CardTitle>Escolas</CardTitle>
                 <CardDescription>Gerencie as escolas cadastradas no sistema.</CardDescription>
             </div>
              <Dialog open={isAddSchoolModalOpen} onOpenChange={setAddSchoolModalOpen}>
                 <DialogTrigger asChild>
-                    <Button size="sm" className="gap-1">
+                    <Button size="sm" className="gap-1 w-full md:w-auto">
                         <PlusCircle className="h-3.5 w-3.5" />
                         Nova Escola
                     </Button>
@@ -977,8 +982,8 @@ export default function SchoolsPage() {
                 <AddSchoolDialog onSave={handleSaveSchool} onOpenChange={setAddSchoolModalOpen} />
             </Dialog>
         </div>
-         <div className="flex items-center gap-2 pt-4">
-            <div className="relative flex-1">
+         <div className="flex flex-col md:flex-row items-center gap-2 pt-4">
+            <div className="relative flex-1 w-full">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
                     placeholder="Buscar por nome..."
@@ -987,36 +992,39 @@ export default function SchoolsPage() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filtrar por status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Todos os Status</SelectItem>
-                    <SelectItem value="Ativa">Ativas</SelectItem>
-                    <SelectItem value="Inativa">Inativas</SelectItem>
-                </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Filtrar por tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Todos os Tipos</SelectItem>
-                    <SelectItem value="MUNICIPAL">Municipal</SelectItem>
-                    <SelectItem value="ESTADUAL">Estadual</SelectItem>
-                    <SelectItem value="MUNICIPALIZADA">Municipalizada</SelectItem>
-                </SelectContent>
-            </Select>
+            <div className="flex w-full md:w-auto gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full md:w-[180px]">
+                      <SelectValue placeholder="Filtrar por status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Todos os Status</SelectItem>
+                      <SelectItem value="Ativa">Ativas</SelectItem>
+                      <SelectItem value="Inativa">Inativas</SelectItem>
+                  </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-full md:w-[200px]">
+                      <SelectValue placeholder="Filtrar por tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Todos os Tipos</SelectItem>
+                      <SelectItem value="MUNICIPAL">Municipal</SelectItem>
+                      <SelectItem value="ESTADUAL">Estadual</SelectItem>
+                      <SelectItem value="MUNICIPALIZADA">Municipalizada</SelectItem>
+                  </SelectContent>
+              </Select>
+            </div>
         </div>
       </CardHeader>
       <CardContent>
+       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Nome da Escola</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Endereço</TableHead>
+              <TableHead className="hidden sm:table-cell">Tipo</TableHead>
+              <TableHead className="hidden md:table-cell">Endereço</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>
                 <span className="sr-only">Ações</span>
@@ -1031,8 +1039,8 @@ export default function SchoolsPage() {
                         {school.name}
                     </button>
                 </TableCell>
-                <TableCell>{school.schoolType}</TableCell>
-                <TableCell>{school.address}</TableCell>
+                <TableCell className="hidden sm:table-cell">{school.schoolType}</TableCell>
+                <TableCell className="hidden md:table-cell">{school.address}</TableCell>
                 <TableCell>
                   <Badge variant={school.status === 'Ativa' ? 'default' : 'secondary'} className={school.status === 'Ativa' ? 'bg-green-600' : ''}>
                     {school.status}
@@ -1045,6 +1053,7 @@ export default function SchoolsPage() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
      <Dialog open={isSchoolModalOpen} onOpenChange={(isOpen) => {
@@ -1061,3 +1070,6 @@ export default function SchoolsPage() {
 
     
 
+
+
+    

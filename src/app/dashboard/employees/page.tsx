@@ -91,7 +91,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
         <p><strong>Nome:</strong> {employee.name}</p>
         <p><strong>Email:</strong> {employee.email}</p>
         <p><strong>Escola/Secretaria:</strong> {employee.schoolName || 'N/A'}</p>
-        <div className="flex items-center gap-4">
+        <div className="grid md:grid-cols-2 gap-4 items-center">
           <Label htmlFor="role" className="whitespace-nowrap">Nível de Privilégio</Label>
           <Select 
             value={currentEmployee.role.toString()}
@@ -107,7 +107,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="grid md:grid-cols-2 gap-4 items-center">
           <Label htmlFor="status">Status</Label>
            <Select 
             value={currentEmployee.status}
@@ -259,92 +259,96 @@ export default function EmployeesPage() {
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Escola/Secretaria</TableHead>
-              <TableHead>Nível</TableHead>
-              <TableHead>
-                <span className="sr-only">Ações</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {employees.map((employee) => (
-              <TableRow key={employee.id}>
-                <TableCell className="font-medium">{employee.name}</TableCell>
-                <TableCell>
-                  <Badge variant={employee.status === 'Aprovado' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
-                         className={
-                            employee.status === 'Aprovado' ? 'bg-green-600' : 
-                            employee.status === 'Pendente' ? 'bg-orange-500' :
-                            'bg-red-600'
-                         }>
-                    {employee.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>{employee.schoolName}</TableCell>
-                <TableCell>{getRoleName(employee.role)}</TableCell>
-                <TableCell>
-                 <Dialog open={isManageDialogOpen && selectedEmployee?.id === employee.id} onOpenChange={(isOpen) => {
-                     if(!isOpen) {
-                         setSelectedEmployee(null);
-                         setIsManageDialogOpen(false);
-                     } else {
-                         openManageDialog(employee)
-                     }
-                 }}>
-                    <AlertDialog>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Toggle menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                            <DialogTrigger asChild>
-                              <DropdownMenuItem>
-                                {employee.status === 'Pendente' ? 'Aprovar/Rejeitar' : 'Editar Permissões'}
-                              </DropdownMenuItem>
-                            </DialogTrigger>
-                             {employee.status !== 'Pendente' && (
-                                <>
-                                 <DropdownMenuSeparator />
-                                 <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem className="text-red-500">
-                                        {employee.status === 'Inativo' ? 'Excluir' : 'Desativar'}
-                                    </DropdownMenuItem>
-                                 </AlertDialogTrigger>
-                                </>
-                             )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação irá {employee.status === 'Inativo' ? 'excluir permanentemente' : 'desativar'} o funcionário '{employee.name}'. 
-                              {employee.status !== 'Inativo' && ' Ele não terá mais acesso ao sistema.'}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeactivate(employee.id)}>Confirmar</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                    {selectedEmployee && <ManageEmployeeDialog employee={selectedEmployee} onSave={handleSaveEmployee} onOpenChange={setIsManageDialogOpen} />}
-                  </Dialog>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden sm:table-cell">Escola/Secretaria</TableHead>
+                  <TableHead className="hidden md:table-cell">Nível</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Ações</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {employees.map((employee) => (
+                  <TableRow key={employee.id}>
+                    <TableCell className="font-medium">{employee.name}</TableCell>
+                    <TableCell>
+                      <Badge variant={employee.status === 'Aprovado' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
+                             className={
+                                employee.status === 'Aprovado' ? 'bg-green-600' : 
+                                employee.status === 'Pendente' ? 'bg-orange-500' :
+                                'bg-red-600'
+                             }>
+                        {employee.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">{employee.schoolName}</TableCell>
+                    <TableCell className="hidden md:table-cell">{getRoleName(employee.role)}</TableCell>
+                    <TableCell>
+                     <Dialog open={isManageDialogOpen && selectedEmployee?.id === employee.id} onOpenChange={(isOpen) => {
+                         if(!isOpen) {
+                             setSelectedEmployee(null);
+                             setIsManageDialogOpen(false);
+                         } else {
+                             openManageDialog(employee)
+                         }
+                     }}>
+                        <AlertDialog>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button aria-haspopup="true" size="icon" variant="ghost">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Toggle menu</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                <DialogTrigger asChild>
+                                  <DropdownMenuItem>
+                                    {employee.status === 'Pendente' ? 'Aprovar/Rejeitar' : 'Editar Permissões'}
+                                  </DropdownMenuItem>
+                                </DialogTrigger>
+                                 {employee.status !== 'Pendente' && (
+                                    <>
+                                     <DropdownMenuSeparator />
+                                     <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem className="text-red-500">
+                                            {employee.status === 'Inativo' ? 'Excluir' : 'Desativar'}
+                                        </DropdownMenuItem>
+                                     </AlertDialogTrigger>
+                                    </>
+                                 )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta ação irá {employee.status === 'Inativo' ? 'excluir permanentemente' : 'desativar'} o funcionário '{employee.name}'. 
+                                  {employee.status !== 'Inativo' && ' Ele não terá mais acesso ao sistema.'}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeactivate(employee.id)}>Confirmar</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        {selectedEmployee && <ManageEmployeeDialog employee={selectedEmployee} onSave={handleSaveEmployee} onOpenChange={setIsManageDialogOpen} />}
+                      </Dialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+        </div>
       </CardContent>
     </Card>
   );
 }
+
+    
