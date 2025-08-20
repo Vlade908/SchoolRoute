@@ -119,8 +119,6 @@ function StudentProfileDialog({
 
   useEffect(() => {
     if (isOpen && student) {
-      setEditedStudent(student);
-
       const fetchSchoolsAndSetState = async () => {
         const schoolsCollection = collection(db, 'schools');
         const snapshot = await getDocs(schoolsCollection);
@@ -136,6 +134,7 @@ function StudentProfileDialog({
 
         const currentSchool = schoolsData.find(s => s.id === student.schoolId);
         setSelectedSchool(currentSchool || null);
+        setEditedStudent(student);
       };
       
       fetchSchoolsAndSetState();
@@ -146,6 +145,18 @@ function StudentProfileDialog({
     if (!selectedSchool || !editedStudent?.grade) return null;
     return selectedSchool.grades?.find(g => g.name === editedStudent.grade);
   }, [selectedSchool, editedStudent?.grade]);
+  
+  const availablePeriods = useMemo(() => {
+    if (!selectedGradeObj) return [];
+    const periods = selectedGradeObj.classes.map(c => c.period);
+    return [...new Set(periods)]; // Unique periods
+  }, [selectedGradeObj]);
+
+  const availableClasses = useMemo(() => {
+    if (!selectedGradeObj || !editedStudent?.classPeriod) return [];
+    return selectedGradeObj.classes.filter(c => c.period === editedStudent.classPeriod);
+  }, [selectedGradeObj, editedStudent?.classPeriod]);
+
 
   const handleClose = () => {
     onOpenChange(false);
@@ -189,13 +200,15 @@ function StudentProfileDialog({
   }
   
   const handleGradeSelect = (gradeName: string) => {
-    setEditedStudent(prev => prev ? ({ ...prev, grade: gradeName, className: '', classPeriod: '' }) : null);
+    setEditedStudent(prev => prev ? ({ ...prev, grade: gradeName, classPeriod: '', className: '' }) : null);
+  }
+  
+  const handlePeriodSelect = (period: string) => {
+    setEditedStudent(prev => prev ? ({ ...prev, classPeriod: period, className: '' }) : null);
   }
 
   const handleClassSelect = (className: string) => {
-    const grade = selectedSchool?.grades?.find(g => g.name === editedStudent?.grade);
-    const selectedClass = grade?.classes.find(c => c.name === className);
-    setEditedStudent(prev => prev ? ({ ...prev, className: className, classPeriod: selectedClass?.period || '' }) : null);
+    setEditedStudent(prev => prev ? ({ ...prev, className: className }) : null);
   }
 
 
@@ -279,21 +292,28 @@ function StudentProfileDialog({
                                     </PopoverContent>
                                 </Popover>
                             </div>
-                            
-                              <Select value={editedStudent.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
-                                  <SelectTrigger><Label htmlFor="grade" className="sr-only">Série/Ano</Label><SelectValue placeholder="Selecione a série" /></SelectTrigger>
-                                  <SelectContent>
-                                    {selectedSchool?.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
-                                  </SelectContent>
-                              </Select>
+                             <div className="col-span-2 grid grid-cols-3 gap-4">
+                                <Select value={editedStudent.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
+                                    <SelectTrigger><Label htmlFor="grade" className="sr-only">Série/Ano</Label><SelectValue placeholder="Selecione a série" /></SelectTrigger>
+                                    <SelectContent>
+                                        {selectedSchool?.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
 
-                              <Select value={editedStudent.className} onValueChange={handleClassSelect} disabled={!selectedGradeObj?.classes || selectedGradeObj.classes.length === 0}>
-                                  <SelectTrigger><Label htmlFor="className" className="sr-only">Classe</Label><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
-                                  <SelectContent>
-                                  {selectedGradeObj?.classes.map(cls => <SelectItem key={cls.name} value={cls.name}>{cls.name}</SelectItem>)}
-                                  </SelectContent>
-                              </Select>
-                            
+                                <Select value={editedStudent.classPeriod} onValueChange={handlePeriodSelect} disabled={availablePeriods.length === 0}>
+                                    <SelectTrigger><Label htmlFor="classPeriod" className="sr-only">Período</Label><SelectValue placeholder="Selecione o período" /></SelectTrigger>
+                                    <SelectContent>
+                                        {availablePeriods.map(period => <SelectItem key={period} value={period}>{period}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                
+                                <Select value={editedStudent.className} onValueChange={handleClassSelect} disabled={availableClasses.length === 0}>
+                                    <SelectTrigger><Label htmlFor="className" className="sr-only">Classe</Label><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
+                                    <SelectContent>
+                                        {availableClasses.map(cls => <SelectItem key={cls.name} value={cls.name}>{cls.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                              <div>
                               <Label htmlFor="hasPass">Possui Passe?</Label>
                                 <Select value={editedStudent.hasPass} onValueChange={(value) => handleSelectChange('hasPass', value as 'Sim' | 'Não')}>
@@ -327,6 +347,7 @@ function StudentProfileDialog({
                             <div><span className="font-semibold">Contato:</span> {student.contactPhone}</div>
                             <div><span className="font-semibold">Série/Ano:</span> {student.grade}</div>
                             <div><span className="font-semibold">Classe:</span> {student.className}</div>
+                             <div><span className="font-semibold">Período:</span> {student.classPeriod}</div>
                             <div className="col-span-2"><span className="font-semibold">Escola:</span> {student.schoolName}</div>
                             <div><span className="font-semibold">Possui Passe:</span> {student.hasPass ?? 'N/A'}</div>
                             {student.hasPass === 'Sim' && <div><span className="font-semibold">Nº Cartão SOU:</span> {student.souCardNumber}</div>}
@@ -458,6 +479,21 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     fetchSchools();
   }, []);
 
+  const selectedGradeObj = useMemo(() => {
+    return selectedSchool?.grades?.find(g => g.name === studentData.grade);
+  }, [selectedSchool, studentData.grade]);
+
+  const availablePeriods = useMemo(() => {
+    if (!selectedGradeObj) return [];
+    const periods = selectedGradeObj.classes.map(c => c.period);
+    return [...new Set(periods)]; // Unique periods
+  }, [selectedGradeObj]);
+
+  const availableClasses = useMemo(() => {
+    if (!selectedGradeObj || !studentData.classPeriod) return [];
+    return selectedGradeObj.classes.filter(c => c.period === studentData.classPeriod);
+  }, [selectedGradeObj, studentData.classPeriod]);
+
   if (!user || user.role < 2) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -477,13 +513,15 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
   }
   
   const handleGradeSelect = (gradeName: string) => {
-    setStudentData(prev => ({ ...prev, grade: gradeName, className: '', classPeriod: '' }));
+    setStudentData(prev => ({ ...prev, grade: gradeName, classPeriod: '', className: '' }));
+  }
+
+  const handlePeriodSelect = (period: string) => {
+    setStudentData(prev => ({ ...prev, classPeriod: period, className: '' }));
   }
 
   const handleClassSelect = (className: string) => {
-    const grade = selectedSchool?.grades?.find(g => g.name === studentData.grade);
-    const selectedClass = grade?.classes.find(c => c.name === className);
-    setStudentData(prev => ({ ...prev, className: className, classPeriod: selectedClass?.period || '' }));
+    setStudentData(prev => ({ ...prev, className: className }));
   }
 
   const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -576,10 +614,6 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     onSave(studentToSave);
   }
 
-  const selectedGradeObj = useMemo(() => {
-    return selectedSchool?.grades?.find(g => g.name === studentData.grade);
-  }, [selectedSchool, studentData.grade]);
-
   return (
     <DialogContent className="sm:max-w-[900px]">
       <DialogHeader>
@@ -646,29 +680,26 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                 </PopoverContent>
             </Popover>
 
-            {selectedSchool && (
-              <>
-                <Select value={studentData.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool.grades || selectedSchool.grades.length === 0}>
-                  <SelectTrigger><SelectValue placeholder="Selecione a série" /></SelectTrigger>
-                  <SelectContent>
-                    {selectedSchool.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
+            <Select value={studentData.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
+                <SelectTrigger><SelectValue placeholder="Selecione a série" /></SelectTrigger>
+                <SelectContent>
+                {selectedSchool?.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
+                </SelectContent>
+            </Select>
 
-            {selectedGradeObj && (
-              <>
-                <Select value={studentData.className} onValueChange={handleClassSelect} disabled={!selectedGradeObj.classes || selectedGradeObj.classes.length === 0}>
-                  <SelectTrigger><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
-                  <SelectContent>
-                    {selectedGradeObj.classes.map(cls => <SelectItem key={cls.name} value={cls.name}>{cls.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
+            <Select value={studentData.classPeriod} onValueChange={handlePeriodSelect} disabled={availablePeriods.length === 0}>
+                <SelectTrigger><SelectValue placeholder="Selecione o período" /></SelectTrigger>
+                <SelectContent>
+                {availablePeriods.map(period => <SelectItem key={period} value={period}>{period}</SelectItem>)}
+                </SelectContent>
+            </Select>
 
-            {studentData.className && <Input readOnly value={`Período: ${studentData.classPeriod}`} className="bg-muted" />}
+            <Select value={studentData.className} onValueChange={handleClassSelect} disabled={availableClasses.length === 0}>
+                <SelectTrigger><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
+                <SelectContent>
+                {availableClasses.map(cls => <SelectItem key={cls.name} value={cls.name}>{cls.name}</SelectItem>)}
+                </SelectContent>
+            </Select>
 
              <AddressMap onAddressSelect={handleAddressSelect} markerType="student" />
              <div className="grid grid-cols-2 gap-4">
@@ -1064,3 +1095,4 @@ export default function StudentsPage() {
     
 
     
+
