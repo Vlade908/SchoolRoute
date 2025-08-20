@@ -71,7 +71,15 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
+              <div className="flex items-center">
+                <Label htmlFor="password">Senha</Label>
+                 <Link
+                  href="#"
+                  className="ml-auto inline-block text-sm underline"
+                >
+                  Esqueceu sua senha?
+                </Link>
+              </div>
               <Input 
                 id="password" 
                 type="password" 
@@ -86,9 +94,15 @@ export default function LoginPage() {
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
-            Não tem uma conta?{' '}
+            É um funcionário?{' '}
+            <Link href="/signup-employee" className="underline">
+              Cadastre-se aqui
+            </Link>
+          </div>
+           <div className="mt-2 text-center text-sm">
+            É o administrador principal?{' '}
             <Link href="/signup" className="underline">
-              Cadastre-se
+              Criar conta de administrador
             </Link>
           </div>
         </CardContent>

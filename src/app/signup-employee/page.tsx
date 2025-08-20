@@ -21,19 +21,36 @@ import { collection, doc, getDocs, query, setDoc, serverTimestamp, where } from 
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
+async function validateHash(hash: string) {
+    if (!hash) return false;
 
-export default function SignupPage() {
+    const collectionsToSearch = ['schools', 'city-halls'];
+    for (const collectionName of collectionsToSearch) {
+        const q = query(collection(db, collectionName));
+        const snapshot = await getDocs(q);
+        for (const doc of snapshot.docs) {
+            const decryptedData = decryptObjectValues(doc.data());
+            if (decryptedData && decryptedData.hash === hash) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+export default function SignupEmployeePage() {
   const router = useRouter();
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [hash, setHash] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     if (password.length < 6) {
         toast({
             variant: "destructive",
@@ -43,19 +60,29 @@ export default function SignupPage() {
         setLoading(false);
         return;
     }
+
+    const isHashValid = await validateHash(hash);
+    if (!isHashValid) {
+         toast({
+            variant: "destructive",
+            title: "Chave Hash Inválida",
+            description: "A chave fornecida não corresponde a nenhuma escola ou prefeitura.",
+        });
+        setLoading(false);
+        return;
+    }
     
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Create admin user directly
       const userProfile = {
         uid: user.uid,
         name: name,
         email: email,
-        hash: 'admin-seed', // Use a placeholder hash
-        role: 3, 
-        status: 'Ativo',
+        hash: hash,
+        role: hash.startsWith('pm') ? 0 : 1, // Default role, 0 for pending secretary, 1 for pending school
+        status: 'Pendente',
         creationDate: serverTimestamp()
       };
       
@@ -64,21 +91,18 @@ export default function SignupPage() {
       await setDoc(doc(db, "users", user.uid), encryptedProfile);
       
       toast({
-          title: "Conta de Administrador Criada!",
-          description: "Sua conta foi criada com sucesso. Redirecionando...",
+          title: "Cadastro Enviado!",
+          description: "Sua solicitação foi enviada. Aguarde a aprovação do administrador.",
       });
       
-      router.push('/dashboard');
+      await auth.signOut();
+      router.push('/');
 
     } catch (error: any) {
        console.error("Signup failed:", error);
        let description = "Não foi possível criar a conta. Verifique os dados.";
        if (error.code === 'auth/email-already-in-use') {
            description = "Este e-mail já está em uso.";
-       } else if (error.code === 'auth/weak-password') {
-           description = "A senha é muito fraca. Use pelo menos 6 caracteres.";
-       } else if (error.code === 'auth/invalid-email') {
-           description = "O e-mail fornecido não é válido.";
        }
        toast({
           variant: "destructive",
@@ -98,9 +122,9 @@ export default function SignupPage() {
       </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Criar Conta de Administrador</CardTitle>
+          <CardTitle className="text-2xl">Cadastro de Funcionário</CardTitle>
           <CardDescription>
-            Crie a conta principal do sistema. Outros usuários deverão se cadastrar pela página de funcionários.
+            Use a Chave Hash fornecida pela sua instituição para se cadastrar.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -138,8 +162,19 @@ export default function SignupPage() {
                 disabled={loading}
               />
             </div>
+             <div className="space-y-2">
+              <Label htmlFor="hash">Chave Hash da Instituição</Label>
+              <Input 
+                id="hash" 
+                required 
+                value={hash}
+                onChange={(e) => setHash(e.target.value)}
+                disabled={loading}
+                placeholder="Chave fornecida pela escola/prefeitura"
+              />
+            </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Criando conta..." : <><UserPlus className="mr-2 h-4 w-4" /> Criar Conta</>}
+              {loading ? "Enviando..." : <><UserPlus className="mr-2 h-4 w-4" /> Solicitar Cadastro</>}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
