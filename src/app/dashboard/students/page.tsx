@@ -314,7 +314,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
   
   const handleCPFBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
     let { value } = e.target;
-    value = value.replace(/[^\d\w]/g, ''); // Keep alphanumeric
+    value = value.replace(/[^\d\w]/g, '');
     let formatted = value;
     if (value.length === 11) {
       formatted = value.replace(/(\w{3})(\w{3})(\w{3})(\w{2})/, '$1.$2.$3-$4');
@@ -326,10 +326,19 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
 
   const handleRGBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
     let { value } = e.target;
-    value = value.replace(/[^\d\w]/g, ''); // Keep alphanumeric
+    value = value.replace(/[^\d\w]/g, '');
     if (value.length === 9) {
       const formatted = value.replace(/(\w{2})(\w{3})(\w{3})(\w{1})/, '$1.$2.$3-$4');
        setStudentData(prev => ({...prev, rg: formatted}));
+    }
+  }
+  
+  const handleRABlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { value } = e.target;
+    value = value.replace(/[^\d\w]/g, '');
+    if (value.length === 13) {
+      const formatted = value.replace(/(\w{12})(\w{1})/, '$1-$2');
+      setStudentData(prev => ({...prev, ra: formatted}));
     }
   }
 
@@ -372,7 +381,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
         <div className="space-y-4">
             <Input id="name" placeholder="Nome Completo" value={studentData.name} onChange={handleChange}/>
             <Input id="cpf" placeholder="CPF" value={studentData.cpf} onChange={handleChange} onBlur={handleCPFBlur} maxLength={14} />
-            <Input id="ra" placeholder="RA (Registro do Aluno)" value={studentData.ra} onChange={handleChange}/>
+            <Input id="ra" placeholder="RA (Registro do Aluno)" value={studentData.ra} onChange={handleChange} onBlur={handleRABlur} maxLength={14} />
             <Input id="rg" placeholder="RG" value={studentData.rg} onChange={handleChange} onBlur={handleRGBlur} maxLength={12} />
              <Input 
                 id="rgIssueDate" 
