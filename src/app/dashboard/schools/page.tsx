@@ -39,6 +39,7 @@ type School = {
   name: string;
   address: string;
   hash: string;
+  schoolType: 'MUNICIPAL' | 'ESTADUAL' | 'MUNICIPALIZADA';
 };
 
 type Employee = {
@@ -123,7 +124,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
 }
 
 function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<School, 'id'>) => void, onOpenChange: (open:boolean)=>void}) {
-  const [schoolData, setSchoolData] = useState({ name: '', address: '', hash: '' });
+  const [schoolData, setSchoolData] = useState({ name: '', address: '', hash: '', schoolType: '' as School['schoolType'] | '' });
   const { toast } = useToast();
 
   const handleDataChange = (field: keyof typeof schoolData, value: string) => {
@@ -142,11 +143,11 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
   }
 
   const handleSave = () => {
-    if (!schoolData.name || !schoolData.address || !schoolData.hash) {
+    if (!schoolData.name || !schoolData.address || !schoolData.schoolType || !schoolData.hash) {
       toast({ variant: 'destructive', title: "Erro de Validação", description: "Por favor, preencha todos os campos e gere uma chave." });
       return;
     }
-    onSave(schoolData);
+    onSave(schoolData as Omit<School, 'id'>);
   }
 
   return (
@@ -163,6 +164,21 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
             Nome
           </Label>
           <Input id="name" value={schoolData.name} onChange={(e) => handleDataChange('name', e.target.value)} className="col-span-3" placeholder="Nome da Escola" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="schoolType" className="text-right">
+            Tipo de Escola
+          </Label>
+           <Select value={schoolData.schoolType} onValueChange={(value) => handleDataChange('schoolType', value)}>
+                <SelectTrigger id="schoolType" className="col-span-3">
+                    <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="MUNICIPAL">MUNICIPAL</SelectItem>
+                    <SelectItem value="ESTADUAL">ESTADUAL</SelectItem>
+                    <SelectItem value="MUNICIPALIZADA">MUNICIPALIZADA</SelectItem>
+                </SelectContent>
+            </Select>
         </div>
         <div className="grid grid-cols-4 items-start gap-4">
           <Label htmlFor="address" className="text-right pt-2">
@@ -301,6 +317,7 @@ function SchoolDetailsDialog({ school }: { school: School }) {
                         <CardContent className="space-y-4 pt-6">
                             <p><span className="font-semibold">ID:</span> {school.id}</p>
                             <p><span className="font-semibold">Nome:</span> {school.name}</p>
+                            <p><span className="font-semibold">Tipo:</span> {school.schoolType}</p>
                             <p><span className="font-semibold">Endereço:</span> {school.address}</p>
                             <p className="flex items-center gap-2"><span className="font-semibold">Chave Hash:</span> <span className="font-mono text-muted-foreground">{school.hash}</span>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigator.clipboard.writeText(school.hash)}>
@@ -481,6 +498,7 @@ export default function SchoolsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome da Escola</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Endereço</TableHead>
               <TableHead>
                 <span className="sr-only">Ações</span>
@@ -495,6 +513,7 @@ export default function SchoolsPage() {
                         {school.name}
                     </button>
                 </TableCell>
+                <TableCell>{school.schoolType}</TableCell>
                 <TableCell>{school.address}</TableCell>
                 <TableCell>
                   <DropdownMenu>
@@ -523,5 +542,7 @@ export default function SchoolsPage() {
     </>
   );
 }
+
+    
 
     
