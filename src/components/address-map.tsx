@@ -1,9 +1,13 @@
 
 'use client';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, Autocomplete } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
 import { Input } from './ui/input';
 import { Skeleton } from './ui/skeleton';
+import { MapPin } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
 
 const containerStyle = {
   width: '100%',
@@ -33,12 +37,23 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [center, setCenter] = useState(defaultCenter);
   const [markerPosition, setMarkerPosition] = useState<google.maps.LatLngLiteral | null>(null);
-  const [address, setAddress] = useState(initialAddress || '');
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  const {
+    ready,
+    value,
+    suggestions: { status, data },
+    setValue,
+    clearSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      componentRestrictions: { country: 'br' }, // Restringe para o Brasil
+    },
+    debounce: 300,
+  });
 
   useEffect(() => {
     if (initialAddress) {
-      // Se um endereço inicial é fornecido, tenta geocodificá-lo para centrar o mapa.
+      setValue(initialAddress, false);
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode({ address: initialAddress }, (results, status) => {
         if (status === 'OK' && results && results[0]) {
@@ -50,7 +65,7 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
         }
       });
     }
-  }, [initialAddress, map, isLoaded]);
+  }, [initialAddress, isLoaded, map, setValue]);
 
   const onLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance);
@@ -60,29 +75,28 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
     setMap(null);
   }, []);
 
-  const onAutocompleteLoad = (autocomplete: google.maps.places.Autocomplete) => {
-    autocompleteRef.current = autocomplete;
-  };
+  const handleSelect = ({ description }: { description: string }) => async () => {
+    setValue(description, false);
+    clearSuggestions();
 
-  const onPlaceChanged = () => {
-    if (autocompleteRef.current) {
-      const place = autocompleteRef.current.getPlace();
-      if (place.geometry && place.geometry.location) {
-        const location = place.geometry.location;
-        const newPos = { lat: location.lat(), lng: location.lng() };
-        setCenter(newPos);
-        setMarkerPosition(newPos);
-        map?.panTo(newPos);
-        map?.setZoom(15);
-        const formattedAddress = place.formatted_address || '';
-        setAddress(formattedAddress);
-        if (onAddressSelect) {
-          onAddressSelect(formattedAddress, newPos);
-        }
+    try {
+      const results = await getGeocode({ address: description });
+      const { lat, lng } = await getLatLng(results[0]);
+      const newPos = { lat, lng };
+
+      setMarkerPosition(newPos);
+      setCenter(newPos);
+      map?.panTo(newPos);
+      map?.setZoom(15);
+      
+      if (onAddressSelect) {
+        onAddressSelect(description, newPos);
       }
+    } catch (error) {
+      console.log('😱 Error geocoding: ', error);
     }
   };
-  
+
   const onMapClick = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       const newPos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
@@ -92,7 +106,7 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
       geocoder.geocode({ location: newPos }, (results, status) => {
         if (status === 'OK' && results && results[0]) {
           const formattedAddress = results[0].formatted_address;
-          setAddress(formattedAddress);
+          setValue(formattedAddress, false);
            if (onAddressSelect) {
               onAddressSelect(formattedAddress, newPos);
            }
@@ -101,26 +115,47 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
     }
   }
 
-
   if (loadError) return <div>Erro ao carregar o mapa. Verifique a chave de API.</div>;
   if (!isLoaded) return <Skeleton className="w-full h-[300px]" />;
 
   return (
-    <div className="space-y-2">
-      <Autocomplete onLoad={onAutocompleteLoad} onPlaceChanged={onPlaceChanged}>
-        <Input
-          type="text"
-          id="address"
-          placeholder="Busque o endereço"
-          value={address}
-          onChange={(e) => {
-              setAddress(e.target.value);
-              if(onAddressSelect && markerPosition) {
-                  onAddressSelect(e.target.value, markerPosition)
-              }
-          }}
-        />
-      </Autocomplete>
+    <div className="space-y-2 relative">
+      <Input
+        id="address"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        disabled={!ready}
+        placeholder="Busque o endereço"
+      />
+      {status === 'OK' && (
+        <div className="absolute top-full mt-1.5 z-50 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
+          <div className="p-1">
+            {data.map((suggestion) => {
+               const {
+                place_id,
+                structured_formatting: { main_text, secondary_text },
+              } = suggestion;
+
+              return (
+                 <div
+                  key={place_id}
+                  onClick={handleSelect(suggestion)}
+                  className="flex cursor-pointer items-center gap-3 rounded-sm px-2 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                    <MapPin className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{main_text}</p>
+                    <p className="text-xs text-muted-foreground">{secondary_text}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <GoogleMap
         mapContainerStyle={containerStyle}
         center={center}
