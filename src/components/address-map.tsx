@@ -50,10 +50,22 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
       componentRestrictions: { country: 'br' }, // Restringe para o Brasil
     },
     debounce: 300,
+    // Disabling this because it was causing the input to be disabled initially.
+    // The user experience is better if they can start typing right away.
+    // The hook will just not return suggestions until it's ready.
+    initOnMount: false,
   });
 
   useEffect(() => {
-    if (initialAddress) {
+    if (isLoaded) {
+      // Manually initialize the hook once the script is loaded.
+      setValue('', false); // A way to trigger initialization
+    }
+  }, [isLoaded, setValue]);
+
+
+  useEffect(() => {
+    if (initialAddress && isLoaded) {
       setValue(initialAddress, false);
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode({ address: initialAddress }, (results, status) => {
@@ -62,7 +74,10 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
           const pos = { lat: location.lat(), lng: location.lng() };
           setCenter(pos);
           setMarkerPosition(pos);
-          if (map) map.panTo(pos);
+          if (map) {
+            map.panTo(pos);
+            map.setZoom(15);
+          }
         }
       });
     }
@@ -135,7 +150,6 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
           ref={inputRef}
           value={value}
           onChange={handleInputChange}
-          disabled={!ready}
           placeholder="Busque o endereço"
           autoComplete="off"
         />
