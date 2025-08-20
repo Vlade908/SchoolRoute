@@ -32,6 +32,8 @@ export default function LoginPage() {
       let description = "Ocorreu um erro. Por favor, tente novamente.";
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         description = "E-mail ou senha inválidos.";
+      } else if (error.code === 'auth/too-many-requests') {
+        description = "O acesso a esta conta foi temporariamente desativado devido a muitas tentativas de login com falha. Você pode restaurá-lo redefinindo sua senha ou tentar novamente mais tarde.";
       }
       toast({
         variant: "destructive",
