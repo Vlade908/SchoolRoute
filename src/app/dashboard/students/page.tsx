@@ -113,11 +113,35 @@ function StudentProfileDialog({
   onOpenChange: (isOpen: boolean) => void;
 }) {
   const [editedStudent, setEditedStudent] = useState<Student | null>(student);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
 
   useEffect(() => {
     setEditedStudent(student);
   }, [student]);
   
+  useEffect(() => {
+    if(!isOpen) return;
+
+    const fetchSchools = async () => {
+        const schoolsCollection = collection(db, 'schools');
+        const snapshot = await getDocs(schoolsCollection);
+        const schoolsData: School[] = [];
+        snapshot.forEach(doc => {
+             const decryptedData = decryptObjectValues(doc.data()) as any;
+             if(decryptedData) {
+                 schoolsData.push({ id: doc.id, name: decryptedData.name, grades: decryptedData.grades || [] });
+             }
+        });
+        setSchools(schoolsData);
+        if (student) {
+          const school = schoolsData.find(s => s.id === student.schoolId);
+          setSelectedSchool(school || null);
+        }
+    };
+    fetchSchools();
+  }, [isOpen, student]);
+
   const handleClose = () => {
     onOpenChange(false);
   }
@@ -141,7 +165,7 @@ function StudentProfileDialog({
     setEditedStudent(prev => prev ? { ...prev, [id]: numericValue } : null);
   }
 
-  const handleSouCardBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSouCardBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     let { value } = e.target;
     value = value.replace(/\D/g, ''); // Remove non-digits
     if (value.length === 13) {
@@ -150,9 +174,23 @@ function StudentProfileDialog({
     }
   }
 
-  const handleSelectChange = (id: string, value: string) => {
+  const handleSelectChange = (id: keyof Student, value: string) => {
     setEditedStudent(prev => prev ? ({ ...prev, [id]: value }) : null);
   }
+  
+  const handleGradeSelect = (gradeName: string) => {
+    setEditedStudent(prev => prev ? ({ ...prev, grade: gradeName, className: '', classPeriod: '' }) : null);
+  }
+
+  const handleClassSelect = (className: string) => {
+    const grade = selectedSchool?.grades?.find(g => g.name === editedStudent.grade);
+    const selectedClass = grade?.classes.find(c => c.name === className);
+    setEditedStudent(prev => prev ? ({ ...prev, className: className, classPeriod: selectedClass?.period || '' }) : null);
+  }
+
+  const selectedGradeObj = useMemo(() => {
+    return selectedSchool?.grades?.find(g => g.name === editedStudent.grade);
+  }, [selectedSchool, editedStudent.grade]);
 
 
   return (
@@ -190,9 +228,22 @@ function StudentProfileDialog({
                           </div>
                           <div><Label htmlFor="responsibleName">Responsável</Label><Input id="responsibleName" value={editedStudent.responsibleName} onChange={handleChange} /></div>
                           <div><Label htmlFor="contactPhone">Contato</Label><Input id="contactPhone" value={editedStudent.contactPhone} onChange={handleChange} /></div>
-                          <div><Label htmlFor="grade">Série/Ano</Label><Input id="grade" value={editedStudent.grade} onChange={handleChange} /></div>
-                          <div><Label htmlFor="className">Classe</Label><Input id="className" value={editedStudent.className} onChange={handleChange} /></div>
-                          <div className="col-span-2"><Label htmlFor="schoolName">Escola</Label><Input id="schoolName" value={editedStudent.schoolName} onChange={handleChange} /></div>
+                           <div className="col-span-2"><Label htmlFor="schoolName">Escola</Label><Input id="schoolName" value={editedStudent.schoolName} readOnly disabled /></div>
+                          
+                            <Select value={editedStudent.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
+                                <SelectTrigger><Label htmlFor="grade" className="sr-only">Série/Ano</Label><SelectValue placeholder="Selecione a série" /></SelectTrigger>
+                                <SelectContent>
+                                  {selectedSchool?.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={editedStudent.className} onValueChange={handleClassSelect} disabled={!selectedGradeObj?.classes || selectedGradeObj.classes.length === 0}>
+                                <SelectTrigger><Label htmlFor="className" className="sr-only">Classe</Label><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
+                                <SelectContent>
+                                {selectedGradeObj?.classes.map(cls => <SelectItem key={cls.name} value={cls.name}>{cls.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                          
                            <div>
                             <Label htmlFor="hasPass">Possui Passe?</Label>
                               <Select value={editedStudent.hasPass} onValueChange={(value) => handleSelectChange('hasPass', value as 'Sim' | 'Não')}>
@@ -443,7 +494,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     }
   }
 
-  const handleSouCardBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSouCardBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     let { value } = e.target;
     value = value.replace(/\D/g, ''); // Use \D to remove non-digits
     if (value.length === 13) {
@@ -952,7 +1003,7 @@ export default function StudentsPage() {
           isEditing={isEditing}
           onSave={handleSaveStudent}
           isOpen={isProfileDialogOpen}
-          onOpenChange={setProfileDialogOpen}
+          onOpenChange={handleCloseProfileDialog}
       />
     </Tabs>
   );
