@@ -784,6 +784,9 @@ export default function StudentsPage() {
                   <TableHead className="hidden md:table-cell">
                     RA
                   </TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    N° do Cartão
+                  </TableHead>
                   <TableHead>
                     <span className="sr-only">Ações</span>
                   </TableHead>
@@ -803,6 +806,7 @@ export default function StudentsPage() {
                         </TableCell>
                         <TableCell className="hidden md:table-cell">{student.schoolYear} / {student.class}</TableCell>
                         <TableCell className="hidden md:table-cell">{student.ra}</TableCell>
+                        <TableCell className="hidden md:table-cell">{student.souCardNumber || ''}</TableCell>
                         <TableCell>
                           <DropdownMenu>
                               <DropdownMenuTrigger asChild>
