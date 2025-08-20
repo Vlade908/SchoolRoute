@@ -115,6 +115,21 @@ function StudentProfileDialog({
     const { id, value } = e.target;
     setEditedStudent(prev => prev ? ({ ...prev, [id]: value }) : null);
   };
+  
+  const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    const numericValue = value.replace(/[^0-9]/g, '');
+    setEditedStudent(prev => prev ? { ...prev, [id]: numericValue } : null);
+  }
+
+  const handleSouCardBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { value } = e.target;
+    value = value.replace(/\D/g, ''); // Remove non-digits
+    if (value.length === 13) {
+      const formatted = value.replace(/(\d{2})(\d{2})(\d{8})(\d{1})/, '$1.$2.$3-$4');
+      setEditedStudent(prev => prev ? { ...prev, souCardNumber: formatted } : null);
+    }
+  }
 
   const handleSelectChange = (id: string, value: string) => {
     setEditedStudent(prev => prev ? ({ ...prev, [id]: value }) : null);
@@ -171,7 +186,16 @@ function StudentProfileDialog({
                           </Select>
                       </div>
                       {editedStudent.hasPass === 'Sim' && (
-                        <div><Label htmlFor="souCardNumber">Nº Cartão SOU</Label><Input id="souCardNumber" value={editedStudent.souCardNumber || ''} onChange={handleChange} /></div>
+                        <div>
+                          <Label htmlFor="souCardNumber">Nº Cartão SOU</Label>
+                          <Input 
+                            id="souCardNumber" 
+                            value={editedStudent.souCardNumber || ''} 
+                            onChange={handleNumericChange}
+                            onBlur={handleSouCardBlur}
+                            maxLength={16}
+                          />
+                        </div>
                       )}
                     </>
                   ) : (
@@ -875,4 +899,5 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
 
