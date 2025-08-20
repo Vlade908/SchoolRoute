@@ -23,7 +23,7 @@ const defaultCenter = {
 const libraries: ('places' | 'drawing' | 'geometry' | 'localContext' | 'visualization')[] = ['places'];
 
 interface AddressMapProps {
-  onAddressSelect?: (address: string, position: { lat: number; lng: number }) => void;
+  onAddressSelect?: (address: string, position?: { lat: number; lng: number }) => void;
   initialAddress?: string;
 }
 
@@ -96,6 +96,13 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
       console.log('😱 Error geocoding: ', error);
     }
   };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setValue(e.target.value);
+    if (onAddressSelect) {
+      onAddressSelect(e.target.value);
+    }
+  }
 
   const onMapClick = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
@@ -123,7 +130,7 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
       <Input
         id="address"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={handleInputChange}
         disabled={!ready}
         placeholder="Busque o endereço"
       />
