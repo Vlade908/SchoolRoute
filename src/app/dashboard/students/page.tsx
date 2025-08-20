@@ -382,8 +382,8 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
 
   const handleSouCardBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
     let { value } = e.target;
-    value = value.replace(/[^\d\w]/g, '');
-    if(value.length === 13) {
+    value = value.replace(/\D/g, ''); // Use \D to remove non-digits
+    if (value.length === 13) {
       const formatted = value.replace(/(\d{2})(\d{2})(\d{8})(\d{1})/, '$1.$2.$3-$4');
       setStudentData(prev => ({...prev, souCardNumber: formatted}));
     }
@@ -505,7 +505,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                       id="souCardNumber" 
                       placeholder="00.00.00000000-0"
                       value={studentData.souCardNumber} 
-                      onChange={handleAlphaNumericChange}
+                      onChange={handleNumericChange}
                       onBlur={handleSouCardBlur}
                       maxLength={16}
                     />
@@ -784,7 +784,7 @@ export default function StudentsPage() {
                   <TableHead className="hidden md:table-cell">
                     RA
                   </TableHead>
-                  <TableHead className="hidden md:table-cell">
+                  <TableHead>
                     N° do Cartão
                   </TableHead>
                   <TableHead>
@@ -806,7 +806,7 @@ export default function StudentsPage() {
                         </TableCell>
                         <TableCell className="hidden md:table-cell">{student.schoolYear} / {student.class}</TableCell>
                         <TableCell className="hidden md:table-cell">{student.ra}</TableCell>
-                        <TableCell className="hidden md:table-cell">{student.souCardNumber || ''}</TableCell>
+                        <TableCell>{student.souCardNumber || ''}</TableCell>
                         <TableCell>
                           <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -875,3 +875,4 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
