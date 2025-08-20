@@ -119,39 +119,42 @@ function StudentProfileDialog({
   useEffect(() => {
     setEditedStudent(student);
   }, [student]);
-  
+
   useEffect(() => {
-    if(!isOpen) return;
+    if (!isOpen) return;
 
     const fetchSchools = async () => {
-        const schoolsCollection = collection(db, 'schools');
-        const snapshot = await getDocs(schoolsCollection);
-        const schoolsData: School[] = [];
-        snapshot.forEach(doc => {
-             const decryptedData = decryptObjectValues(doc.data()) as any;
-             if(decryptedData) {
-                 schoolsData.push({ id: doc.id, name: decryptedData.name, grades: decryptedData.grades || [] });
-             }
-        });
-        setSchools(schoolsData);
-        if (student) {
-          const school = schoolsData.find(s => s.id === student.schoolId);
-          setSelectedSchool(school || null);
+      const schoolsCollection = collection(db, 'schools');
+      const snapshot = await getDocs(schoolsCollection);
+      const schoolsData: School[] = [];
+      snapshot.forEach(doc => {
+        const decryptedData = decryptObjectValues(doc.data()) as any;
+        if (decryptedData) {
+          schoolsData.push({ id: doc.id, name: decryptedData.name, grades: decryptedData.grades || [] });
         }
+      });
+      setSchools(schoolsData);
+      if (student) {
+        const school = schoolsData.find(s => s.id === student.schoolId);
+        setSelectedSchool(school || null);
+      }
     };
     fetchSchools();
   }, [isOpen, student]);
+  
+  const selectedGradeObj = useMemo(() => {
+    if (!selectedSchool || !editedStudent) return null;
+    return selectedSchool?.grades?.find(g => g.name === editedStudent.grade);
+  }, [selectedSchool, editedStudent?.grade]);
 
   const handleClose = () => {
     onOpenChange(false);
   }
-
-  if (!isOpen || !student || !editedStudent) {
-    return null;
-  }
-
+  
   const handleSaveClick = () => {
-    onSave(editedStudent);
+    if (editedStudent) {
+      onSave(editedStudent);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,199 +186,201 @@ function StudentProfileDialog({
   }
 
   const handleClassSelect = (className: string) => {
-    const grade = selectedSchool?.grades?.find(g => g.name === editedStudent.grade);
+    const grade = selectedSchool?.grades?.find(g => g.name === editedStudent?.grade);
     const selectedClass = grade?.classes.find(c => c.name === className);
     setEditedStudent(prev => prev ? ({ ...prev, className: className, classPeriod: selectedClass?.period || '' }) : null);
   }
 
-  const selectedGradeObj = useMemo(() => {
-    return selectedSchool?.grades?.find(g => g.name === editedStudent.grade);
-  }, [selectedSchool, editedStudent.grade]);
-
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[800px]">
-          <DialogHeader>
-            <DialogTitle>{isEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
-            <DialogDescription>{student.name} - {student.ra}</DialogDescription>
-          </DialogHeader>
-          <Tabs defaultValue="data">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="data">Dados</TabsTrigger>
-              <TabsTrigger value="documents">Documentos</TabsTrigger>
-              <TabsTrigger value="enrollments">Matrículas</TabsTrigger>
-              <TabsTrigger value="history">Histórico</TabsTrigger>
-            </TabsList>
-            <TabsContent value="data" className="pt-4">
-              <Card>
-                <CardContent className="space-y-4 pt-6">
-                   <div className="grid grid-cols-2 gap-4">
-                      {isEditing ? (
-                        <>
-                          <div><Label htmlFor="name">Nome</Label><Input id="name" value={editedStudent.name} onChange={handleChange} /></div>
-                          <div>
-                            <Label htmlFor="student-status">Status</Label>
-                              <Select value={editedStudent.status} onValueChange={(value) => handleSelectChange('status', value)}>
-                                  <SelectTrigger id="student-status">
-                                      <SelectValue placeholder="Selecione o status" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                      <SelectItem value="Homologado">Homologado</SelectItem>
-                                      <SelectItem value="Não Homologado">Não Homologado</SelectItem>
-                                  </SelectContent>
-                              </Select>
-                          </div>
-                          <div><Label htmlFor="responsibleName">Responsável</Label><Input id="responsibleName" value={editedStudent.responsibleName} onChange={handleChange} /></div>
-                          <div><Label htmlFor="contactPhone">Contato</Label><Input id="contactPhone" value={editedStudent.contactPhone} onChange={handleChange} /></div>
-                           <div className="col-span-2"><Label htmlFor="schoolName">Escola</Label><Input id="schoolName" value={editedStudent.schoolName} readOnly disabled /></div>
-                          
-                            <Select value={editedStudent.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
-                                <SelectTrigger><Label htmlFor="grade" className="sr-only">Série/Ano</Label><SelectValue placeholder="Selecione a série" /></SelectTrigger>
-                                <SelectContent>
-                                  {selectedSchool?.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-
-                            <Select value={editedStudent.className} onValueChange={handleClassSelect} disabled={!selectedGradeObj?.classes || selectedGradeObj.classes.length === 0}>
-                                <SelectTrigger><Label htmlFor="className" className="sr-only">Classe</Label><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
-                                <SelectContent>
-                                {selectedGradeObj?.classes.map(cls => <SelectItem key={cls.name} value={cls.name}>{cls.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                          
-                           <div>
-                            <Label htmlFor="hasPass">Possui Passe?</Label>
-                              <Select value={editedStudent.hasPass} onValueChange={(value) => handleSelectChange('hasPass', value as 'Sim' | 'Não')}>
-                                  <SelectTrigger id="hasPass">
-                                      <SelectValue placeholder="Selecione" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                      <SelectItem value="Sim">Sim</SelectItem>
-                                      <SelectItem value="Não">Não</SelectItem>
-                                  </SelectContent>
-                              </Select>
-                          </div>
-                          {editedStudent.hasPass === 'Sim' && (
+      <DialogContent className="sm:max-w-[800px]">
+        {!student || !editedStudent ? (
+           <div>Carregando...</div>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>{isEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
+              <DialogDescription>{student.name} - {student.ra}</DialogDescription>
+            </DialogHeader>
+            <Tabs defaultValue="data">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="data">Dados</TabsTrigger>
+                <TabsTrigger value="documents">Documentos</TabsTrigger>
+                <TabsTrigger value="enrollments">Matrículas</TabsTrigger>
+                <TabsTrigger value="history">Histórico</TabsTrigger>
+              </TabsList>
+              <TabsContent value="data" className="pt-4">
+                <Card>
+                  <CardContent className="space-y-4 pt-6">
+                     <div className="grid grid-cols-2 gap-4">
+                        {isEditing ? (
+                          <>
+                            <div><Label htmlFor="name">Nome</Label><Input id="name" value={editedStudent.name} onChange={handleChange} /></div>
                             <div>
-                              <Label htmlFor="souCardNumber">Nº Cartão SOU</Label>
-                              <Input 
-                                id="souCardNumber" 
-                                value={editedStudent.souCardNumber || ''} 
-                                onChange={handleNumericChange}
-                                onBlur={handleSouCardBlur}
-                                maxLength={16}
-                              />
+                              <Label htmlFor="student-status">Status</Label>
+                                <Select value={editedStudent.status} onValueChange={(value) => handleSelectChange('status', value)}>
+                                    <SelectTrigger id="student-status">
+                                        <SelectValue placeholder="Selecione o status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Homologado">Homologado</SelectItem>
+                                        <SelectItem value="Não Homologado">Não Homologado</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <div><span className="font-semibold">Nome:</span> {student.name}</div>
-                          <div><span className="font-semibold">Status:</span> <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className={student.status === 'Homologado' ? 'bg-green-600' : ''}>{student.status}</Badge></div>
-                          <div><span className="font-semibold">Responsável:</span> {student.responsibleName}</div>
-                          <div><span className="font-semibold">Contato:</span> {student.contactPhone}</div>
-                          <div><span className="font-semibold">Série/Ano:</span> {student.grade}</div>
-                          <div><span className="font-semibold">Classe:</span> {student.className}</div>
-                          <div className="col-span-2"><span className="font-semibold">Escola:</span> {student.schoolName}</div>
-                          <div><span className="font-semibold">Possui Passe:</span> {student.hasPass ?? 'N/A'}</div>
-                          {student.hasPass === 'Sim' && <div><span className="font-semibold">Nº Cartão SOU:</span> {student.souCardNumber}</div>}
-                        </>
-                      )}
-                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="documents" className="pt-4">
-                <Card>
-                    <CardContent className="space-y-4 pt-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            {isEditing ? (
-                              <>
-                                <div><Label htmlFor="ra">RA</Label><Input id="ra" value={editedStudent.ra} onChange={handleChange} /></div>
-                                <div><Label htmlFor="cpf">CPF</Label><Input id="cpf" value={editedStudent.cpf} onChange={handleChange} /></div>
-                                <div><Label htmlFor="rg">RG</Label><Input id="rg" value={editedStudent.rg} onChange={handleChange} /></div>
-                                <div><Label htmlFor="rgIssueDate">Emissão RG</Label><Input id="rgIssueDate" value={editedStudent.rgIssueDate} onChange={handleChange} /></div>
-                              </>
-                            ) : (
-                              <>
-                                <div><span className="font-semibold">RA:</span> {student.ra}</div>
-                                <div><span className="font-semibold">CPF:</span> {student.cpf}</div>
-                                <div><span className="font-semibold">RG:</span> {student.rg}</div>
-                                <div><span className="font-semibold">Emissão RG:</span> {student.rgIssueDate}</div>
-                               </>
+                            <div><Label htmlFor="responsibleName">Responsável</Label><Input id="responsibleName" value={editedStudent.responsibleName} onChange={handleChange} /></div>
+                            <div><Label htmlFor="contactPhone">Contato</Label><Input id="contactPhone" value={editedStudent.contactPhone} onChange={handleChange} /></div>
+                             <div className="col-span-2"><Label htmlFor="schoolName">Escola</Label><Input id="schoolName" value={editedStudent.schoolName} readOnly disabled /></div>
+                            
+                              <Select value={editedStudent.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
+                                  <SelectTrigger><Label htmlFor="grade" className="sr-only">Série/Ano</Label><SelectValue placeholder="Selecione a série" /></SelectTrigger>
+                                  <SelectContent>
+                                    {selectedSchool?.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
+                                  </SelectContent>
+                              </Select>
+
+                              <Select value={editedStudent.className} onValueChange={handleClassSelect} disabled={!selectedGradeObj?.classes || selectedGradeObj.classes.length === 0}>
+                                  <SelectTrigger><Label htmlFor="className" className="sr-only">Classe</Label><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
+                                  <SelectContent>
+                                  {selectedGradeObj?.classes.map(cls => <SelectItem key={cls.name} value={cls.name}>{cls.name}</SelectItem>)}
+                                  </SelectContent>
+                              </Select>
+                            
+                             <div>
+                              <Label htmlFor="hasPass">Possui Passe?</Label>
+                                <Select value={editedStudent.hasPass} onValueChange={(value) => handleSelectChange('hasPass', value as 'Sim' | 'Não')}>
+                                    <SelectTrigger id="hasPass">
+                                        <SelectValue placeholder="Selecione" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Sim">Sim</SelectItem>
+                                        <SelectItem value="Não">Não</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {editedStudent.hasPass === 'Sim' && (
+                              <div>
+                                <Label htmlFor="souCardNumber">Nº Cartão SOU</Label>
+                                <Input 
+                                  id="souCardNumber" 
+                                  value={editedStudent.souCardNumber || ''} 
+                                  onChange={handleNumericChange}
+                                  onBlur={handleSouCardBlur}
+                                  maxLength={16}
+                                />
+                              </div>
                             )}
-                        </div>
+                          </>
+                        ) : (
+                          <>
+                            <div><span className="font-semibold">Nome:</span> {student.name}</div>
+                            <div><span className="font-semibold">Status:</span> <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className={student.status === 'Homologado' ? 'bg-green-600' : ''}>{student.status}</Badge></div>
+                            <div><span className="font-semibold">Responsável:</span> {student.responsibleName}</div>
+                            <div><span className="font-semibold">Contato:</span> {student.contactPhone}</div>
+                            <div><span className="font-semibold">Série/Ano:</span> {student.grade}</div>
+                            <div><span className="font-semibold">Classe:</span> {student.className}</div>
+                            <div className="col-span-2"><span className="font-semibold">Escola:</span> {student.schoolName}</div>
+                            <div><span className="font-semibold">Possui Passe:</span> {student.hasPass ?? 'N/A'}</div>
+                            {student.hasPass === 'Sim' && <div><span className="font-semibold">Nº Cartão SOU:</span> {student.souCardNumber}</div>}
+                          </>
+                        )}
+                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              <TabsContent value="documents" className="pt-4">
+                  <Card>
+                      <CardContent className="space-y-4 pt-6">
+                          <div className="grid grid-cols-2 gap-4">
+                              {isEditing ? (
+                                <>
+                                  <div><Label htmlFor="ra">RA</Label><Input id="ra" value={editedStudent.ra} onChange={handleChange} /></div>
+                                  <div><Label htmlFor="cpf">CPF</Label><Input id="cpf" value={editedStudent.cpf} onChange={handleChange} /></div>
+                                  <div><Label htmlFor="rg">RG</Label><Input id="rg" value={editedStudent.rg} onChange={handleChange} /></div>
+                                  <div><Label htmlFor="rgIssueDate">Emissão RG</Label><Input id="rgIssueDate" value={editedStudent.rgIssueDate} onChange={handleChange} /></div>
+                                </>
+                              ) : (
+                                <>
+                                  <div><span className="font-semibold">RA:</span> {student.ra}</div>
+                                  <div><span className="font-semibold">CPF:</span> {student.cpf}</div>
+                                  <div><span className="font-semibold">RG:</span> {student.rg}</div>
+                                  <div><span className="font-semibold">Emissão RG:</span> {student.rgIssueDate}</div>
+                                 </>
+                              )}
+                          </div>
+                      </CardContent>
+                  </Card>
+              </TabsContent>
+              <TabsContent value="enrollments" className="pt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Histórico de Matrículas</CardTitle>
+                      <Button size="sm" className="w-fit"><PlusCircle className="mr-2 h-4 w-4"/> Nova Movimentação</Button>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                          <TableHeader>
+                              <TableRow>
+                                  <TableHead>Data Inserção</TableHead>
+                                  <TableHead>Data Início</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Escola</TableHead>
+                              </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                              <TableRow>
+                                  <TableCell>01/02/2024</TableCell>
+                                  <TableCell>15/02/2024</TableCell>
+                                  <TableCell><Badge>Ativa</Badge></TableCell>
+                                  <TableCell>{student.schoolName}</TableCell>
+                              </TableRow>
+                          </TableBody>
+                      </Table>
                     </CardContent>
-                </Card>
-            </TabsContent>
-            <TabsContent value="enrollments" className="pt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Histórico de Matrículas</CardTitle>
-                    <Button size="sm" className="w-fit"><PlusCircle className="mr-2 h-4 w-4"/> Nova Movimentação</Button>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Data Inserção</TableHead>
-                                <TableHead>Data Início</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Escola</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell>01/02/2024</TableCell>
-                                <TableCell>15/02/2024</TableCell>
-                                <TableCell><Badge>Ativa</Badge></TableCell>
-                                <TableCell>{student.schoolName}</TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-            </TabsContent>
-             <TabsContent value="history" className="pt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Histórico Escolar</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Ano</TableHead>
-                                <TableHead>Escola</TableHead>
-                                <TableHead>Série/Ano</TableHead>
-                                 <TableHead>Status</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell>2024</TableCell>
-                                <TableCell>{student.schoolName}</TableCell>
-                                <TableCell>{student.grade}</TableCell>
-                                <TableCell><Badge variant="outline" className="text-green-600 border-green-600">Aprovado</Badge></TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-            </TabsContent>
-          </Tabs>
-          <DialogFooter>
-            {isEditing ? (
-                <>
-                    <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-                    <Button onClick={handleSaveClick}>Salvar Alterações</Button>
-                </>
-            ) : (
-                <Button variant="outline" onClick={handleClose}>Fechar</Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
+                  </Card>
+              </TabsContent>
+               <TabsContent value="history" className="pt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Histórico Escolar</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                          <TableHeader>
+                              <TableRow>
+                                  <TableHead>Ano</TableHead>
+                                  <TableHead>Escola</TableHead>
+                                  <TableHead>Série/Ano</TableHead>
+                                   <TableHead>Status</TableHead>
+                              </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                              <TableRow>
+                                  <TableCell>2024</TableCell>
+                                  <TableCell>{student.schoolName}</TableCell>
+                                  <TableCell>{student.grade}</TableCell>
+                                  <TableCell><Badge variant="outline" className="text-green-600 border-green-600">Aprovado</Badge></TableCell>
+                              </TableRow>
+                          </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+              </TabsContent>
+            </Tabs>
+            <DialogFooter>
+              {isEditing ? (
+                  <>
+                      <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+                      <Button onClick={handleSaveClick}>Salvar Alterações</Button>
+                  </>
+              ) : (
+                  <Button variant="outline" onClick={handleClose}>Fechar</Button>
+              )}
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
     </Dialog>
   );
 }
