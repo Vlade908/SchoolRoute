@@ -51,7 +51,7 @@ import { useUser } from '@/contexts/user-context';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { AddressMap } from '@/components/address-map';
@@ -475,10 +475,21 @@ export default function StudentsPage() {
             const encryptedData = doc.data();
             const data = decryptObjectValues(encryptedData) as any;
             if (data) {
+                let enrollmentDateStr = 'N/A';
+                if (data.enrollmentDate) {
+                  // Handle both Timestamp and object with seconds/nanoseconds
+                  const date = data.enrollmentDate.seconds 
+                      ? new Timestamp(data.enrollmentDate.seconds, data.enrollmentDate.nanoseconds).toDate()
+                      : data.enrollmentDate; // Assume it's already a JS Date if not a Firestore-like object
+                  
+                  if(date instanceof Date) {
+                    enrollmentDateStr = date.toLocaleDateString('pt-BR');
+                  }
+                }
                 studentsData.push({
                     id: doc.id,
                     ...data,
-                    enrollmentDate: data.enrollmentDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                    enrollmentDate: enrollmentDateStr,
                 } as Student);
             }
         });
