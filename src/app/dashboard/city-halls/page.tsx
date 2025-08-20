@@ -460,9 +460,7 @@ export default function CityHallsPage() {
     const handleAddCityHall = async (newCityHallData: Omit<CityHall, 'id'>) => {
         try {
             const encryptedData = encryptObjectValues(newCityHallData);
-            const docRef = await addDoc(collection(db, "city-halls"), encryptedData);
-            const newCityHall = { id: docRef.id, ...newCityHallData };
-            setCityHalls(prev => [...prev, newCityHall]);
+            await addDoc(collection(db, "city-halls"), encryptedData);
             setIsAddModalOpen(false);
             toast({ title: 'Sucesso!', description: 'Prefeitura cadastrada com sucesso.'});
         } catch (error) {
