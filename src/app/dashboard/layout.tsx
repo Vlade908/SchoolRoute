@@ -169,7 +169,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }
             } else {
                // This case might happen if user exists in Auth but not in Firestore
-               throw new Error("User profile not found in Firestore.");
+               // Instead of throwing an error, we sign out and redirect.
+               console.error("User profile not found in Firestore. Signing out.");
+               await auth.signOut();
+               setUser(null);
+               router.push('/');
             }
         } catch (error) {
             console.error("Error fetching user profile:", error);
