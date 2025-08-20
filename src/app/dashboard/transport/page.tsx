@@ -1,3 +1,4 @@
+
 'use client';
 import { MoreHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +24,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useUser } from '@/contexts/user-context';
 import { useRouter } from 'next/navigation';
@@ -90,15 +91,18 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
 }
 
 export default function TransportPage() {
-    const { user } = useUser();
-    const router = useRouter();
+  const { user } = useUser();
+  const router = useRouter();
 
-    if (!user || user.role < 3) {
-      useEffect(() => {
-        router.push('/dashboard');
-      }, [router]);
-      return <p>Acesso negado.</p>;
+  useEffect(() => {
+    if (user && user.role < 3) {
+      router.push('/dashboard');
     }
+  }, [user, router]);
+
+  if (!user || user.role < 3) {
+    return <p>Acesso negado.</p>;
+  }
 
   return (
     <Tabs defaultValue="pending">
@@ -160,7 +164,7 @@ export default function TransportPage() {
             <CardDescription>
               Lista de todas as solicitações que já foram aprovadas.
             </CardDescription>
-          </CardHeader>
+          </Header>
           <CardContent>
             <Table>
               <TableHeader>
