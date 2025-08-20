@@ -46,13 +46,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { useUser } from '@/contexts/user-context';
-import { MapPlaceholder } from '@/components/map-placeholder';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
+import { AddressMap } from '@/components/address-map';
 
 
 type Student = {
@@ -268,6 +268,10 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     setStudentData(prev => ({...prev, [id]: value}));
   }
 
+  const handleAddressSelect = (address: string) => {
+    setStudentData(prev => ({...prev, address}));
+  }
+
   const handleSave = () => {
     for (const key in studentData) {
         if (studentData[key as keyof typeof studentData] === '') {
@@ -301,8 +305,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
         </div>
          <div className="space-y-4">
              <Input id="school" placeholder="Escola" value={studentData.school} onChange={handleChange}/>
-            <Input id="address" placeholder="Endereço (Rua, Número, Bairro...)" value={studentData.address} onChange={handleChange}/>
-            <MapPlaceholder />
+             <AddressMap onAddressSelect={handleAddressSelect} />
          </div>
       </div>
        <Button type="submit" className="w-full" onClick={handleSave}>Salvar Aluno</Button>

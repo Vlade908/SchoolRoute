@@ -22,7 +22,6 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapPlaceholder } from '@/components/map-placeholder';
 import { useUser } from '@/contexts/user-context';
 import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,6 +31,7 @@ import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, doc, updateDoc, onSnapshot, query, where, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
+import { AddressMap } from '@/components/address-map';
 
 
 type School = {
@@ -167,8 +167,7 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
             Endereço
           </Label>
           <div className="col-span-3 space-y-2">
-            <Input id="address" placeholder="Busque o endereço ou preencha manualmente" value={address} onChange={(e) => setAddress(e.target.value)} />
-            <MapPlaceholder />
+            <AddressMap onAddressSelect={(addr, latlng) => setAddress(addr)} />
           </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
@@ -306,7 +305,7 @@ function SchoolDetailsDialog({ school }: { school: School }) {
                                     <Copy className="h-3 w-3" />
                                 </Button>
                             </p>
-                            <MapPlaceholder />
+                            <AddressMap initialAddress={school.address} />
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -445,8 +444,7 @@ export default function SchoolsPage() {
     const handleSaveSchool = async (schoolData: Omit<School, 'id'>) => {
         try {
             const encryptedSchool = encryptObjectValues(schoolData);
-            const docRef = await addDoc(collection(db, "schools"), encryptedSchool);
-            setSchools(prev => [...prev, { id: docRef.id, ...schoolData }]);
+            await addDoc(collection(db, "schools"), encryptedSchool);
             setAddSchoolModalOpen(false);
             toast({ title: 'Sucesso!', description: 'Escola cadastrada com sucesso.'});
         } catch (error) {
@@ -482,7 +480,6 @@ export default function SchoolsPage() {
             <TableRow>
               <TableHead>Nome da Escola</TableHead>
               <TableHead>Endereço</TableHead>
-              <TableHead>Chave Hash</TableHead>
               <TableHead>
                 <span className="sr-only">Ações</span>
               </TableHead>
@@ -497,14 +494,6 @@ export default function SchoolsPage() {
                     </button>
                 </TableCell>
                 <TableCell>{school.address}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-muted-foreground">{school.hash}</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigator.clipboard.writeText(school.hash)}>
-                        <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
