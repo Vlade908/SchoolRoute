@@ -314,18 +314,18 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
   
   const handleCPFBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
     let { value } = e.target;
-    value = value.replace(/\D/g, '');
+    value = value.replace(/[^\d\w]/g, '');
     if (value.length === 11) {
-      const formatted = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      const formatted = value.replace(/(\w{3})(\w{3})(\w{3})(\w{2})/, '$1.$2.$3-$4');
       setStudentData(prev => ({...prev, cpf: formatted}));
     }
   }
 
   const handleRGBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
     let { value } = e.target;
-    value = value.replace(/\D/g, '');
+    value = value.replace(/[^\d\w]/g, '');
     if (value.length === 9) {
-      const formatted = value.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4');
+      const formatted = value.replace(/(\w{2})(\w{3})(\w{3})(\w{1})/, '$1.$2.$3-$4');
       setStudentData(prev => ({...prev, rg: formatted}));
     }
   }
@@ -368,9 +368,9 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
       <div className="grid gap-4 py-4 md:grid-cols-2">
         <div className="space-y-4">
             <Input id="name" placeholder="Nome Completo" value={studentData.name} onChange={handleChange}/>
-            <Input id="cpf" placeholder="CPF" value={studentData.cpf} onChange={handleNumericChange} onBlur={handleCPFBlur} maxLength={14} />
+            <Input id="cpf" placeholder="CPF" value={studentData.cpf} onChange={handleChange} onBlur={handleCPFBlur} maxLength={14} />
             <Input id="ra" placeholder="RA (Registro do Aluno)" value={studentData.ra} onChange={handleChange}/>
-            <Input id="rg" placeholder="RG" value={studentData.rg} onChange={handleNumericChange} onBlur={handleRGBlur} maxLength={12} />
+            <Input id="rg" placeholder="RG" value={studentData.rg} onChange={handleChange} onBlur={handleRGBlur} maxLength={12} />
              <Input 
                 id="rgIssueDate" 
                 placeholder="Data de Emissão RG (DDMMAAAA)" 
