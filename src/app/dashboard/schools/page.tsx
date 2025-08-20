@@ -289,39 +289,46 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
                 <span>{grade.name}</span>
               </AccordionTrigger>
               <AccordionContent>
-                <div className="p-4 bg-muted/50 rounded-lg space-y-4">
-                  {periods.map(period => (
-                    <div key={period}>
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-semibold">{period}</h4>
-                        <Button variant="outline" size="sm" onClick={() => handleOpenAddClass(gradeIndex, period)}>
-                          <PlusCircle className="mr-2 h-4 w-4"/> Adicionar Turma
-                        </Button>
-                      </div>
-                      <Table>
-                        <TableBody>
-                          {grade.classes.filter(c => c.period === period).map((cls, classIndex) => (
-                            <TableRow key={classIndex}>
-                              <TableCell>{cls.name}</TableCell>
-                              <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" onClick={() => handleRemoveClass(gradeIndex, grade.classes.indexOf(cls))}>
-                                  <Trash2 className="h-4 w-4 text-red-500"/>
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {grade.classes.filter(c => c.period === period).length === 0 && (
-                            <TableRow>
-                              <TableCell colSpan={2} className="text-sm text-muted-foreground text-center">
-                                Nenhuma turma cadastrada para este período.
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ))}
-                  <div className="pt-4 border-t">
+                <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                   <Accordion type="multiple" className="w-full space-y-2">
+                    {periods.map(period => (
+                       <AccordionItem value={`${grade.name}-${period}`} key={period} className="bg-background rounded-md border px-4">
+                           <AccordionTrigger className="py-2 no-underline">
+                               <div className="flex justify-between items-center w-full">
+                                    <h4 className="font-semibold text-sm">{period}</h4>
+                                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenAddClass(gradeIndex, period);}}>
+                                        <PlusCircle className="mr-2 h-3 w-3"/> Adicionar Turma
+                                    </Button>
+                               </div>
+                           </AccordionTrigger>
+                           <AccordionContent className="pb-2">
+                                <Table>
+                                <TableBody>
+                                  {grade.classes.filter(c => c.period === period).map((cls, classIndex) => (
+                                    <TableRow key={classIndex}>
+                                      <TableCell className="py-1">{cls.name}</TableCell>
+                                      <TableCell className="text-right py-1">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveClass(gradeIndex, grade.classes.indexOf(cls))}>
+                                          <Trash2 className="h-3 w-3 text-red-500"/>
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                  {grade.classes.filter(c => c.period === period).length === 0 && (
+                                    <TableRow>
+                                      <TableCell colSpan={2} className="text-xs text-muted-foreground text-center py-2">
+                                        Nenhuma turma cadastrada para este período.
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </TableBody>
+                              </Table>
+                           </AccordionContent>
+                       </AccordionItem>
+                    ))}
+                   </Accordion>
+
+                  <div className="pt-4 mt-4 border-t">
                      <Button variant="destructive" size="sm" onClick={() => handleRemoveGrade(gradeIndex)}>Remover Série</Button>
                   </div>
                 </div>
