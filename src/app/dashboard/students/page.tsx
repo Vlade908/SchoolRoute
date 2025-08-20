@@ -115,36 +115,31 @@ function StudentProfileDialog({
   const [editedStudent, setEditedStudent] = useState<Student | null>(student);
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [isSchoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (isOpen && student) {
+      setEditedStudent(student);
 
-    const fetchAndSetData = async () => {
-      if (student) {
-          // Set student for editing first
-          setEditedStudent(student);
+      const fetchSchoolsAndSetState = async () => {
+        const schoolsCollection = collection(db, 'schools');
+        const snapshot = await getDocs(schoolsCollection);
+        const schoolsData: School[] = snapshot.docs.map(doc => {
+            const decryptedData = decryptObjectValues(doc.data()) as any;
+            return { 
+                id: doc.id, 
+                name: decryptedData.name, 
+                grades: decryptedData.grades || [] 
+            };
+        });
+        setSchools(schoolsData);
 
-          // Then fetch all schools
-          const schoolsCollection = collection(db, 'schools');
-          const snapshot = await getDocs(schoolsCollection);
-          const schoolsData: School[] = snapshot.docs.map(doc => {
-              const decryptedData = decryptObjectValues(doc.data()) as any;
-              return { 
-                  id: doc.id, 
-                  name: decryptedData.name, 
-                  grades: decryptedData.grades || [] 
-              };
-          });
-          setSchools(schoolsData);
-
-          // Now, find and set the selected school from the fetched list
-          const currentSchool = schoolsData.find(s => s.id === student.schoolId);
-          setSelectedSchool(currentSchool || null);
-      }
-    };
-    
-    fetchAndSetData();
-
+        const currentSchool = schoolsData.find(s => s.id === student.schoolId);
+        setSelectedSchool(currentSchool || null);
+      };
+      
+      fetchSchoolsAndSetState();
+    }
   }, [isOpen, student]);
   
   const selectedGradeObj = useMemo(() => {
@@ -184,6 +179,13 @@ function StudentProfileDialog({
 
   const handleSelectChange = (id: keyof Student, value: string) => {
     setEditedStudent(prev => prev ? ({ ...prev, [id]: value }) : null);
+  }
+
+  const handleSchoolSelect = (schoolId: string) => {
+    const school = schools.find(s => s.id === schoolId) || null;
+    setSelectedSchool(school);
+    setEditedStudent(prev => prev ? { ...prev, schoolId: school?.id || '', schoolName: school?.name || '', grade: '', className: '', classPeriod: '' } : null);
+    setSchoolComboboxOpen(false);
   }
   
   const handleGradeSelect = (gradeName: string) => {
@@ -236,7 +238,47 @@ function StudentProfileDialog({
                             </div>
                             <div><Label htmlFor="responsibleName">Responsável</Label><Input id="responsibleName" value={editedStudent.responsibleName} onChange={handleChange} /></div>
                             <div><Label htmlFor="contactPhone">Contato</Label><Input id="contactPhone" value={editedStudent.contactPhone} onChange={handleChange} /></div>
-                             <div className="col-span-2"><Label htmlFor="schoolName">Escola</Label><Input id="schoolName" value={editedStudent.schoolName} readOnly disabled /></div>
+                            <div className="col-span-2">
+                                <Label htmlFor="schoolName">Escola</Label>
+                                <Popover open={isSchoolComboboxOpen} onOpenChange={setSchoolComboboxOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={isSchoolComboboxOpen}
+                                            className="w-full justify-between font-normal"
+                                        >
+                                            {editedStudent.schoolName || "Selecione a escola"}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[370px] p-0">
+                                        <Command>
+                                            <CommandInput placeholder="Buscar escola..." />
+                                            <CommandList>
+                                                <CommandEmpty>Nenhuma escola encontrada.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {schools.map((school) => (
+                                                    <CommandItem
+                                                        key={school.id}
+                                                        value={school.name}
+                                                        onSelect={() => handleSchoolSelect(school.id)}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                "mr-2 h-4 w-4",
+                                                                editedStudent.schoolId === school.id ? "opacity-100" : "opacity-0"
+                                                            )}
+                                                        />
+                                                        {school.name}
+                                                    </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
                             
                               <Select value={editedStudent.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
                                   <SelectTrigger><Label htmlFor="grade" className="sr-only">Série/Ano</Label><SelectValue placeholder="Selecione a série" /></SelectTrigger>
