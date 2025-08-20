@@ -27,13 +27,7 @@ interface AddressMapProps {
   initialAddress?: string;
 }
 
-export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps) {
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-    libraries,
-  });
-
+function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [center, setCenter] = useState(defaultCenter);
   const [markerPosition, setMarkerPosition] = useState<google.maps.LatLngLiteral | null>(null);
@@ -47,29 +41,26 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
     clearSuggestions,
   } = usePlacesAutocomplete({
     requestOptions: {
-      componentRestrictions: { country: 'br' }, // Restringe para o Brasil
+      componentRestrictions: { country: 'br' },
     },
     debounce: 300,
   });
 
   useEffect(() => {
-    if (initialAddress && isLoaded) {
+    if (initialAddress) {
       setValue(initialAddress, false);
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: initialAddress }, (results, status) => {
-        if (status === 'OK' && results && results[0]) {
-          const location = results[0].geometry.location;
-          const pos = { lat: location.lat(), lng: location.lng() };
-          setCenter(pos);
-          setMarkerPosition(pos);
-          if (map) {
-            map.panTo(pos);
-            map.setZoom(15);
-          }
+      getGeocode({ address: initialAddress }).then((results) => {
+        const { lat, lng } = getLatLng(results[0]);
+        const pos = { lat, lng };
+        setCenter(pos);
+        setMarkerPosition(pos);
+        if (map) {
+          map.panTo(pos);
+          map.setZoom(15);
         }
       });
     }
-  }, [initialAddress, isLoaded, map, setValue]);
+  }, [initialAddress, map, setValue]);
 
   const onLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance);
@@ -127,9 +118,6 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
     }
   }
 
-  if (loadError) return <div>Erro ao carregar o mapa. Verifique a chave de API.</div>;
-  if (!isLoaded) return <Skeleton className="w-full h-[300px]" />;
-
   return (
     <div className="space-y-2">
       <div className="relative">
@@ -138,7 +126,6 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
           ref={inputRef}
           value={value}
           onChange={handleInputChange}
-          disabled={!ready}
           placeholder="Busque o endereço"
           autoComplete="off"
         />
@@ -188,4 +175,17 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
       </GoogleMap>
     </div>
   );
+}
+
+export function AddressMap(props: AddressMapProps) {
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    libraries,
+  });
+
+  if (loadError) return <div>Erro ao carregar o mapa. Verifique a chave de API.</div>;
+  if (!isLoaded) return <Skeleton className="w-full h-[300px]" />;
+
+  return <MapComponent {...props} />;
 }
