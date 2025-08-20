@@ -91,19 +91,25 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
 }
 
 export default function TransportPage() {
-  const { user } = useUser();
+  const { user, loading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    if (user && user.role < 3) {
+    // We run this check inside useEffect to ensure it only happens on the client-side,
+    // after the component has mounted and the user context is available.
+    // We also wait for loading to be false.
+    if (!loading && (!user || user.role < 3)) {
       router.push('/dashboard');
     }
-  }, [user, router]);
+  }, [user, loading, router]);
 
-  if (!user || user.role < 3) {
-    return <p>Acesso negado.</p>;
+  // While waiting for user data or if the user doesn't have the right role, 
+  // we can show a loading/access denied message.
+  if (loading || !user || user.role < 3) {
+    return <p>Carregando ou acesso negado...</p>;
   }
 
+  // If the user has the correct role, we render the full component.
   return (
     <Tabs defaultValue="pending">
       <div className="flex items-center">
