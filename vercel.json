@@ -1,0 +1,6 @@
+{
+  "env": {
+    "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY": "@next_public_google_maps_api_key",
+    "NEXT_PUBLIC_CRYPTO_SECRET_KEY": "@next_public_crypto_secret_key"
+  }
+}
