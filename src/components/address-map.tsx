@@ -5,7 +5,7 @@ import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
 import { Input } from './ui/input';
 import { Skeleton } from './ui/skeleton';
-import { MapPin } from 'lucide-react';
+import { MapPin, School } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -27,6 +27,16 @@ interface AddressMapProps {
   initialAddress?: string;
 }
 
+const schoolIcon = {
+  path: "M4 15.5A2.5 2.5 0 0 1 1.5 13V5.5A2.5 2.5 0 0 1 4 3h16a2.5 2.5 0 0 1 2.5 2.5V13a2.5 2.5 0 0 1-2.5 2.5h-3.11L15 21l-2.89-5.5H4z",
+  fillColor: 'hsl(var(--primary))',
+  fillOpacity: 1,
+  strokeWeight: 0,
+  rotation: 0,
+  scale: 1.2,
+  anchor: new google.maps.Point(12, 12),
+};
+
 function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [center, setCenter] = useState(defaultCenter);
@@ -44,6 +54,7 @@ function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
       componentRestrictions: { country: 'br' },
     },
     debounce: 300,
+    initOnMount: true,
   });
 
   useEffect(() => {
@@ -58,7 +69,7 @@ function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
           map.panTo(pos);
           map.setZoom(15);
         }
-      });
+      }).catch(err => console.error("Geocoding error on initial address:", err));
     }
   }, [initialAddress, map, setValue]);
 
@@ -171,7 +182,7 @@ function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
             mapTypeControl: false,
         }}
       >
-        {markerPosition && <Marker position={markerPosition} />}
+        {markerPosition && <Marker position={markerPosition} icon={schoolIcon} />}
       </GoogleMap>
     </div>
   );
@@ -189,5 +200,3 @@ export function AddressMap(props: AddressMapProps) {
 
   return <MapComponent {...props} />;
 }
-
-    
