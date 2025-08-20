@@ -16,10 +16,10 @@ import { Badge } from '@/components/ui/badge';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -76,6 +76,8 @@ type Student = {
   rgIssueDate: string;
   address?: string;
   contactEmail?: string;
+  hasPass?: 'Sim' | 'Não';
+  souCardNumber?: string;
 };
 
 type School = {
@@ -114,8 +116,8 @@ function StudentProfileDialog({
     setEditedStudent(prev => prev ? ({ ...prev, [id]: value }) : null);
   };
 
-  const handleSelectChange = (value: string) => {
-    setEditedStudent(prev => prev ? ({ ...prev, status: value }) : null);
+  const handleSelectChange = (id: string, value: string) => {
+    setEditedStudent(prev => prev ? ({ ...prev, [id]: value }) : null);
   }
 
 
@@ -141,7 +143,7 @@ function StudentProfileDialog({
                       <div><Label htmlFor="name">Nome</Label><Input id="name" value={editedStudent.name} onChange={handleChange} /></div>
                       <div>
                         <Label htmlFor="student-status">Status</Label>
-                          <Select value={editedStudent.status} onValueChange={handleSelectChange}>
+                          <Select value={editedStudent.status} onValueChange={(value) => handleSelectChange('status', value)}>
                               <SelectTrigger id="student-status">
                                   <SelectValue placeholder="Selecione o status" />
                               </SelectTrigger>
@@ -156,6 +158,21 @@ function StudentProfileDialog({
                       <div><Label htmlFor="schoolYear">Série/Ano</Label><Input id="schoolYear" value={editedStudent.schoolYear} onChange={handleChange} /></div>
                       <div><Label htmlFor="class">Classe</Label><Input id="class" value={editedStudent.class} onChange={handleChange} /></div>
                       <div className="col-span-2"><Label htmlFor="school">Escola</Label><Input id="school" value={editedStudent.school} onChange={handleChange} /></div>
+                       <div>
+                        <Label htmlFor="hasPass">Possui Passe?</Label>
+                          <Select value={editedStudent.hasPass} onValueChange={(value) => handleSelectChange('hasPass', value)}>
+                              <SelectTrigger id="hasPass">
+                                  <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="Sim">Sim</SelectItem>
+                                  <SelectItem value="Não">Não</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      {editedStudent.hasPass === 'Sim' && (
+                        <div><Label htmlFor="souCardNumber">Nº Cartão SOU</Label><Input id="souCardNumber" value={editedStudent.souCardNumber || ''} onChange={handleChange} /></div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -166,6 +183,8 @@ function StudentProfileDialog({
                       <div><span className="font-semibold">Série/Ano:</span> {student.schoolYear}</div>
                       <div><span className="font-semibold">Classe:</span> {student.class}</div>
                       <div className="col-span-2"><span className="font-semibold">Escola:</span> {student.school}</div>
+                      <div><span className="font-semibold">Possui Passe:</span> {student.hasPass ?? 'N/A'}</div>
+                      {student.hasPass === 'Sim' && <div><span className="font-semibold">Nº Cartão SOU:</span> {student.souCardNumber}</div>}
                     </>
                   )}
                </div>
@@ -268,7 +287,7 @@ function StudentProfileDialog({
 function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Student, 'id' | 'enrollmentDate' | 'status'>) => void, onOpenChange: (open: boolean) => void }) {
   const { user } = useUser();
   const [studentData, setStudentData] = useState({
-    name: '', cpf: '', ra: '', rg: '', schoolYear: '', class: '', responsibleName: '', contactEmail: '', contactPhone: '', address: '', school: '', rgIssueDate: ''
+    name: '', cpf: '', ra: '', rg: '', schoolYear: '', class: '', responsibleName: '', contactEmail: '', contactPhone: '', address: '', school: '', rgIssueDate: '', hasPass: 'Não', souCardNumber: ''
   });
 
   const [schools, setSchools] = useState<School[]>([]);
@@ -297,10 +316,20 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     setStudentData(prev => ({...prev, [id]: value}));
   }
   
+  const handleSelectChange = (id: 'hasPass', value: 'Sim' | 'Não') => {
+      setStudentData(prev => ({...prev, [id]: value}));
+  }
+
   const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     const numericValue = value.replace(/[^0-9]/g, '');
     setStudentData(prev => ({...prev, [id]: numericValue}));
+  }
+
+  const handleAlphaNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    const alphaNumericValue = value.replace(/[^a-zA-Z0-9]/g, '');
+    setStudentData(prev => ({...prev, [id]: alphaNumericValue}));
   }
 
   const handleDateBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -351,6 +380,15 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     }
   }
 
+  const handleSouCardBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { value } = e.target;
+    value = value.replace(/[^\d\w]/g, '');
+    if(value.length === 13) {
+      const formatted = value.replace(/(\d{2})(\d{2})(\d{8})(\d{1})/, '$1.$2.$3-$4');
+      setStudentData(prev => ({...prev, souCardNumber: formatted}));
+    }
+  }
+
 
   const handleAddressSelect = (address: string) => {
     setStudentData(prev => ({...prev, address}));
@@ -362,8 +400,14 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
   }
 
   const handleSave = () => {
-    for (const key in studentData) {
-        if (studentData[key as keyof typeof studentData] === '') {
+    // Exclude souCardNumber from validation if hasPass is 'Não'
+    const dataToValidate = { ...studentData };
+    if (dataToValidate.hasPass === 'Não') {
+      delete dataToValidate.souCardNumber;
+    }
+
+    for (const key in dataToValidate) {
+        if (dataToValidate[key as keyof typeof dataToValidate] === '') {
             alert(`Por favor, preencha o campo: ${key}`);
             return;
         }
@@ -380,9 +424,9 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
       <div className="grid gap-4 py-4 md:grid-cols-2">
         <div className="space-y-4">
             <Input id="name" placeholder="Nome Completo" value={studentData.name} onChange={handleChange}/>
-            <Input id="cpf" placeholder="CPF" value={studentData.cpf} onChange={handleChange} onBlur={handleCPFBlur} maxLength={14} />
-            <Input id="ra" placeholder="RA (Registro do Aluno)" value={studentData.ra} onChange={handleChange} onBlur={handleRABlur} maxLength={14} />
-            <Input id="rg" placeholder="RG" value={studentData.rg} onChange={handleChange} onBlur={handleRGBlur} maxLength={12} />
+            <Input id="cpf" placeholder="CPF" value={studentData.cpf} onChange={handleAlphaNumericChange} onBlur={handleCPFBlur} maxLength={14} />
+            <Input id="ra" placeholder="RA (Registro do Aluno)" value={studentData.ra} onChange={handleAlphaNumericChange} onBlur={handleRABlur} maxLength={14} />
+            <Input id="rg" placeholder="RG" value={studentData.rg} onChange={handleAlphaNumericChange} onBlur={handleRGBlur} maxLength={12} />
              <Input 
                 id="rgIssueDate" 
                 placeholder="Data de Emissão RG (DDMMAAAA)" 
@@ -441,6 +485,33 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                 </PopoverContent>
             </Popover>
              <AddressMap onAddressSelect={handleAddressSelect} markerType="student" />
+             <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="hasPass" className="mb-2 block">Possui passe?</Label>
+                  <Select value={studentData.hasPass} onValueChange={(value: 'Sim' | 'Não') => handleSelectChange('hasPass', value)}>
+                    <SelectTrigger id="hasPass">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Sim">Sim</SelectItem>
+                      <SelectItem value="Não">Não</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {studentData.hasPass === 'Sim' && (
+                  <div>
+                    <Label htmlFor="souCardNumber" className="mb-2 block">Nº Cartão SOU</Label>
+                    <Input 
+                      id="souCardNumber" 
+                      placeholder="00.00.00000000-0"
+                      value={studentData.souCardNumber} 
+                      onChange={handleAlphaNumericChange}
+                      onBlur={handleSouCardBlur}
+                      maxLength={16}
+                    />
+                  </div>
+                )}
+             </div>
          </div>
       </div>
        <Button type="submit" className="w-full" onClick={handleSave}>Salvar Aluno</Button>
@@ -480,9 +551,9 @@ export default function StudentsPage() {
                   // Handle both Timestamp and object with seconds/nanoseconds
                   const date = data.enrollmentDate.seconds 
                       ? new Timestamp(data.enrollmentDate.seconds, data.enrollmentDate.nanoseconds).toDate()
-                      : data.enrollmentDate; // Assume it's already a JS Date if not a Firestore-like object
+                      : new Date(data.enrollmentDate); // Assume it might be a string date
                   
-                  if(date instanceof Date) {
+                  if(date instanceof Date && !isNaN(date.getTime())) {
                     enrollmentDateStr = date.toLocaleDateString('pt-BR');
                   }
                 }
