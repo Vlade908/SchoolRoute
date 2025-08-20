@@ -123,28 +123,30 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
 }
 
 function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<School, 'id'>) => void, onOpenChange: (open:boolean)=>void}) {
-  const [hash, setHash] = useState('');
-  const [schoolName, setSchoolName] = useState('');
-  const [address, setAddress] = useState('');
+  const [schoolData, setSchoolData] = useState({ name: '', address: '', hash: '' });
   const { toast } = useToast();
+
+  const handleDataChange = (field: keyof typeof schoolData, value: string) => {
+    setSchoolData(prev => ({ ...prev, [field]: value }));
+  };
 
   const generateHash = () => {
     const newHash = Array(16).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
-    setHash(newHash);
+    handleDataChange('hash', newHash);
   };
   
   const copyToClipboard = () => {
-    if(!hash) return;
-    navigator.clipboard.writeText(hash);
+    if(!schoolData.hash) return;
+    navigator.clipboard.writeText(schoolData.hash);
     toast({ title: 'Copiado!', description: 'Chave hash copiada para a área de transferência.'});
   }
 
   const handleSave = () => {
-    if (!schoolName || !address || !hash) {
-      alert("Por favor, preencha todos os campos.");
+    if (!schoolData.name || !schoolData.address || !schoolData.hash) {
+      toast({ variant: 'destructive', title: "Erro de Validação", description: "Por favor, preencha todos os campos e gere uma chave." });
       return;
     }
-    onSave({ name: schoolName, address, hash });
+    onSave(schoolData);
   }
 
   return (
@@ -160,14 +162,14 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
           <Label htmlFor="name" className="text-right">
             Nome
           </Label>
-          <Input id="name" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="col-span-3" placeholder="Nome da Escola" />
+          <Input id="name" value={schoolData.name} onChange={(e) => handleDataChange('name', e.target.value)} className="col-span-3" placeholder="Nome da Escola" />
         </div>
         <div className="grid grid-cols-4 items-start gap-4">
           <Label htmlFor="address" className="text-right pt-2">
             Endereço
           </Label>
           <div className="col-span-3 space-y-2">
-            <AddressMap onAddressSelect={(addr, latlng) => setAddress(addr)} />
+            <AddressMap onAddressSelect={(addr) => handleDataChange('address', addr)} />
           </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
@@ -175,8 +177,8 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
             Chave Hash
           </Label>
           <div className="col-span-3 flex items-center gap-2">
-            <Input id="hash" value={hash} readOnly className="font-mono bg-muted" />
-            <Button variant="outline" size="icon" onClick={copyToClipboard} disabled={!hash}><Copy className="h-4 w-4"/></Button>
+            <Input id="hash" value={schoolData.hash} readOnly className="font-mono bg-muted" />
+            <Button variant="outline" size="icon" onClick={copyToClipboard} disabled={!schoolData.hash}><Copy className="h-4 w-4"/></Button>
           </div>
         </div>
       </div>
