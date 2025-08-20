@@ -712,6 +712,9 @@ export default function SchoolsPage() {
     const [isAddSchoolModalOpen, setAddSchoolModalOpen] = useState(false);
     const [isSchoolModalOpen, setIsSchoolModalOpen] = useState(false);
     const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         if (!user || user.role < 3) {
@@ -737,6 +740,15 @@ export default function SchoolsPage() {
 
         return () => unsubscribe();
     }, [user, router]);
+    
+    const filteredSchools = useMemo(() => {
+        return schools.filter(school => {
+            const statusMatch = statusFilter === 'all' || school.status === statusFilter;
+            const typeMatch = typeFilter === 'all' || school.schoolType === typeFilter;
+            const searchMatch = searchTerm === '' || school.name.toLowerCase().includes(searchTerm.toLowerCase());
+            return statusMatch && typeMatch && searchMatch;
+        });
+    }, [schools, statusFilter, typeFilter, searchTerm]);
 
 
     if (!user || user.role < 3) {
@@ -781,6 +793,38 @@ export default function SchoolsPage() {
                 <AddSchoolDialog onSave={handleSaveSchool} onOpenChange={setAddSchoolModalOpen} />
             </Dialog>
         </div>
+         <div className="flex items-center gap-2 pt-4">
+            <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="Buscar por nome..."
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filtrar por status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="Ativa">Ativas</SelectItem>
+                    <SelectItem value="Inativa">Inativas</SelectItem>
+                </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filtrar por tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Todos os Tipos</SelectItem>
+                    <SelectItem value="MUNICIPAL">Municipal</SelectItem>
+                    <SelectItem value="ESTADUAL">Estadual</SelectItem>
+                    <SelectItem value="MUNICIPALIZADA">Municipalizada</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
@@ -795,7 +839,7 @@ export default function SchoolsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {schools.map((school) => (
+            {filteredSchools.map((school) => (
               <TableRow key={school.id} className={school.status === 'Inativa' ? 'bg-muted/50 text-muted-foreground' : ''}>
                 <TableCell className="font-medium">
                     <button onClick={() => handleSchoolClick(school)} data-school-id={school.id} className="hover:underline text-primary disabled:text-muted-foreground disabled:no-underline" disabled={school.status === 'Inativa'}>
