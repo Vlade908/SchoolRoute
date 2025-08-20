@@ -117,30 +117,34 @@ function StudentProfileDialog({
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
 
   useEffect(() => {
-    setEditedStudent(student);
-  }, [student]);
-
-  useEffect(() => {
     if (!isOpen) return;
 
-    const fetchSchools = async () => {
-      const schoolsCollection = collection(db, 'schools');
-      const snapshot = await getDocs(schoolsCollection);
-      const schoolsData: School[] = [];
-      snapshot.forEach(doc => {
-        const decryptedData = decryptObjectValues(doc.data()) as any;
-        if (decryptedData) {
-          schoolsData.push({ id: doc.id, name: decryptedData.name, grades: decryptedData.grades || [] });
-        }
-      });
-      setSchools(schoolsData);
-      
+    const fetchAndSetData = async () => {
       if (student) {
-        const school = schoolsData.find(s => s.id === student.schoolId);
-        setSelectedSchool(school || null);
+          // Set student for editing first
+          setEditedStudent(student);
+
+          // Then fetch all schools
+          const schoolsCollection = collection(db, 'schools');
+          const snapshot = await getDocs(schoolsCollection);
+          const schoolsData: School[] = snapshot.docs.map(doc => {
+              const decryptedData = decryptObjectValues(doc.data()) as any;
+              return { 
+                  id: doc.id, 
+                  name: decryptedData.name, 
+                  grades: decryptedData.grades || [] 
+              };
+          });
+          setSchools(schoolsData);
+
+          // Now, find and set the selected school from the fetched list
+          const currentSchool = schoolsData.find(s => s.id === student.schoolId);
+          setSelectedSchool(currentSchool || null);
       }
     };
-    fetchSchools();
+    
+    fetchAndSetData();
+
   }, [isOpen, student]);
   
   const selectedGradeObj = useMemo(() => {
@@ -1014,5 +1018,7 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
+    
 
     
