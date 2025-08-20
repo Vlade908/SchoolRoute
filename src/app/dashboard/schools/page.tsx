@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { MoreHorizontal, PlusCircle, Copy, Search } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Copy, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -32,7 +32,18 @@ import { collection, addDoc, getDocs, doc, updateDoc, onSnapshot, query, where, 
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { AddressMap } from '@/components/address-map';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
+
+type SchoolClass = {
+  name: string;
+  period: 'Manhã' | 'Tarde' | 'Noite' | 'Integral';
+};
+
+type SchoolGrade = {
+  name: string;
+  classes: SchoolClass[];
+};
 
 type School = {
   id: string;
@@ -40,6 +51,7 @@ type School = {
   address: string;
   hash: string;
   schoolType: 'MUNICIPAL' | 'ESTADUAL' | 'MUNICIPALIZADA';
+  grades?: SchoolGrade[];
 };
 
 type Employee = {
@@ -124,7 +136,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
 }
 
 function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<School, 'id'>) => void, onOpenChange: (open:boolean)=>void}) {
-  const [schoolData, setSchoolData] = useState({ name: '', address: '', hash: '', schoolType: '' as School['schoolType'] | '' });
+  const [schoolData, setSchoolData] = useState({ name: '', address: '', hash: '', schoolType: '' as School['schoolType'] | '', grades: [] });
   const { toast } = useToast();
 
   const handleDataChange = (field: keyof typeof schoolData, value: string) => {
@@ -206,7 +218,146 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
   );
 }
 
-function SchoolDetailsDialog({ school }: { school: School }) {
+function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdate: (updatedGrades: SchoolGrade[]) => void }) {
+  const [grades, setGrades] = useState<SchoolGrade[]>(school.grades || []);
+  const [newGradeName, setNewGradeName] = useState('');
+  const [editingClass, setEditingClass] = useState<{gradeIndex: number, classData: SchoolClass, className: string, classPeriod: SchoolClass['period']} | null>(null);
+
+  const handleAddGrade = () => {
+    if (newGradeName.trim() && !grades.find(g => g.name.toLowerCase() === newGradeName.trim().toLowerCase())) {
+      const updatedGrades = [...grades, { name: newGradeName.trim(), classes: [] }];
+      setGrades(updatedGrades);
+      onUpdate(updatedGrades);
+      setNewGradeName('');
+    }
+  };
+  
+  const handleRemoveGrade = (gradeIndex: number) => {
+    const updatedGrades = grades.filter((_, i) => i !== gradeIndex);
+    setGrades(updatedGrades);
+    onUpdate(updatedGrades);
+  }
+
+  const handleAddClass = (gradeIndex: number) => {
+    setEditingClass({ gradeIndex, classData: {name: '', period: 'Manhã'}, className: '', classPeriod: 'Manhã' });
+  }
+
+  const handleSaveClass = () => {
+    if(!editingClass) return;
+    const { gradeIndex, className, classPeriod } = editingClass;
+    if(className.trim()){
+      const updatedGrades = [...grades];
+      const newClass = { name: className.trim(), period: classPeriod };
+      updatedGrades[gradeIndex].classes.push(newClass);
+      setGrades(updatedGrades);
+      onUpdate(updatedGrades);
+      setEditingClass(null);
+    }
+  }
+
+  const handleRemoveClass = (gradeIndex: number, classIndex: number) => {
+     const updatedGrades = [...grades];
+     updatedGrades[gradeIndex].classes.splice(classIndex, 1);
+     setGrades(updatedGrades);
+     onUpdate(updatedGrades);
+  }
+
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Séries e Turmas</CardTitle>
+        <CardDescription>Gerencie as séries e turmas oferecidas pela escola.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-2 mb-4">
+          <Input 
+            placeholder="Nome da nova série (ex: 1º Ano)"
+            value={newGradeName}
+            onChange={(e) => setNewGradeName(e.target.value)}
+          />
+          <Button onClick={handleAddGrade}><PlusCircle className="mr-2 h-4 w-4"/> Adicionar Série</Button>
+        </div>
+        <Accordion type="multiple" className="w-full">
+          {grades.map((grade, gradeIndex) => (
+            <AccordionItem value={grade.name} key={gradeIndex}>
+              <AccordionTrigger className="flex justify-between w-full">
+                <span>{grade.name}</span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-semibold">Turmas</h4>
+                     <Button variant="outline" size="sm" onClick={() => handleAddClass(gradeIndex)}>
+                      <PlusCircle className="mr-2 h-4 w-4"/> Adicionar Turma
+                     </Button>
+                  </div>
+                  {grade.classes.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nome da Turma</TableHead>
+                          <TableHead>Período</TableHead>
+                          <TableHead><span className="sr-only">Ações</span></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {grade.classes.map((cls, classIndex) => (
+                          <TableRow key={classIndex}>
+                            <TableCell>{cls.name}</TableCell>
+                            <TableCell>{cls.period}</TableCell>
+                            <TableCell className="text-right">
+                               <Button variant="ghost" size="icon" onClick={() => handleRemoveClass(gradeIndex, classIndex)}>
+                                <Trash2 className="h-4 w-4 text-red-500"/>
+                               </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : <p className="text-sm text-muted-foreground">Nenhuma turma cadastrada para esta série.</p>}
+                  <Button variant="destructive" size="sm" className="mt-4" onClick={() => handleRemoveGrade(gradeIndex)}>Remover Série</Button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </CardContent>
+       <Dialog open={!!editingClass} onOpenChange={(isOpen) => !isOpen && setEditingClass(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Adicionar Nova Turma</DialogTitle>
+                <DialogDescription>
+                    Para a série: {editingClass && grades[editingClass.gradeIndex].name}
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <Label htmlFor="className">Nome da Turma (Ex: A, B, Única)</Label>
+                <Input id="className" value={editingClass?.className} onChange={(e) => setEditingClass(prev => prev ? {...prev, className: e.target.value} : null)} />
+                <Label htmlFor="classPeriod">Período</Label>
+                 <Select value={editingClass?.classPeriod} onValueChange={(value) => setEditingClass(prev => prev ? {...prev, classPeriod: value as SchoolClass['period']} : null)}>
+                    <SelectTrigger id="classPeriod">
+                        <SelectValue placeholder="Selecione o período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Manhã">Manhã</SelectItem>
+                        <SelectItem value="Tarde">Tarde</SelectItem>
+                        <SelectItem value="Noite">Noite</SelectItem>
+                        <SelectItem value="Integral">Integral</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingClass(null)}>Cancelar</Button>
+                <Button onClick={handleSaveClass}>Salvar Turma</Button>
+            </DialogFooter>
+        </DialogContent>
+       </Dialog>
+    </Card>
+  )
+}
+
+function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () => void }) {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
@@ -258,6 +409,28 @@ function SchoolDetailsDialog({ school }: { school: School }) {
 
         return filtered;
     }, [employees, searchTerm, statusFilter]);
+    
+    const updateSchoolData = async (dataToUpdate: Partial<School>) => {
+      try {
+        const schoolDocRef = doc(db, 'schools', school.id);
+        const currentDoc = await getDocs(query(collection(db, 'schools'), where('__name__', '==', school.id)));
+        if (currentDoc.empty) throw new Error("Escola não encontrada.");
+
+        const encryptedData = currentDoc.docs[0].data();
+        const decryptedData = decryptObjectValues(encryptedData);
+        if(!decryptedData) throw new Error("Falha ao descriptografar dados da escola.");
+
+        const finalData = { ...decryptedData, ...dataToUpdate };
+        const encryptedUpdate = encryptObjectValues(finalData);
+
+        await updateDoc(schoolDocRef, encryptedUpdate);
+        toast({ title: 'Sucesso!', description: 'Dados da escola atualizados.'});
+      } catch (error) {
+        console.error("Error updating school:", error);
+        toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível atualizar os dados da escola.'});
+      }
+    }
+
 
     const handleSaveEmployee = async (updatedEmployee: Employee) => {
         if (!updatedEmployee.uid) return;
@@ -308,8 +481,9 @@ function SchoolDetailsDialog({ school }: { school: School }) {
                 <DialogDescription>{school.address}</DialogDescription>
             </DialogHeader>
             <Tabs defaultValue="info">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="info">Informações da Escola</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="info">Informações</TabsTrigger>
+                    <TabsTrigger value="grades">Séries e Turmas</TabsTrigger>
                     <TabsTrigger value="employees">Funcionários</TabsTrigger>
                 </TabsList>
                 <TabsContent value="info" className="pt-4">
@@ -327,6 +501,9 @@ function SchoolDetailsDialog({ school }: { school: School }) {
                             <AddressMap initialAddress={school.address} markerType="school" />
                         </CardContent>
                     </Card>
+                </TabsContent>
+                 <TabsContent value="grades" className="pt-4">
+                    <GradesAndClassesManager school={school} onUpdate={(updatedGrades) => updateSchoolData({ grades: updatedGrades })}/>
                 </TabsContent>
                 <TabsContent value="employees" className="pt-4">
                     <Card>
@@ -536,13 +713,12 @@ export default function SchoolsPage() {
         </Table>
       </CardContent>
     </Card>
-     <Dialog open={isSchoolModalOpen} onOpenChange={setIsSchoolModalOpen}>
-        {selectedSchool && <SchoolDetailsDialog school={selectedSchool} />}
+     <Dialog open={isSchoolModalOpen} onOpenChange={(isOpen) => {
+        if(!isOpen) setSelectedSchool(null);
+        setIsSchoolModalOpen(isOpen);
+      }}>
+        {selectedSchool && <SchoolDetailsDialog school={selectedSchool} onClose={() => setIsSchoolModalOpen(false)} />}
     </Dialog>
     </>
   );
 }
-
-    
-
-    

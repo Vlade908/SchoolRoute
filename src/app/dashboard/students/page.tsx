@@ -66,9 +66,11 @@ type Student = {
   ra: string;
   cpf: string;
   rg: string;
-  school: string;
-  schoolYear: string;
-  class: string;
+  schoolId: string;
+  schoolName: string;
+  grade: string;
+  className: string;
+  classPeriod: string;
   status: string;
   enrollmentDate: string; // Should be a Timestamp in Firestore, converted to string for display
   responsibleName: string;
@@ -80,30 +82,47 @@ type Student = {
   souCardNumber?: string;
 };
 
+type SchoolClass = {
+  name: string;
+  period: 'Manhã' | 'Tarde' | 'Noite' | 'Integral';
+};
+
+type SchoolGrade = {
+  name: string;
+  classes: SchoolClass[];
+};
+
 type School = {
   id: string;
   name: string;
+  grades?: SchoolGrade[];
 };
 
 
-function StudentProfileDialog({ 
-  student, 
+function StudentProfileDialog({
+  student,
   isEditing = false,
   onSave,
-  onClose,
-}: { 
-  student: Student | null, 
-  isEditing?: boolean,
-  onSave: (updatedStudent: Student) => void,
-  onClose: () => void,
+  isOpen,
+  onOpenChange,
+}: {
+  student: Student | null;
+  isEditing?: boolean;
+  onSave: (updatedStudent: Student) => void;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
 }) {
   const [editedStudent, setEditedStudent] = useState<Student | null>(student);
-  
+
   useEffect(() => {
     setEditedStudent(student);
   }, [student]);
+  
+  const handleClose = () => {
+    onOpenChange(false);
+  }
 
-  if (!student || !editedStudent) {
+  if (!isOpen || !student || !editedStudent) {
     return null;
   }
 
@@ -137,184 +156,187 @@ function StudentProfileDialog({
 
 
   return (
-    <DialogContent className="sm:max-w-[800px]">
-      <DialogHeader>
-        <DialogTitle>{isEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
-        <DialogDescription>{student.name} - {student.ra}</DialogDescription>
-      </DialogHeader>
-      <Tabs defaultValue="data">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="data">Dados</TabsTrigger>
-          <TabsTrigger value="documents">Documentos</TabsTrigger>
-          <TabsTrigger value="enrollments">Matrículas</TabsTrigger>
-          <TabsTrigger value="history">Histórico</TabsTrigger>
-        </TabsList>
-        <TabsContent value="data" className="pt-4">
-          <Card>
-            <CardContent className="space-y-4 pt-6">
-               <div className="grid grid-cols-2 gap-4">
-                  {isEditing ? (
-                    <>
-                      <div><Label htmlFor="name">Nome</Label><Input id="name" value={editedStudent.name} onChange={handleChange} /></div>
-                      <div>
-                        <Label htmlFor="student-status">Status</Label>
-                          <Select value={editedStudent.status} onValueChange={(value) => handleSelectChange('status', value)}>
-                              <SelectTrigger id="student-status">
-                                  <SelectValue placeholder="Selecione o status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  <SelectItem value="Homologado">Homologado</SelectItem>
-                                  <SelectItem value="Não Homologado">Não Homologado</SelectItem>
-                              </SelectContent>
-                          </Select>
-                      </div>
-                      <div><Label htmlFor="responsibleName">Responsável</Label><Input id="responsibleName" value={editedStudent.responsibleName} onChange={handleChange} /></div>
-                      <div><Label htmlFor="contactPhone">Contato</Label><Input id="contactPhone" value={editedStudent.contactPhone} onChange={handleChange} /></div>
-                      <div><Label htmlFor="schoolYear">Série/Ano</Label><Input id="schoolYear" value={editedStudent.schoolYear} onChange={handleChange} /></div>
-                      <div><Label htmlFor="class">Classe</Label><Input id="class" value={editedStudent.class} onChange={handleChange} /></div>
-                      <div className="col-span-2"><Label htmlFor="school">Escola</Label><Input id="school" value={editedStudent.school} onChange={handleChange} /></div>
-                       <div>
-                        <Label htmlFor="hasPass">Possui Passe?</Label>
-                          <Select value={editedStudent.hasPass} onValueChange={(value) => handleSelectChange('hasPass', value)}>
-                              <SelectTrigger id="hasPass">
-                                  <SelectValue placeholder="Selecione" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  <SelectItem value="Sim">Sim</SelectItem>
-                                  <SelectItem value="Não">Não</SelectItem>
-                              </SelectContent>
-                          </Select>
-                      </div>
-                      {editedStudent.hasPass === 'Sim' && (
-                        <div>
-                          <Label htmlFor="souCardNumber">Nº Cartão SOU</Label>
-                          <Input 
-                            id="souCardNumber" 
-                            value={editedStudent.souCardNumber || ''} 
-                            onChange={handleNumericChange}
-                            onBlur={handleSouCardBlur}
-                            maxLength={16}
-                          />
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div><span className="font-semibold">Nome:</span> {student.name}</div>
-                      <div><span className="font-semibold">Status:</span> <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className={student.status === 'Homologado' ? 'bg-green-600' : ''}>{student.status}</Badge></div>
-                      <div><span className="font-semibold">Responsável:</span> {student.responsibleName}</div>
-                      <div><span className="font-semibold">Contato:</span> {student.contactPhone}</div>
-                      <div><span className="font-semibold">Série/Ano:</span> {student.schoolYear}</div>
-                      <div><span className="font-semibold">Classe:</span> {student.class}</div>
-                      <div className="col-span-2"><span className="font-semibold">Escola:</span> {student.school}</div>
-                      <div><span className="font-semibold">Possui Passe:</span> {student.hasPass ?? 'N/A'}</div>
-                      {student.hasPass === 'Sim' && <div><span className="font-semibold">Nº Cartão SOU:</span> {student.souCardNumber}</div>}
-                    </>
-                  )}
-               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="documents" className="pt-4">
-            <Card>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>{isEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
+            <DialogDescription>{student.name} - {student.ra}</DialogDescription>
+          </DialogHeader>
+          <Tabs defaultValue="data">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="data">Dados</TabsTrigger>
+              <TabsTrigger value="documents">Documentos</TabsTrigger>
+              <TabsTrigger value="enrollments">Matrículas</TabsTrigger>
+              <TabsTrigger value="history">Histórico</TabsTrigger>
+            </TabsList>
+            <TabsContent value="data" className="pt-4">
+              <Card>
                 <CardContent className="space-y-4 pt-6">
-                    <div className="grid grid-cols-2 gap-4">
-                        {isEditing ? (
-                          <>
-                            <div><Label htmlFor="ra">RA</Label><Input id="ra" value={editedStudent.ra} onChange={handleChange} /></div>
-                            <div><Label htmlFor="cpf">CPF</Label><Input id="cpf" value={editedStudent.cpf} onChange={handleChange} /></div>
-                            <div><Label htmlFor="rg">RG</Label><Input id="rg" value={editedStudent.rg} onChange={handleChange} /></div>
-                            <div><Label htmlFor="rgIssueDate">Emissão RG</Label><Input id="rgIssueDate" value={editedStudent.rgIssueDate} onChange={handleChange} /></div>
-                          </>
-                        ) : (
-                          <>
-                            <div><span className="font-semibold">RA:</span> {student.ra}</div>
-                            <div><span className="font-semibold">CPF:</span> {student.cpf}</div>
-                            <div><span className="font-semibold">RG:</span> {student.rg}</div>
-                            <div><span className="font-semibold">Emissão RG:</span> {student.rgIssueDate}</div>
-                           </>
-                        )}
-                    </div>
+                   <div className="grid grid-cols-2 gap-4">
+                      {isEditing ? (
+                        <>
+                          <div><Label htmlFor="name">Nome</Label><Input id="name" value={editedStudent.name} onChange={handleChange} /></div>
+                          <div>
+                            <Label htmlFor="student-status">Status</Label>
+                              <Select value={editedStudent.status} onValueChange={(value) => handleSelectChange('status', value)}>
+                                  <SelectTrigger id="student-status">
+                                      <SelectValue placeholder="Selecione o status" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="Homologado">Homologado</SelectItem>
+                                      <SelectItem value="Não Homologado">Não Homologado</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+                          <div><Label htmlFor="responsibleName">Responsável</Label><Input id="responsibleName" value={editedStudent.responsibleName} onChange={handleChange} /></div>
+                          <div><Label htmlFor="contactPhone">Contato</Label><Input id="contactPhone" value={editedStudent.contactPhone} onChange={handleChange} /></div>
+                          <div><Label htmlFor="grade">Série/Ano</Label><Input id="grade" value={editedStudent.grade} onChange={handleChange} /></div>
+                          <div><Label htmlFor="className">Classe</Label><Input id="className" value={editedStudent.className} onChange={handleChange} /></div>
+                          <div className="col-span-2"><Label htmlFor="schoolName">Escola</Label><Input id="schoolName" value={editedStudent.schoolName} onChange={handleChange} /></div>
+                           <div>
+                            <Label htmlFor="hasPass">Possui Passe?</Label>
+                              <Select value={editedStudent.hasPass} onValueChange={(value) => handleSelectChange('hasPass', value as 'Sim' | 'Não')}>
+                                  <SelectTrigger id="hasPass">
+                                      <SelectValue placeholder="Selecione" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="Sim">Sim</SelectItem>
+                                      <SelectItem value="Não">Não</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+                          {editedStudent.hasPass === 'Sim' && (
+                            <div>
+                              <Label htmlFor="souCardNumber">Nº Cartão SOU</Label>
+                              <Input 
+                                id="souCardNumber" 
+                                value={editedStudent.souCardNumber || ''} 
+                                onChange={handleNumericChange}
+                                onBlur={handleSouCardBlur}
+                                maxLength={16}
+                              />
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div><span className="font-semibold">Nome:</span> {student.name}</div>
+                          <div><span className="font-semibold">Status:</span> <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className={student.status === 'Homologado' ? 'bg-green-600' : ''}>{student.status}</Badge></div>
+                          <div><span className="font-semibold">Responsável:</span> {student.responsibleName}</div>
+                          <div><span className="font-semibold">Contato:</span> {student.contactPhone}</div>
+                          <div><span className="font-semibold">Série/Ano:</span> {student.grade}</div>
+                          <div><span className="font-semibold">Classe:</span> {student.className}</div>
+                          <div className="col-span-2"><span className="font-semibold">Escola:</span> {student.schoolName}</div>
+                          <div><span className="font-semibold">Possui Passe:</span> {student.hasPass ?? 'N/A'}</div>
+                          {student.hasPass === 'Sim' && <div><span className="font-semibold">Nº Cartão SOU:</span> {student.souCardNumber}</div>}
+                        </>
+                      )}
+                   </div>
                 </CardContent>
-            </Card>
-        </TabsContent>
-        <TabsContent value="enrollments" className="pt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Histórico de Matrículas</CardTitle>
-                <Button size="sm" className="w-fit"><PlusCircle className="mr-2 h-4 w-4"/> Nova Movimentação</Button>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Data Inserção</TableHead>
-                            <TableHead>Data Início</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Escola</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableRow>
-                            <TableCell>01/02/2024</TableCell>
-                            <TableCell>15/02/2024</TableCell>
-                            <TableCell><Badge>Ativa</Badge></TableCell>
-                            <TableCell>{student.school}</TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-        </TabsContent>
-         <TabsContent value="history" className="pt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Histórico Escolar</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Ano</TableHead>
-                            <TableHead>Escola</TableHead>
-                            <TableHead>Série/Ano</TableHead>
-                             <TableHead>Status</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableRow>
-                            <TableCell>2024</TableCell>
-                            <TableCell>{student.school}</TableCell>
-                            <TableCell>{student.schoolYear}</TableCell>
-                            <TableCell><Badge variant="outline" className="text-green-600 border-green-600">Aprovado</Badge></TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-        </TabsContent>
-      </Tabs>
-      <DialogFooter>
-        {isEditing ? (
-            <>
-                <Button variant="outline" onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleSaveClick}>Salvar Alterações</Button>
-            </>
-        ) : (
-            <Button variant="outline" onClick={onClose}>Fechar</Button>
-        )}
-      </DialogFooter>
-    </DialogContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="documents" className="pt-4">
+                <Card>
+                    <CardContent className="space-y-4 pt-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            {isEditing ? (
+                              <>
+                                <div><Label htmlFor="ra">RA</Label><Input id="ra" value={editedStudent.ra} onChange={handleChange} /></div>
+                                <div><Label htmlFor="cpf">CPF</Label><Input id="cpf" value={editedStudent.cpf} onChange={handleChange} /></div>
+                                <div><Label htmlFor="rg">RG</Label><Input id="rg" value={editedStudent.rg} onChange={handleChange} /></div>
+                                <div><Label htmlFor="rgIssueDate">Emissão RG</Label><Input id="rgIssueDate" value={editedStudent.rgIssueDate} onChange={handleChange} /></div>
+                              </>
+                            ) : (
+                              <>
+                                <div><span className="font-semibold">RA:</span> {student.ra}</div>
+                                <div><span className="font-semibold">CPF:</span> {student.cpf}</div>
+                                <div><span className="font-semibold">RG:</span> {student.rg}</div>
+                                <div><span className="font-semibold">Emissão RG:</span> {student.rgIssueDate}</div>
+                               </>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="enrollments" className="pt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Histórico de Matrículas</CardTitle>
+                    <Button size="sm" className="w-fit"><PlusCircle className="mr-2 h-4 w-4"/> Nova Movimentação</Button>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Data Inserção</TableHead>
+                                <TableHead>Data Início</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Escola</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell>01/02/2024</TableCell>
+                                <TableCell>15/02/2024</TableCell>
+                                <TableCell><Badge>Ativa</Badge></TableCell>
+                                <TableCell>{student.schoolName}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+            </TabsContent>
+             <TabsContent value="history" className="pt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Histórico Escolar</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Ano</TableHead>
+                                <TableHead>Escola</TableHead>
+                                <TableHead>Série/Ano</TableHead>
+                                 <TableHead>Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell>2024</TableCell>
+                                <TableCell>{student.schoolName}</TableCell>
+                                <TableCell>{student.grade}</TableCell>
+                                <TableCell><Badge variant="outline" className="text-green-600 border-green-600">Aprovado</Badge></TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+            </TabsContent>
+          </Tabs>
+          <DialogFooter>
+            {isEditing ? (
+                <>
+                    <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+                    <Button onClick={handleSaveClick}>Salvar Alterações</Button>
+                </>
+            ) : (
+                <Button variant="outline" onClick={handleClose}>Fechar</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+    </Dialog>
   );
 }
 
 function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Student, 'id' | 'enrollmentDate' | 'status'>) => void, onOpenChange: (open: boolean) => void }) {
   const { user } = useUser();
   const [studentData, setStudentData] = useState({
-    name: '', cpf: '', ra: '', rg: '', schoolYear: '', class: '', responsibleName: '', contactEmail: '', contactPhone: '', address: '', school: '', rgIssueDate: '', hasPass: 'Não', souCardNumber: ''
+    name: '', cpf: '', ra: '', rg: '', grade: '', className: '', classPeriod: '', responsibleName: '', contactEmail: '', contactPhone: '', address: '', schoolId: '', schoolName: '', rgIssueDate: '', hasPass: 'Não' as 'Sim' | 'Não', souCardNumber: ''
   });
 
   const [schools, setSchools] = useState<School[]>([]);
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [isSchoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
 
   useEffect(() => {
@@ -325,7 +347,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
         snapshot.forEach(doc => {
              const decryptedData = decryptObjectValues(doc.data()) as any;
              if(decryptedData) {
-                 schoolsData.push({ id: doc.id, name: decryptedData.name });
+                 schoolsData.push({ id: doc.id, name: decryptedData.name, grades: decryptedData.grades || [] });
              }
         });
         setSchools(schoolsData);
@@ -340,8 +362,25 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     setStudentData(prev => ({...prev, [id]: value}));
   }
   
-  const handleSelectChange = (id: 'hasPass', value: 'Sim' | 'Não') => {
+  const handleSelectChange = (id: keyof typeof studentData, value: string) => {
       setStudentData(prev => ({...prev, [id]: value}));
+  }
+  
+  const handleSchoolSelect = (schoolId: string) => {
+    const school = schools.find(s => s.id === schoolId) || null;
+    setSelectedSchool(school);
+    setStudentData(prev => ({ ...prev, schoolId: school?.id || '', schoolName: school?.name || '', grade: '', className: '', classPeriod: '' }));
+    setSchoolComboboxOpen(false);
+  }
+  
+  const handleGradeSelect = (gradeName: string) => {
+    setStudentData(prev => ({ ...prev, grade: gradeName, className: '', classPeriod: '' }));
+  }
+
+  const handleClassSelect = (className: string) => {
+    const grade = selectedSchool?.grades?.find(g => g.name === studentData.grade);
+    const selectedClass = grade?.classes.find(c => c.name === className);
+    setStudentData(prev => ({ ...prev, className: className, classPeriod: selectedClass?.period || '' }));
   }
 
   const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -417,15 +456,9 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
   const handleAddressSelect = (address: string) => {
     setStudentData(prev => ({...prev, address}));
   }
-  
-  const handleSchoolSelect = (schoolName: string) => {
-    setStudentData(prev => ({...prev, school: schoolName}));
-    setSchoolComboboxOpen(false);
-  }
 
   const handleSave = () => {
-    // Exclude souCardNumber from validation if hasPass is 'Não'
-    const dataToValidate = { ...studentData };
+    const dataToValidate: Partial<typeof studentData> = { ...studentData };
     if (dataToValidate.hasPass === 'Não') {
       delete dataToValidate.souCardNumber;
     }
@@ -436,8 +469,13 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
             return;
         }
     }
-    onSave(studentData);
+    const { ...studentToSave } = studentData;
+    onSave(studentToSave);
   }
+
+  const selectedGradeObj = useMemo(() => {
+    return selectedSchool?.grades?.find(g => g.name === studentData.grade);
+  }, [selectedSchool, studentData.grade]);
 
   return (
     <DialogContent className="sm:max-w-[900px]">
@@ -459,10 +497,6 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                 onBlur={handleDateBlur}
                 maxLength={10}
              />
-            <div className="grid grid-cols-2 gap-4">
-                <Input id="schoolYear" placeholder="Ano Escolar" value={studentData.schoolYear} onChange={handleChange}/>
-                <Input id="class" placeholder="Classe" value={studentData.class} onChange={handleChange}/>
-            </div>
              <Input id="responsibleName" placeholder="Nome do Responsável" value={studentData.responsibleName} onChange={handleChange}/>
              <Input id="contactEmail" type="email" placeholder="Email de Contato" value={studentData.contactEmail} onChange={handleChange}/>
              <Input id="contactPhone" type="tel" placeholder="Telefone de Contato" value={studentData.contactPhone} onChange={handleNumericChange} onBlur={handlePhoneBlur} maxLength={15} />
@@ -476,7 +510,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                         aria-expanded={isSchoolComboboxOpen}
                         className="w-full justify-between font-normal"
                     >
-                        {studentData.school || "Selecione a escola"}
+                        {studentData.schoolName || "Selecione a escola"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </PopoverTrigger>
@@ -490,14 +524,14 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                                 <CommandItem
                                     key={school.id}
                                     value={school.name}
-                                    onSelect={(currentValue) => {
-                                      handleSchoolSelect(currentValue === studentData.school ? "" : school.name)
+                                    onSelect={() => {
+                                      handleSchoolSelect(school.id)
                                     }}
                                 >
                                     <Check
                                         className={cn(
                                             "mr-2 h-4 w-4",
-                                            studentData.school === school.name ? "opacity-100" : "opacity-0"
+                                            studentData.schoolId === school.id ? "opacity-100" : "opacity-0"
                                         )}
                                     />
                                     {school.name}
@@ -508,6 +542,31 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                     </Command>
                 </PopoverContent>
             </Popover>
+
+            {selectedSchool && (
+              <>
+                <Select value={studentData.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool.grades || selectedSchool.grades.length === 0}>
+                  <SelectTrigger><SelectValue placeholder="Selecione a série" /></SelectTrigger>
+                  <SelectContent>
+                    {selectedSchool.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            {selectedGradeObj && (
+              <>
+                <Select value={studentData.className} onValueChange={handleClassSelect} disabled={!selectedGradeObj.classes || selectedGradeObj.classes.length === 0}>
+                  <SelectTrigger><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
+                  <SelectContent>
+                    {selectedGradeObj.classes.map(cls => <SelectItem key={cls.name} value={cls.name}>{cls.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            {studentData.className && <Input readOnly value={`Período: ${studentData.classPeriod}`} className="bg-muted" />}
+
              <AddressMap onAddressSelect={handleAddressSelect} markerType="student" />
              <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -610,9 +669,9 @@ export default function StudentsPage() {
 
     if (!schoolTypeFilter.estaduais || !schoolTypeFilter.municipais) {
         filtered = filtered.filter(student => {
-            if (!student.school) return false;
-            const isEst = isEstadual(student.school);
-            const isMun = isMunicipal(student.school);
+            if (!student.schoolName) return false;
+            const isEst = isEstadual(student.schoolName);
+            const isMun = isMunicipal(student.schoolName);
             if (schoolTypeFilter.estaduais && isEst) return true;
             if (schoolTypeFilter.municipais && isMun) return true;
             return false;
@@ -803,7 +862,7 @@ export default function StudentsPage() {
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden md:table-cell">Escola</TableHead>
                   <TableHead className="hidden md:table-cell">
-                    Ano / Classe
+                    Série / Turma
                   </TableHead>
                   <TableHead className="hidden md:table-cell">
                     RA
@@ -826,9 +885,9 @@ export default function StudentsPage() {
                         </Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                        {student.school}
+                        {student.schoolName}
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">{student.schoolYear} / {student.class}</TableCell>
+                        <TableCell className="hidden md:table-cell">{student.grade} / {student.className}</TableCell>
                         <TableCell className="hidden md:table-cell">{student.ra}</TableCell>
                         <TableCell>{student.souCardNumber || ''}</TableCell>
                         <TableCell>
@@ -888,16 +947,13 @@ export default function StudentsPage() {
           </CardFooter>
         </Card>
       </TabsContent>
-      <Dialog open={isProfileDialogOpen} onOpenChange={setProfileDialogOpen}>
-        <StudentProfileDialog 
-            student={activeStudent}
-            isEditing={isEditing}
-            onSave={handleSaveStudent}
-            onClose={handleCloseProfileDialog}
-        />
-      </Dialog>
+      <StudentProfileDialog 
+          student={activeStudent}
+          isEditing={isEditing}
+          onSave={handleSaveStudent}
+          isOpen={isProfileDialogOpen}
+          onOpenChange={setProfileDialogOpen}
+      />
     </Tabs>
   );
 }
-
-
