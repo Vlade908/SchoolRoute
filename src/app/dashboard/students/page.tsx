@@ -314,19 +314,22 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
   
   const handleCPFBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
     let { value } = e.target;
-    value = value.replace(/[^\d\w]/g, '');
+    value = value.replace(/[^\d\w]/g, ''); // Keep alphanumeric
+    let formatted = value;
     if (value.length === 11) {
-      const formatted = value.replace(/(\w{3})(\w{3})(\w{3})(\w{2})/, '$1.$2.$3-$4');
-      setStudentData(prev => ({...prev, cpf: formatted}));
+      formatted = value.replace(/(\w{3})(\w{3})(\w{3})(\w{2})/, '$1.$2.$3-$4');
+    } else if (value.length === 10) {
+      formatted = value.replace(/(\w{3})(\w{3})(\w{3})(\w{1})/, '$1.$2.$3-$4');
     }
+    setStudentData(prev => ({...prev, cpf: formatted}));
   }
 
   const handleRGBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
     let { value } = e.target;
-    value = value.replace(/[^\d\w]/g, '');
+    value = value.replace(/[^\d\w]/g, ''); // Keep alphanumeric
     if (value.length === 9) {
       const formatted = value.replace(/(\w{2})(\w{3})(\w{3})(\w{1})/, '$1.$2.$3-$4');
-      setStudentData(prev => ({...prev, rg: formatted}));
+       setStudentData(prev => ({...prev, rg: formatted}));
     }
   }
 
