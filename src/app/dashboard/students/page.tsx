@@ -9,6 +9,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Check,
+  ChevronsUpDown
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -53,6 +55,9 @@ import { collection, addDoc, getDocs, onSnapshot, doc, updateDoc, deleteDoc, ser
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { AddressMap } from '@/components/address-map';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 
 
 type Student = {
@@ -71,6 +76,11 @@ type Student = {
   rgIssueDate: string;
   address?: string;
   contactEmail?: string;
+};
+
+type School = {
+  id: string;
+  name: string;
 };
 
 
@@ -261,15 +271,55 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     name: '', cpf: '', ra: '', rg: '', schoolYear: '', class: '', responsibleName: '', contactEmail: '', contactPhone: '', address: '', school: '', rgIssueDate: ''
   });
 
+  const [schools, setSchools] = useState<School[]>([]);
+  const [isSchoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchSchools = async () => {
+        const schoolsCollection = collection(db, 'schools');
+        const snapshot = await getDocs(schoolsCollection);
+        const schoolsData: School[] = [];
+        snapshot.forEach(doc => {
+             const decryptedData = decryptObjectValues(doc.data()) as any;
+             if(decryptedData) {
+                 schoolsData.push({ id: doc.id, name: decryptedData.name });
+             }
+        });
+        setSchools(schoolsData);
+    };
+    fetchSchools();
+  }, []);
+
   if (!user || user.role < 2) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setStudentData(prev => ({...prev, [id]: value}));
   }
+  
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    // Allow only numbers
+    const numericValue = value.replace(/[^0-9]/g, '');
+    setStudentData(prev => ({...prev, [id]: numericValue}));
+  }
+
+  const handleDateBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { id, value } = e.target;
+    value = value.replace(/[^0-9]/g, '');
+    if (value.length === 8) {
+        const formattedDate = `${value.substring(0, 2)}/${value.substring(2, 4)}/${value.substring(4, 8)}`;
+        setStudentData(prev => ({...prev, [id]: formattedDate}));
+    }
+  }
 
   const handleAddressSelect = (address: string) => {
     setStudentData(prev => ({...prev, address}));
+  }
+  
+  const handleSchoolSelect = (schoolName: string) => {
+    setStudentData(prev => ({...prev, school: schoolName}));
+    setSchoolComboboxOpen(false);
   }
 
   const handleSave = () => {
@@ -294,7 +344,14 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
             <Input id="cpf" placeholder="CPF" value={studentData.cpf} onChange={handleChange}/>
             <Input id="ra" placeholder="RA (Registro do Aluno)" value={studentData.ra} onChange={handleChange}/>
             <Input id="rg" placeholder="RG" value={studentData.rg} onChange={handleChange}/>
-             <Input id="rgIssueDate" placeholder="Data de Emissão RG" value={studentData.rgIssueDate} onChange={handleChange}/>
+             <Input 
+                id="rgIssueDate" 
+                placeholder="Data de Emissão RG (DDMMAAAA)" 
+                value={studentData.rgIssueDate} 
+                onChange={handleDateChange} 
+                onBlur={handleDateBlur}
+                maxLength={10}
+             />
             <div className="grid grid-cols-2 gap-4">
                 <Input id="schoolYear" placeholder="Ano Escolar" value={studentData.schoolYear} onChange={handleChange}/>
                 <Input id="class" placeholder="Classe" value={studentData.class} onChange={handleChange}/>
@@ -304,7 +361,46 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
              <Input id="contactPhone" type="tel" placeholder="Telefone de Contato" value={studentData.contactPhone} onChange={handleChange}/>
         </div>
          <div className="space-y-4">
-             <Input id="school" placeholder="Escola" value={studentData.school} onChange={handleChange}/>
+             <Popover open={isSchoolComboboxOpen} onOpenChange={setSchoolComboboxOpen}>
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={isSchoolComboboxOpen}
+                        className="w-full justify-between font-normal"
+                    >
+                        {studentData.school || "Selecione a escola"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[420px] p-0">
+                    <Command>
+                        <CommandInput placeholder="Buscar escola..." />
+                        <CommandList>
+                            <CommandEmpty>Nenhuma escola encontrada.</CommandEmpty>
+                            <CommandGroup>
+                                {schools.map((school) => (
+                                <CommandItem
+                                    key={school.id}
+                                    value={school.name}
+                                    onSelect={(currentValue) => {
+                                      handleSchoolSelect(currentValue === studentData.school ? "" : currentValue)
+                                    }}
+                                >
+                                    <Check
+                                        className={cn(
+                                            "mr-2 h-4 w-4",
+                                            studentData.school === school.name ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    {school.name}
+                                </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
              <AddressMap onAddressSelect={handleAddressSelect} markerType="student" />
          </div>
       </div>
