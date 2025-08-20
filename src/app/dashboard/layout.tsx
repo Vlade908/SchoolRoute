@@ -72,11 +72,19 @@ function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user } = useUser();
+  const { user, loading } = useUser();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p>Carregando...</p>
+      </div>
+    );
+  }
 
   if (!user) {
-    // This will be shown briefly while the UserProvider figures out the auth state.
-    // The actual redirect is handled in the DashboardLayout's useEffect.
+    // This should ideally not be reached if the provider handles redirection,
+    // but serves as a fallback.
     return (
       <div className="flex h-screen items-center justify-center">
         <p>Verificando autenticação...</p>
@@ -140,29 +148,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const encryptedData = userDoc.data();
-          const userData = decryptObjectValues(encryptedData) as any;
-          if (userData) {
-            const userProfile = {
-              uid: firebaseUser.uid,
-              name: userData.name,
-              email: firebaseUser.email,
-              role: userData.role,
-              schoolId: userData.schoolId || null,
-            };
-            setUser(userProfile);
-          } else {
-             await auth.signOut();
-             setUser(null);
-             router.push('/');
-          }
-        } else {
-          await auth.signOut();
-          setUser(null);
-          router.push('/');
+        try {
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+              const encryptedData = userDoc.data();
+              const userData = decryptObjectValues(encryptedData) as any;
+              if (userData) {
+                const userProfile = {
+                  uid: firebaseUser.uid,
+                  name: userData.name,
+                  email: firebaseUser.email,
+                  role: userData.role,
+                  schoolId: userData.schoolId || null,
+                };
+                setUser(userProfile);
+              } else {
+                 // Decryption failed or data malformed
+                 throw new Error("Failed to decrypt user data.");
+              }
+            } else {
+               // This case might happen if user exists in Auth but not in Firestore
+               throw new Error("User profile not found in Firestore.");
+            }
+        } catch (error) {
+            console.error("Error fetching user profile:", error);
+            await auth.signOut(); // Sign out to prevent inconsistent state
+            setUser(null);
+            router.push('/');
         }
       } else {
         setUser(null);
@@ -178,17 +191,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = async () => {
     try {
         await auth.signOut();
+        router.push('/');
     } catch (error) {
         console.error("Logout failed:", error);
     }
   };
-
-  if (loading) {
-    return <div className="flex h-screen items-center justify-center">Carregando...</div>;
-  }
   
   return (
-    <UserProvider user={user} logout={handleLogout}>
+    <UserProvider user={user} logout={handleLogout} loading={loading}>
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </UserProvider>
   );

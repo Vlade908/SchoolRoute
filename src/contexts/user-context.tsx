@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, ReactNode } from 'react';
@@ -13,13 +14,14 @@ type User = {
 type UserContextType = {
   user: User | null;
   logout: () => void;
+  loading: boolean;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-export const UserProvider = ({ children, user, logout }: { children: ReactNode; user: User | null; logout: () => void; }) => {
+export const UserProvider = ({ children, user, logout, loading }: { children: ReactNode; user: User | null; logout: () => void; loading: boolean }) => {
   return (
-    <UserContext.Provider value={{ user, logout }}>
+    <UserContext.Provider value={{ user, logout, loading }}>
       {children}
     </UserContext.Provider>
   );
