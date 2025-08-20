@@ -37,6 +37,7 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [center, setCenter] = useState(defaultCenter);
   const [markerPosition, setMarkerPosition] = useState<google.maps.LatLngLiteral | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const {
     ready,
@@ -78,6 +79,7 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
   const handleSelect = ({ description }: { description: string }) => async () => {
     setValue(description, false);
     clearSuggestions();
+    inputRef.current?.blur();
 
     try {
       const results = await getGeocode({ address: description });
@@ -126,42 +128,46 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
   if (!isLoaded) return <Skeleton className="w-full h-[300px]" />;
 
   return (
-    <div className="space-y-2 relative">
-      <Input
-        id="address"
-        value={value}
-        onChange={handleInputChange}
-        disabled={!ready}
-        placeholder="Busque o endereço"
-      />
-      {status === 'OK' && (
-        <div className="absolute top-full mt-1.5 z-50 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
-          <div className="p-1">
-            {data.map((suggestion) => {
-               const {
-                place_id,
-                structured_formatting: { main_text, secondary_text },
-              } = suggestion;
+    <div className="space-y-2">
+      <div className="relative">
+        <Input
+          id="address"
+          ref={inputRef}
+          value={value}
+          onChange={handleInputChange}
+          disabled={!ready}
+          placeholder="Busque o endereço"
+          autoComplete="off"
+        />
+        {status === 'OK' && (
+          <div className="absolute top-full mt-1.5 z-50 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
+            <div className="p-1">
+              {data.map((suggestion) => {
+                 const {
+                  place_id,
+                  structured_formatting: { main_text, secondary_text },
+                } = suggestion;
 
-              return (
-                 <div
-                  key={place_id}
-                  onClick={handleSelect(suggestion)}
-                  className="flex cursor-pointer items-center gap-3 rounded-sm px-2 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-                    <MapPin className="h-5 w-5 text-muted-foreground" />
+                return (
+                   <div
+                    key={place_id}
+                    onClick={handleSelect(suggestion)}
+                    className="flex cursor-pointer items-center gap-3 rounded-sm px-2 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                      <MapPin className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{main_text}</p>
+                      <p className="text-xs text-muted-foreground">{secondary_text}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">{main_text}</p>
-                    <p className="text-xs text-muted-foreground">{secondary_text}</p>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <GoogleMap
         mapContainerStyle={containerStyle}
