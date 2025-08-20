@@ -297,9 +297,8 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     setStudentData(prev => ({...prev, [id]: value}));
   }
   
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    // Allow only numbers
     const numericValue = value.replace(/[^0-9]/g, '');
     setStudentData(prev => ({...prev, [id]: numericValue}));
   }
@@ -312,6 +311,34 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
         setStudentData(prev => ({...prev, [id]: formattedDate}));
     }
   }
+  
+  const handleCPFBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { value } = e.target;
+    value = value.replace(/\D/g, '');
+    if (value.length === 11) {
+      const formatted = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      setStudentData(prev => ({...prev, cpf: formatted}));
+    }
+  }
+
+  const handleRGBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { value } = e.target;
+    value = value.replace(/\D/g, '');
+    if (value.length === 9) {
+      const formatted = value.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4');
+      setStudentData(prev => ({...prev, rg: formatted}));
+    }
+  }
+
+  const handlePhoneBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { value } = e.target;
+    value = value.replace(/\D/g, '');
+    if (value.length === 11) {
+      const formatted = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+      setStudentData(prev => ({...prev, contactPhone: formatted}));
+    }
+  }
+
 
   const handleAddressSelect = (address: string) => {
     setStudentData(prev => ({...prev, address}));
@@ -341,14 +368,14 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
       <div className="grid gap-4 py-4 md:grid-cols-2">
         <div className="space-y-4">
             <Input id="name" placeholder="Nome Completo" value={studentData.name} onChange={handleChange}/>
-            <Input id="cpf" placeholder="CPF" value={studentData.cpf} onChange={handleChange}/>
+            <Input id="cpf" placeholder="CPF" value={studentData.cpf} onChange={handleNumericChange} onBlur={handleCPFBlur} maxLength={14} />
             <Input id="ra" placeholder="RA (Registro do Aluno)" value={studentData.ra} onChange={handleChange}/>
-            <Input id="rg" placeholder="RG" value={studentData.rg} onChange={handleChange}/>
+            <Input id="rg" placeholder="RG" value={studentData.rg} onChange={handleNumericChange} onBlur={handleRGBlur} maxLength={12} />
              <Input 
                 id="rgIssueDate" 
                 placeholder="Data de Emissão RG (DDMMAAAA)" 
                 value={studentData.rgIssueDate} 
-                onChange={handleDateChange} 
+                onChange={handleNumericChange} 
                 onBlur={handleDateBlur}
                 maxLength={10}
              />
@@ -358,7 +385,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
             </div>
              <Input id="responsibleName" placeholder="Nome do Responsável" value={studentData.responsibleName} onChange={handleChange}/>
              <Input id="contactEmail" type="email" placeholder="Email de Contato" value={studentData.contactEmail} onChange={handleChange}/>
-             <Input id="contactPhone" type="tel" placeholder="Telefone de Contato" value={studentData.contactPhone} onChange={handleChange}/>
+             <Input id="contactPhone" type="tel" placeholder="Telefone de Contato" value={studentData.contactPhone} onChange={handleNumericChange} onBlur={handlePhoneBlur} maxLength={15} />
         </div>
          <div className="space-y-4">
              <Popover open={isSchoolComboboxOpen} onOpenChange={setSchoolComboboxOpen}>
@@ -384,7 +411,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                                     key={school.id}
                                     value={school.name}
                                     onSelect={(currentValue) => {
-                                      handleSchoolSelect(currentValue === studentData.school ? "" : currentValue)
+                                      handleSchoolSelect(currentValue === studentData.school ? "" : school.name)
                                     }}
                                 >
                                     <Check
@@ -623,7 +650,7 @@ export default function StudentsPage() {
           </DropdownMenu>
           <Button size="sm" variant="outline" className="h-10 gap-1">
             <File className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+            <span className="sr-only sm:not-sr-only sm:whitespace-rap">
               Exportar
             </span>
           </Button>
