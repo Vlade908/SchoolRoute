@@ -82,9 +82,9 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
                     </CardContent>
                 </Card>
             </div>
-            <DialogFooter>
-                <Button variant="destructive">Negar Solicitação</Button>
-                <Button variant="default" className="bg-green-600 hover:bg-green-700">Aprovar Solicitação</Button>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="destructive" className="w-full sm:w-auto">Negar Solicitação</Button>
+                <Button variant="default" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Aprovar Solicitação</Button>
             </DialogFooter>
         </DialogContent>
     )
@@ -121,39 +121,41 @@ export default function TransportPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nº Solicitação</TableHead>
-                  <TableHead>Nome do Aluno</TableHead>
-                  <TableHead>RA</TableHead>
-                  <TableHead>Escola</TableHead>
-                  <TableHead>Distância</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requests.filter(r => r.status === 'Pendente').map((request) => (
-                  <Dialog key={request.id}>
-                    <TableRow>
-                      <TableCell className="font-medium">{request.id}</TableCell>
-                      <TableCell>{request.studentName}</TableCell>
-                      <TableCell>{request.ra}</TableCell>
-                      <TableCell>{request.school}</TableCell>
-                      <TableCell>{request.distance}</TableCell>
-                      <TableCell>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">Analisar</Button>
-                        </DialogTrigger>
-                      </TableCell>
-                    </TableRow>
-                    <ApprovalRequestDialog request={request} />
-                  </Dialog>
-                ))}
-              </TableBody>
-            </Table>
+             <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nº Solicitação</TableHead>
+                    <TableHead>Nome do Aluno</TableHead>
+                    <TableHead className="hidden sm:table-cell">RA</TableHead>
+                    <TableHead className="hidden md:table-cell">Escola</TableHead>
+                    <TableHead className="hidden lg:table-cell">Distância</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Ações</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requests.filter(r => r.status === 'Pendente').map((request) => (
+                    <Dialog key={request.id}>
+                      <TableRow>
+                        <TableCell className="font-medium">{request.id}</TableCell>
+                        <TableCell>{request.studentName}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{request.ra}</TableCell>
+                        <TableCell className="hidden md:table-cell">{request.school}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{request.distance}</TableCell>
+                        <TableCell>
+                          <DialogTrigger asChild>
+                              <Button variant="outline" size="sm">Analisar</Button>
+                          </DialogTrigger>
+                        </TableCell>
+                      </TableRow>
+                      <ApprovalRequestDialog request={request} />
+                    </Dialog>
+                  ))}
+                </TableBody>
+              </Table>
+             </div>
           </CardContent>
         </Card>
       </TabsContent>
@@ -166,37 +168,39 @@ export default function TransportPage() {
             </CardDescription>
           </Header>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nº Solicitação</TableHead>
-                  <TableHead>Nome do Aluno</TableHead>
-                  <TableHead>RA</TableHead>
-                  <TableHead>Escola</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requests.filter(r => r.status === 'Aprovado').map((request) => (
-                   <Dialog key={request.id}>
-                    <TableRow>
-                      <TableCell className="font-medium">{request.id}</TableCell>
-                      <TableCell>{request.studentName}</TableCell>
-                      <TableCell>{request.ra}</TableCell>
-                      <TableCell>{request.school}</TableCell>
-                      <TableCell>
-                       <DialogTrigger asChild>
-                           <Button variant="outline" size="sm">Ver Detalhes</Button>
-                       </DialogTrigger>
-                      </TableCell>
-                    </TableRow>
-                    <ApprovalRequestDialog request={request} />
-                   </Dialog>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nº Solicitação</TableHead>
+                    <TableHead>Nome do Aluno</TableHead>
+                    <TableHead className="hidden sm:table-cell">RA</TableHead>
+                    <TableHead className="hidden md:table-cell">Escola</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Ações</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requests.filter(r => r.status === 'Aprovado').map((request) => (
+                     <Dialog key={request.id}>
+                      <TableRow>
+                        <TableCell className="font-medium">{request.id}</TableCell>
+                        <TableCell>{request.studentName}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{request.ra}</TableCell>
+                        <TableCell className="hidden md:table-cell">{request.school}</TableCell>
+                        <TableCell>
+                         <DialogTrigger asChild>
+                             <Button variant="outline" size="sm">Ver Detalhes</Button>
+                         </DialogTrigger>
+                        </TableCell>
+                      </TableRow>
+                      <ApprovalRequestDialog request={request} />
+                     </Dialog>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </TabsContent>

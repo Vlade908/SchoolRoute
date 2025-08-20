@@ -169,25 +169,25 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Omi
                 </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="name" className="text-right">Nome</Label>
-                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" placeholder="Nome da Prefeitura" />
+                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+                    <Label htmlFor="name" className="sm:text-right">Nome</Label>
+                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-1 sm:col-span-3" placeholder="Nome da Prefeitura" />
                 </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="cnpj" className="text-right">CNPJ</Label>
-                    <Input id="cnpj" value={cnpj} onChange={(e) => setCnpj(e.target.value)} className="col-span-3" placeholder="00.000.000/0001-00" />
+                 <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+                    <Label htmlFor="cnpj" className="sm:text-right">CNPJ</Label>
+                    <Input id="cnpj" value={cnpj} onChange={(e) => setCnpj(e.target.value)} className="col-span-1 sm:col-span-3" placeholder="00.000.000/0001-00" />
                 </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="city" className="text-right">Cidade</Label>
-                    <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} className="col-span-3" placeholder="Cidade" />
+                 <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+                    <Label htmlFor="city" className="sm:text-right">Cidade</Label>
+                    <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} className="col-span-1 sm:col-span-3" placeholder="Cidade" />
                 </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="state" className="text-right">Estado</Label>
-                    <Input id="state" value={state} onChange={(e) => setUf(e.target.value)} className="col-span-3" placeholder="UF" />
+                 <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+                    <Label htmlFor="state" className="sm:text-right">Estado</Label>
+                    <Input id="state" value={state} onChange={(e) => setUf(e.target.value)} className="col-span-1 sm:col-span-3" placeholder="UF" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="hash" className="text-right">Chave Hash</Label>
-                    <div className="col-span-3 flex items-center gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+                    <Label htmlFor="hash" className="sm:text-right">Chave Hash</Label>
+                    <div className="col-span-1 sm:col-span-3 flex items-center gap-2">
                         <Input id="hash" value={hash} readOnly className="font-mono bg-muted" />
                         <Button variant="outline" size="icon" onClick={copyToClipboard} disabled={!hash}><Copy className="h-4 w-4"/></Button>
                     </div>
@@ -215,20 +215,24 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const cityHallEmployees: Employee[] = [];
             querySnapshot.forEach((doc) => {
-                const encryptedData = doc.data();
-                const data = decryptObjectValues(encryptedData) as any;
-                
-                if(data && data.hash === cityHall.hash) {
-                    cityHallEmployees.push({
-                        id: doc.id,
-                        uid: data.uid,
-                        name: data.name,
-                        email: data.email,
-                        role: data.role,
-                        status: data.status,
-                        hash: data.hash,
-                        creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
-                    });
+                try {
+                    const encryptedData = doc.data();
+                    const data = decryptObjectValues(encryptedData) as any;
+                    
+                    if(data && data.hash === cityHall.hash) {
+                        cityHallEmployees.push({
+                            id: doc.id,
+                            uid: data.uid,
+                            name: data.name,
+                            email: data.email,
+                            role: data.role,
+                            status: data.status,
+                            hash: data.hash,
+                            creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                        });
+                    }
+                } catch (e) {
+                    console.error("Error processing user document:", doc.id, e)
                 }
             });
             setEmployees(cityHallEmployees);
@@ -542,5 +546,3 @@ export default function CityHallsPage() {
     </>
   );
 }
-
-    

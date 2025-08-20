@@ -124,9 +124,9 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
           </Select>
         </div>
       </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-        <Button onClick={handleSave}>Salvar Alterações</Button>
+      <DialogFooter className="flex-col sm:flex-row gap-2">
+        <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancelar</Button>
+        <Button onClick={handleSave} className="w-full sm:w-auto">Salvar Alterações</Button>
       </DialogFooter>
     </DialogContent>
   )
@@ -350,5 +350,3 @@ export default function EmployeesPage() {
     </Card>
   );
 }
-
-    

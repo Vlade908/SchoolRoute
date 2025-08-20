@@ -116,31 +116,31 @@ function StudentProfileDialog({
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [isSchoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
-
+  
   useEffect(() => {
-    if (isOpen && student) {
-      const fetchSchoolsAndSetState = async () => {
+    if (isOpen) {
         const schoolsCollection = collection(db, 'schools');
-        const snapshot = await getDocs(schoolsCollection);
-        const schoolsData: School[] = snapshot.docs.map(doc => {
-            const decryptedData = decryptObjectValues(doc.data()) as any;
-            return { 
-                id: doc.id, 
-                name: decryptedData.name, 
-                grades: decryptedData.grades || [] 
-            };
-        });
-        setSchools(schoolsData);
+        getDocs(schoolsCollection).then(snapshot => {
+            const schoolsData: School[] = snapshot.docs.map(doc => {
+                const decryptedData = decryptObjectValues(doc.data()) as any;
+                return { 
+                    id: doc.id, 
+                    name: decryptedData.name, 
+                    grades: decryptedData.grades || [] 
+                };
+            });
+            setSchools(schoolsData);
 
-        const currentSchool = schoolsData.find(s => s.id === student.schoolId);
-        setSelectedSchool(currentSchool || null);
-        setEditedStudent(student);
-      };
-      
-      fetchSchoolsAndSetState();
+            if (student) {
+                const currentSchool = schoolsData.find(s => s.id === student.schoolId);
+                setSelectedSchool(currentSchool || null);
+                setEditedStudent(student);
+            }
+        });
     }
   }, [isOpen, student]);
-  
+
+
   const selectedGradeObj = useMemo(() => {
     if (!selectedSchool || !editedStudent?.grade) return null;
     return selectedSchool.grades?.find(g => g.name === editedStudent.grade);
@@ -233,7 +233,7 @@ function StudentProfileDialog({
               <TabsContent value="data" className="pt-4">
                 <Card>
                   <CardContent className="space-y-4 pt-6">
-                     <div className="grid grid-cols-2 gap-4">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {isEditing ? (
                           <>
                             <div><Label htmlFor="name">Nome</Label><Input id="name" value={editedStudent.name} onChange={handleChange} /></div>
@@ -251,7 +251,7 @@ function StudentProfileDialog({
                             </div>
                             <div><Label htmlFor="responsibleName">Responsável</Label><Input id="responsibleName" value={editedStudent.responsibleName} onChange={handleChange} /></div>
                             <div><Label htmlFor="contactPhone">Contato</Label><Input id="contactPhone" value={editedStudent.contactPhone} onChange={handleChange} /></div>
-                            <div className="col-span-2">
+                            <div className="col-span-1 md:col-span-2">
                                 <Label htmlFor="schoolName">Escola</Label>
                                 <Popover open={isSchoolComboboxOpen} onOpenChange={setSchoolComboboxOpen}>
                                     <PopoverTrigger asChild>
@@ -261,7 +261,7 @@ function StudentProfileDialog({
                                             aria-expanded={isSchoolComboboxOpen}
                                             className="w-full justify-between font-normal"
                                         >
-                                            {editedStudent.schoolName || "Selecione a escola"}
+                                            {selectedSchool?.name || "Selecione a escola"}
                                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                         </Button>
                                     </PopoverTrigger>
@@ -292,7 +292,7 @@ function StudentProfileDialog({
                                     </PopoverContent>
                                 </Popover>
                             </div>
-                             <div className="col-span-2 grid grid-cols-3 gap-4">
+                             <div className="col-span-1 md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <Select value={editedStudent.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
                                     <SelectTrigger><Label htmlFor="grade" className="sr-only">Série/Ano</Label><SelectValue placeholder="Selecione a série" /></SelectTrigger>
                                     <SelectContent>
@@ -360,7 +360,7 @@ function StudentProfileDialog({
               <TabsContent value="documents" className="pt-4">
                   <Card>
                       <CardContent className="space-y-4 pt-6">
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {isEditing ? (
                                 <>
                                   <div><Label htmlFor="ra">RA</Label><Input id="ra" value={editedStudent.ra} onChange={handleChange} /></div>
@@ -436,14 +436,14 @@ function StudentProfileDialog({
                   </Card>
               </TabsContent>
             </Tabs>
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
               {isEditing ? (
                   <>
-                      <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-                      <Button onClick={handleSaveClick}>Salvar Alterações</Button>
+                      <Button variant="outline" onClick={handleClose} className="w-full sm:w-auto">Cancelar</Button>
+                      <Button onClick={handleSaveClick} className="w-full sm:w-auto">Salvar Alterações</Button>
                   </>
               ) : (
-                  <Button variant="outline" onClick={handleClose}>Fechar</Button>
+                  <Button variant="outline" onClick={handleClose} className="w-full sm:w-auto">Fechar</Button>
               )}
             </DialogFooter>
           </>
@@ -615,7 +615,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
   }
 
   return (
-    <DialogContent className="sm:max-w-[900px]">
+    <DialogContent className="sm:max-w-4xl">
       <DialogHeader>
         <DialogTitle>Cadastrar Novo Aluno</DialogTitle>
         <DialogDescription>Preencha os dados do aluno. Clique em salvar para concluir.</DialogDescription>
@@ -651,7 +651,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[420px] p-0">
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
                     <Command>
                         <CommandInput placeholder="Buscar escola..." />
                         <CommandList>
@@ -679,21 +679,21 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
                     </Command>
                 </PopoverContent>
             </Popover>
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select value={studentData.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a série" /></SelectTrigger>
+                    <SelectContent>
+                    {selectedSchool?.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
 
-            <Select value={studentData.grade} onValueChange={handleGradeSelect} disabled={!selectedSchool?.grades || selectedSchool.grades.length === 0}>
-                <SelectTrigger><SelectValue placeholder="Selecione a série" /></SelectTrigger>
-                <SelectContent>
-                {selectedSchool?.grades?.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
-                </SelectContent>
-            </Select>
-
-            <Select value={studentData.classPeriod} onValueChange={handlePeriodSelect} disabled={availablePeriods.length === 0}>
-                <SelectTrigger><SelectValue placeholder="Selecione o período" /></SelectTrigger>
-                <SelectContent>
-                {availablePeriods.map(period => <SelectItem key={period} value={period}>{period}</SelectItem>)}
-                </SelectContent>
-            </Select>
-
+                <Select value={studentData.classPeriod} onValueChange={handlePeriodSelect} disabled={availablePeriods.length === 0}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o período" /></SelectTrigger>
+                    <SelectContent>
+                    {availablePeriods.map(period => <SelectItem key={period} value={period}>{period}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
             <Select value={studentData.className} onValueChange={handleClassSelect} disabled={availableClasses.length === 0}>
                 <SelectTrigger><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
                 <SelectContent>
@@ -731,7 +731,9 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
              </div>
          </div>
       </div>
-       <Button type="submit" className="w-full" onClick={handleSave}>Salvar Aluno</Button>
+       <DialogFooter>
+         <Button type="submit" className="w-full sm:w-auto" onClick={handleSave}>Salvar Aluno</Button>
+      </DialogFooter>
     </DialogContent>
   );
 }
@@ -989,67 +991,69 @@ export default function StudentsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Escola</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Série / Turma
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    RA
-                  </TableHead>
-                  <TableHead>
-                    N° do Cartão
-                  </TableHead>
-                  <TableHead>
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedStudents.map((student) => (
-                    <TableRow key={student.id}>
-                        <TableCell className="font-medium">{student.name}</TableCell>
-                        <TableCell>
-                        <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className={student.status === 'Homologado' ? 'bg-green-600' : ''}>
-                            {student.status}
-                        </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                        {student.schoolName}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">{student.grade} / {student.className}</TableCell>
-                        <TableCell className="hidden md:table-cell">{student.ra}</TableCell>
-                        <TableCell>{student.souCardNumber || ''}</TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                              <Button
-                                  aria-haspopup="true"
-                                  size="icon"
-                                  variant="ghost"
-                              >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                  <span className="sr-only">Toggle menu</span>
-                              </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                <DropdownMenuItem onSelect={() => handleOpenProfileDialog(student, false)}>Ver Perfil</DropdownMenuItem>
-                                {user && user.role >= 2 && 
-                                    <DropdownMenuItem onSelect={() => handleOpenProfileDialog(student, true)}>Editar</DropdownMenuItem>
-                                }
-                                {user && user.role === 3 && <DropdownMenuItem className="text-red-500" onClick={() => handleDeleteStudent(student.id)}>Excluir</DropdownMenuItem>}
-                              </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                    </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden md:table-cell">Escola</TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      Série / Turma
+                    </TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      RA
+                    </TableHead>
+                    <TableHead>
+                      N° do Cartão
+                    </TableHead>
+                    <TableHead>
+                      <span className="sr-only">Ações</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedStudents.map((student) => (
+                      <TableRow key={student.id}>
+                          <TableCell className="font-medium">{student.name}</TableCell>
+                          <TableCell>
+                          <Badge variant={student.status === 'Homologado' ? 'default' : 'destructive'} className={student.status === 'Homologado' ? 'bg-green-600' : ''}>
+                              {student.status}
+                          </Badge>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                          {student.schoolName}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">{student.grade} / {student.className}</TableCell>
+                          <TableCell className="hidden md:table-cell">{student.ra}</TableCell>
+                          <TableCell>{student.souCardNumber || ''}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                <Button
+                                    aria-haspopup="true"
+                                    size="icon"
+                                    variant="ghost"
+                                >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Toggle menu</span>
+                                </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                  <DropdownMenuItem onSelect={() => handleOpenProfileDialog(student, false)}>Ver Perfil</DropdownMenuItem>
+                                  {user && user.role >= 2 && 
+                                      <DropdownMenuItem onSelect={() => handleOpenProfileDialog(student, true)}>Editar</DropdownMenuItem>
+                                  }
+                                  {user && user.role === 3 && <DropdownMenuItem className="text-red-500" onClick={() => handleDeleteStudent(student.id)}>Excluir</DropdownMenuItem>}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                      </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
@@ -1091,8 +1095,3 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
-
-    
-
-    
-

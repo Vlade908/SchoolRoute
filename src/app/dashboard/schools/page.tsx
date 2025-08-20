@@ -137,9 +137,9 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
              </Select>
         </div>
       </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-        <Button onClick={handleSave}>Salvar</Button>
+      <DialogFooter className="flex-col sm:flex-row gap-2">
+        <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancelar</Button>
+        <Button onClick={handleSave} className="w-full sm:w-auto">Salvar</Button>
       </DialogFooter>
     </DialogContent>
   )
@@ -181,18 +181,18 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="name" className="text-right">
+        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+          <Label htmlFor="name" className="sm:text-right">
             Nome
           </Label>
-          <Input id="name" value={schoolData.name} onChange={(e) => handleDataChange('name', e.target.value)} className="col-span-3" placeholder="Nome da Escola" />
+          <Input id="name" value={schoolData.name} onChange={(e) => handleDataChange('name', e.target.value)} className="col-span-1 sm:col-span-3" placeholder="Nome da Escola" />
         </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="schoolType" className="text-right">
+        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+          <Label htmlFor="schoolType" className="sm:text-right">
             Tipo de Escola
           </Label>
            <Select value={schoolData.schoolType} onValueChange={(value) => handleDataChange('schoolType', value)}>
-                <SelectTrigger id="schoolType" className="col-span-3">
+                <SelectTrigger id="schoolType" className="col-span-1 sm:col-span-3">
                     <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -202,19 +202,19 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
                 </SelectContent>
             </Select>
         </div>
-        <div className="grid grid-cols-4 items-start gap-4">
-          <Label htmlFor="address" className="text-right pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-4 items-start gap-4">
+          <Label htmlFor="address" className="sm:text-right pt-2">
             Endereço
           </Label>
-          <div className="col-span-3 space-y-2">
+          <div className="col-span-1 sm:col-span-3 space-y-2">
             <AddressMap onAddressSelect={(addr) => handleDataChange('address', addr)} markerType="school" />
           </div>
         </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="hash" className="text-right">
+        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+          <Label htmlFor="hash" className="sm:text-right">
             Chave Hash
           </Label>
-          <div className="col-span-3 flex items-center gap-2">
+          <div className="col-span-1 sm:col-span-3 flex items-center gap-2">
             <Input id="hash" value={schoolData.hash} readOnly className="font-mono bg-muted" />
             <Button variant="outline" size="icon" onClick={copyToClipboard} disabled={!schoolData.hash}><Copy className="h-4 w-4"/></Button>
           </div>
@@ -633,14 +633,14 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                         <CardContent className="space-y-4 pt-6">
                             {isEditing ? (
                               <div className="space-y-4">
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                  <Label htmlFor="name-edit" className="text-right">Nome</Label>
-                                  <Input id="name-edit" value={editedSchool.name} onChange={(e) => handleEditChange('name', e.target.value)} className="col-span-3" />
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+                                  <Label htmlFor="name-edit" className="sm:text-right">Nome</Label>
+                                  <Input id="name-edit" value={editedSchool.name} onChange={(e) => handleEditChange('name', e.target.value)} className="col-span-1 sm:col-span-3" />
                                 </div>
-                                 <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="schoolType-edit" className="text-right">Tipo</Label>
+                                 <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
+                                    <Label htmlFor="schoolType-edit" className="sm:text-right">Tipo</Label>
                                     <Select value={editedSchool.schoolType} onValueChange={(value) => handleEditChange('schoolType', value)}>
-                                        <SelectTrigger id="schoolType-edit" className="col-span-3">
+                                        <SelectTrigger id="schoolType-edit" className="col-span-1 sm:col-span-3">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -650,9 +650,9 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                                         </SelectContent>
                                     </Select>
                                  </div>
-                                <div className="grid grid-cols-4 items-start gap-4">
-                                    <Label className="text-right pt-2">Endereço</Label>
-                                    <div className="col-span-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start gap-4">
+                                    <Label className="sm:text-right pt-2">Endereço</Label>
+                                    <div className="col-span-1 sm:col-span-3">
                                       <AddressMap 
                                         initialAddress={editedSchool.address} 
                                         onAddressSelect={(addr) => handleEditChange('address', addr)}
@@ -915,7 +915,7 @@ export default function SchoolsPage() {
             const schoolsData: School[] = [];
             snapshot.forEach((doc) => {
                 const encryptedData = doc.data();
-                const data = decryptObjectValues(data as any);
+                const data = decryptObjectValues(encryptedData as any);
                 if (data) {
                     schoolsData.push({ 
                         id: doc.id,
@@ -1065,11 +1065,3 @@ export default function SchoolsPage() {
     </>
   );
 }
-
-    
-
-    
-
-
-
-    

@@ -27,60 +27,60 @@ export const decryptData = <T extends object>(encryptedData: string): T | null =
   }
 };
 
-// Função para criptografar apenas os campos sensíveis de um objeto
+// Função para criptografar um objeto inteiro dentro de um campo 'encryptedData'
 export const encryptObjectValues = (obj: Record<string, any>): Record<string, any> => {
-    const encryptedObj: Record<string, any> = {};
-    for (const key in obj) {
-        if (Object.prototype.hasOwnProperty.call(obj, key)) {
-            if(obj[key] !== null && obj[key] !== undefined) {
-                 encryptedObj[key] = CryptoJS.AES.encrypt(JSON.stringify(obj[key]), secretKey).toString();
-            } else {
-                 encryptedObj[key] = obj[key];
-            }
-        }
-    }
     return { 'encryptedData': encryptData(obj) };
 };
 
 
-// Função para descriptografar os campos de um objeto que foi salvo como um todo
+// Função para descriptografar os campos de um objeto
+// Lida com objetos que estão totalmente criptografados dentro de 'encryptedData'
+// ou objetos onde cada valor é criptografado individualmente (legado).
 export const decryptObjectValues = (encryptedObj: Record<string, any>): Record<string, any> | null => {
-    if (encryptedObj && encryptedObj.encryptedData) {
+    if (!encryptedObj) return null;
+
+    // Cenário 1: O objeto inteiro está criptografado em 'encryptedData'
+    if (encryptedObj.encryptedData && typeof encryptedObj.encryptedData === 'string') {
         return decryptData(encryptedObj.encryptedData);
     }
-    // Fallback para o caso de o objeto inteiro ser passado sem o wrapper 'encryptedData'
-    if (encryptedObj && Object.keys(encryptedObj).length > 0) {
-        try {
-            const decrypted: Record<string, any> = {};
-            let hasDecryptedField = false;
-            // Tentativa de descriptografar cada campo
-            for(const key in encryptedObj) {
+
+    // Cenário 2 (Legado): Tenta descriptografar cada valor do objeto.
+    // Isso é menos eficiente e propenso a erros, mas mantido para retrocompatibilidade.
+    try {
+        const decrypted: Record<string, any> = {};
+        let hasDecryptedField = false;
+
+        for (const key in encryptedObj) {
+            if (Object.prototype.hasOwnProperty.call(encryptedObj, key)) {
                 if (typeof encryptedObj[key] === 'string') {
-                    const bytes  = CryptoJS.AES.decrypt(encryptedObj[key], secretKey);
+                    const bytes = CryptoJS.AES.decrypt(encryptedObj[key], secretKey);
                     const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
-                     if (decryptedText) {
+                    
+                    if (decryptedText) {
                         try {
                            decrypted[key] = JSON.parse(decryptedText);
                            hasDecryptedField = true;
                         } catch (e) {
-                           // Not a JSON string, which is fine for some fields
+                           // Se não for um JSON, usa o texto direto.
                            decrypted[key] = decryptedText;
+                           hasDecryptedField = true; // Considera como sucesso se algo for descriptografado.
                         }
                     } else {
+                        // Se a descriptografia falhar para uma string, mantém o valor original.
                         decrypted[key] = encryptedObj[key];
                     }
                 } else {
+                     // Mantém valores não-string como estão (ex: Timestamps, números).
                      decrypted[key] = encryptedObj[key];
                 }
             }
-            // Se nenhum campo foi descriptografado, é provável que seja um erro
-            if (!hasDecryptedField) return null;
-            return decrypted;
-
-        } catch (error) {
-            // Se houver um erro, é provável que o objeto não esteja no formato esperado
-            return null;
         }
+        // Se pelo menos um campo foi descriptografado, retorna o objeto.
+        // Se nenhum foi, provavelmente o objeto não estava criptografado no formato legado.
+        return hasDecryptedField ? decrypted : encryptedObj;
+    } catch (error) {
+        // Se um erro inesperado ocorrer durante o processo legado, retorna nulo.
+        console.error("Falha no fallback de descriptografia de valores individuais:", error);
+        return null;
     }
-    return null;
 };
