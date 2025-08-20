@@ -498,7 +498,6 @@ export default function CityHallsPage() {
               <TableHead>Nome</TableHead>
               <TableHead>CNPJ</TableHead>
               <TableHead>Cidade</TableHead>
-              <TableHead>Chave Hash</TableHead>
               <TableHead>
                 <span className="sr-only">Ações</span>
               </TableHead>
@@ -514,17 +513,6 @@ export default function CityHallsPage() {
                 </TableCell>
                 <TableCell>{cityHall.cnpj}</TableCell>
                 <TableCell>{cityHall.city}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-muted-foreground">{cityHall.hash}</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                        navigator.clipboard.writeText(cityHall.hash);
-                        toast({ title: 'Copiado!', description: 'Chave hash copiada.' });
-                    }}>
-                        <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
