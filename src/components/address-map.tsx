@@ -50,19 +50,7 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
       componentRestrictions: { country: 'br' }, // Restringe para o Brasil
     },
     debounce: 300,
-    // Disabling this because it was causing the input to be disabled initially.
-    // The user experience is better if they can start typing right away.
-    // The hook will just not return suggestions until it's ready.
-    initOnMount: false,
   });
-
-  useEffect(() => {
-    if (isLoaded) {
-      // Manually initialize the hook once the script is loaded.
-      setValue('', false); // A way to trigger initialization
-    }
-  }, [isLoaded, setValue]);
-
 
   useEffect(() => {
     if (initialAddress && isLoaded) {
@@ -150,6 +138,7 @@ export function AddressMap({ onAddressSelect, initialAddress }: AddressMapProps)
           ref={inputRef}
           value={value}
           onChange={handleInputChange}
+          disabled={!ready}
           placeholder="Busque o endereço"
           autoComplete="off"
         />
