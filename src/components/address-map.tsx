@@ -27,21 +27,21 @@ interface AddressMapProps {
   initialAddress?: string;
 }
 
-const schoolIcon = {
-  path: "M4 15.5A2.5 2.5 0 0 1 1.5 13V5.5A2.5 2.5 0 0 1 4 3h16a2.5 2.5 0 0 1 2.5 2.5V13a2.5 2.5 0 0 1-2.5 2.5h-3.11L15 21l-2.89-5.5H4z",
-  fillColor: 'hsl(var(--primary))',
-  fillOpacity: 1,
-  strokeWeight: 0,
-  rotation: 0,
-  scale: 1.2,
-  anchor: new google.maps.Point(12, 12),
-};
-
 function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [center, setCenter] = useState(defaultCenter);
   const [markerPosition, setMarkerPosition] = useState<google.maps.LatLngLiteral | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const schoolIcon = {
+    path: "M4 15.5A2.5 2.5 0 0 1 1.5 13V5.5A2.5 2.5 0 0 1 4 3h16a2.5 2.5 0 0 1 2.5 2.5V13a2.5 2.5 0 0 1-2.5 2.5h-3.11L15 21l-2.89-5.5H4z",
+    fillColor: 'hsl(var(--primary))',
+    fillOpacity: 1,
+    strokeWeight: 0,
+    rotation: 0,
+    scale: 1.2,
+    anchor: new google.maps.Point(12, 12),
+  };
 
   const {
     ready,
@@ -54,7 +54,6 @@ function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
       componentRestrictions: { country: 'br' },
     },
     debounce: 300,
-    initOnMount: true,
   });
 
   useEffect(() => {
