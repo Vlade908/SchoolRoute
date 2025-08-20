@@ -26,7 +26,6 @@ export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [name, setName] = useState('');
-  const [hash, setHash] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,15 +48,14 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      const isSecretaria = hash.toLowerCase().startsWith('pm');
-
+      // Create admin user directly
       const userProfile = {
         uid: user.uid,
         name: name,
         email: email,
-        hash: hash,
-        role: isSecretaria ? 3 : 1, 
-        status: isSecretaria ? 'Aprovado' : 'Pendente',
+        hash: 'admin-seed', // Use a placeholder hash
+        role: 3, 
+        status: 'Ativo',
         creationDate: serverTimestamp()
       };
       
@@ -66,7 +64,7 @@ export default function SignupPage() {
       await setDoc(doc(db, "users", user.uid), encryptedProfile);
       
       toast({
-          title: "Conta Criada!",
+          title: "Conta de Administrador Criada!",
           description: "Sua conta foi criada com sucesso. Redirecionando...",
       });
       
@@ -100,9 +98,9 @@ export default function SignupPage() {
       </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Criar Conta</CardTitle>
+          <CardTitle className="text-2xl">Criar Conta de Administrador</CardTitle>
           <CardDescription>
-            Preencha os campos abaixo para criar sua conta de funcionário.
+            Preencha os campos abaixo para criar sua conta principal.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -116,16 +114,6 @@ export default function SignupPage() {
                 onChange={(e) => setName(e.target.value)}
                 disabled={loading}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hash">Chave da Escola ou Prefeitura (Hash)</Label>
-              <Input 
-                id="hash" 
-                required 
-                value={hash}
-                onChange={(e) => setHash(e.target.value)}
-                disabled={loading}
-                />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
