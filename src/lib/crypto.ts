@@ -48,5 +48,39 @@ export const decryptObjectValues = (encryptedObj: Record<string, any>): Record<s
     if (encryptedObj && encryptedObj.encryptedData) {
         return decryptData(encryptedObj.encryptedData);
     }
+    // Fallback para o caso de o objeto inteiro ser passado sem o wrapper 'encryptedData'
+    if (encryptedObj && Object.keys(encryptedObj).length > 0) {
+        try {
+            const decrypted: Record<string, any> = {};
+            let hasDecryptedField = false;
+            // Tentativa de descriptografar cada campo
+            for(const key in encryptedObj) {
+                if (typeof encryptedObj[key] === 'string') {
+                    const bytes  = CryptoJS.AES.decrypt(encryptedObj[key], secretKey);
+                    const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
+                     if (decryptedText) {
+                        try {
+                           decrypted[key] = JSON.parse(decryptedText);
+                           hasDecryptedField = true;
+                        } catch (e) {
+                           // Not a JSON string, which is fine for some fields
+                           decrypted[key] = decryptedText;
+                        }
+                    } else {
+                        decrypted[key] = encryptedObj[key];
+                    }
+                } else {
+                     decrypted[key] = encryptedObj[key];
+                }
+            }
+            // Se nenhum campo foi descriptografado, é provável que seja um erro
+            if (!hasDecryptedField) return null;
+            return decrypted;
+
+        } catch (error) {
+            // Se houver um erro, é provável que o objeto não esteja no formato esperado
+            return null;
+        }
+    }
     return null;
 };
