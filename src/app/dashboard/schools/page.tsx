@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { MoreHorizontal, PlusCircle, Copy, Search, Trash2, Edit } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Copy, Search, Trash2, Edit, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -67,6 +67,13 @@ type Employee = {
     status: string;
     creationDate?: string;
 };
+
+type Student = {
+    id: string;
+    name: string;
+    ra: string;
+    cpf: string;
+}
 
 function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Employee, onSave: (employee: Employee) => void, onOpenChange: (open: boolean) => void }) {
   const [currentEmployee, setCurrentEmployee] = useState(employee);
@@ -221,10 +228,14 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
   );
 }
 
-function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdate: (updatedGrades: SchoolGrade[]) => void }) {
+function GradesAndClassesManager({ school, onUpdate, isEditing, onViewClass }: { school: School, onUpdate: (updatedGrades: SchoolGrade[]) => void, isEditing: boolean, onViewClass: (gradeName: string, className: string) => void }) {
   const [grades, setGrades] = useState<SchoolGrade[]>(school.grades || []);
   const [newGradeName, setNewGradeName] = useState('');
   const [editingClass, setEditingClass] = useState<{gradeIndex: number; period: SchoolClass['period']; className: string;} | null>(null);
+
+  useEffect(() => {
+    setGrades(school.grades || []);
+  }, [school.grades]);
 
   const periods: SchoolClass['period'][] = ['Manhã', 'Tarde', 'Noite', 'Integral'];
 
@@ -271,17 +282,23 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
     <Card>
       <CardHeader>
         <CardTitle>Séries e Turmas</CardTitle>
-        <CardDescription>Gerencie as séries e turmas oferecidas pela escola.</CardDescription>
+        <CardDescription>
+          {isEditing 
+            ? 'Gerencie as séries e turmas oferecidas pela escola.' 
+            : 'Visualize as séries e turmas. Clique no nome da turma para ver os alunos.'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-2 mb-4">
-          <Input 
-            placeholder="Nome da nova série (ex: 1º Ano)"
-            value={newGradeName}
-            onChange={(e) => setNewGradeName(e.target.value)}
-          />
-          <Button onClick={handleAddGrade}><PlusCircle className="mr-2 h-4 w-4"/> Adicionar Série</Button>
-        </div>
+        {isEditing && (
+          <div className="flex items-center gap-2 mb-4">
+            <Input 
+              placeholder="Nome da nova série (ex: 1º Ano)"
+              value={newGradeName}
+              onChange={(e) => setNewGradeName(e.target.value)}
+            />
+            <Button onClick={handleAddGrade}><PlusCircle className="mr-2 h-4 w-4"/> Adicionar Série</Button>
+          </div>
+        )}
         <Accordion type="multiple" className="w-full">
           {grades.map((grade, gradeIndex) => (
             <AccordionItem value={grade.name} key={gradeIndex}>
@@ -290,31 +307,47 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
               </AccordionTrigger>
               <AccordionContent>
                 <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                   <Accordion type="multiple" className="w-full space-y-2">
-                    {periods.map(period => (
+                   <Accordion type="multiple" className="w-full space-y-2" defaultValue={periods}>
+                    {periods.map(period => {
+                      const classesForPeriod = grade.classes.filter(c => c.period === period);
+                      if (classesForPeriod.length === 0 && !isEditing) return null;
+
+                      return (
                        <AccordionItem value={`${grade.name}-${period}`} key={period} className="bg-background rounded-md border px-4">
                            <AccordionTrigger className="py-2 no-underline">
                                <div className="flex justify-between items-center w-full">
                                     <h4 className="font-semibold text-sm">{period}</h4>
-                                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenAddClass(gradeIndex, period);}}>
-                                        <PlusCircle className="mr-2 h-3 w-3"/> Adicionar Turma
-                                    </Button>
+                                    {isEditing && (
+                                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenAddClass(gradeIndex, period);}}>
+                                          <PlusCircle className="mr-2 h-3 w-3"/> Adicionar Turma
+                                      </Button>
+                                    )}
                                </div>
                            </AccordionTrigger>
                            <AccordionContent className="pb-2">
                                 <Table>
                                 <TableBody>
-                                  {grade.classes.filter(c => c.period === period).map((cls, classIndex) => (
+                                  {classesForPeriod.map((cls, classIndex) => (
                                     <TableRow key={classIndex}>
-                                      <TableCell className="py-1">{cls.name}</TableCell>
-                                      <TableCell className="text-right py-1">
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveClass(gradeIndex, grade.classes.indexOf(cls))}>
-                                          <Trash2 className="h-3 w-3 text-red-500"/>
-                                        </Button>
+                                      <TableCell className="py-1">
+                                         <button 
+                                            disabled={isEditing} 
+                                            className="disabled:no-underline disabled:cursor-default hover:underline"
+                                            onClick={() => !isEditing && onViewClass(grade.name, cls.name)}
+                                          >
+                                            {cls.name}
+                                          </button>
                                       </TableCell>
+                                      {isEditing && (
+                                        <TableCell className="text-right py-1">
+                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveClass(gradeIndex, grade.classes.indexOf(cls))}>
+                                            <Trash2 className="h-3 w-3 text-red-500"/>
+                                          </Button>
+                                        </TableCell>
+                                      )}
                                     </TableRow>
                                   ))}
-                                  {grade.classes.filter(c => c.period === period).length === 0 && (
+                                  {classesForPeriod.length === 0 && isEditing && (
                                     <TableRow>
                                       <TableCell colSpan={2} className="text-xs text-muted-foreground text-center py-2">
                                         Nenhuma turma cadastrada para este período.
@@ -325,12 +358,14 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
                               </Table>
                            </AccordionContent>
                        </AccordionItem>
-                    ))}
+                    )})}
                    </Accordion>
 
-                  <div className="pt-4 mt-4 border-t">
-                     <Button variant="destructive" size="sm" onClick={() => handleRemoveGrade(gradeIndex)}>Remover Série</Button>
-                  </div>
+                  {isEditing && (
+                    <div className="pt-4 mt-4 border-t">
+                       <Button variant="destructive" size="sm" onClick={() => handleRemoveGrade(gradeIndex)}>Remover Série</Button>
+                    </div>
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -359,6 +394,79 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
   )
 }
 
+function ClassStudentsDialog({ isOpen, onOpenChange, schoolId, gradeName, className }: { isOpen: boolean, onOpenChange: (isOpen: boolean) => void, schoolId: string, gradeName: string, className: string }) {
+    const [students, setStudents] = useState<Student[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        
+        const fetchStudents = async () => {
+            setLoading(true);
+            const studentsRef = collection(db, "students");
+            const q = query(studentsRef);
+            
+            const querySnapshot = await getDocs(q);
+            const classStudents: Student[] = [];
+            querySnapshot.forEach(doc => {
+                const decryptedData = decryptObjectValues(doc.data()) as any;
+                if(decryptedData && decryptedData.schoolId === schoolId && decryptedData.grade === gradeName && decryptedData.className === className) {
+                    classStudents.push({
+                        id: doc.id,
+                        name: decryptedData.name,
+                        ra: decryptedData.ra,
+                        cpf: decryptedData.cpf
+                    });
+                }
+            });
+            setStudents(classStudents);
+            setLoading(false);
+        }
+
+        fetchStudents();
+    }, [isOpen, schoolId, gradeName, className]);
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Alunos da Turma - {gradeName} {className}</DialogTitle>
+                    <DialogDescription>Lista de alunos matriculados nesta turma.</DialogDescription>
+                </DialogHeader>
+                <div className="max-h-[60vh] overflow-y-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Nome</TableHead>
+                                <TableHead>RA</TableHead>
+                                <TableHead>CPF</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {loading ? (
+                                <TableRow><TableCell colSpan={3} className="text-center">Carregando...</TableCell></TableRow>
+                            ) : students.length > 0 ? (
+                                students.map(student => (
+                                    <TableRow key={student.id}>
+                                        <TableCell>{student.name}</TableCell>
+                                        <TableCell>{student.ra}</TableCell>
+                                        <TableCell>{student.cpf}</TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow><TableCell colSpan={3} className="text-center">Nenhum aluno encontrado nesta turma.</TableCell></TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+                 <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () => void }) {
     const [editedSchool, setEditedSchool] = useState<School>(school);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -366,6 +474,7 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
     const [statusFilter, setStatusFilter] = useState('todos');
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
     const [isEditing, setIsEditing] = useState(false);
+    const [classStudentsModal, setClassStudentsModal] = useState<{ isOpen: boolean; gradeName?: string; className?: string }>({ isOpen: false });
     const { toast } = useToast();
 
     useEffect(() => {
@@ -491,6 +600,10 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
             default: return 'Pendente';
         }
     }
+    
+    const handleViewClass = (gradeName: string, className: string) => {
+        setClassStudentsModal({ isOpen: true, gradeName, className });
+    }
 
     return (
         <DialogContent className="sm:max-w-4xl">
@@ -566,7 +679,12 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                     </Card>
                 </TabsContent>
                  <TabsContent value="grades" className="pt-4">
-                    <GradesAndClassesManager school={school} onUpdate={(updatedGrades) => updateSchoolData({ grades: updatedGrades })}/>
+                    <GradesAndClassesManager 
+                      school={school} 
+                      onUpdate={(updatedGrades) => updateSchoolData({ grades: updatedGrades })}
+                      isEditing={isEditing}
+                      onViewClass={handleViewClass}
+                    />
                 </TabsContent>
                 <TabsContent value="employees" className="pt-4">
                     <Card>
@@ -656,6 +774,15 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                     </Card>
                 </TabsContent>
             </Tabs>
+            {classStudentsModal.isOpen && (
+              <ClassStudentsDialog 
+                isOpen={classStudentsModal.isOpen}
+                onOpenChange={(isOpen) => setClassStudentsModal({ isOpen })}
+                schoolId={school.id}
+                gradeName={classStudentsModal.gradeName!}
+                className={classStudentsModal.className!}
+              />
+            )}
         </DialogContent>
     );
 }
@@ -667,9 +794,16 @@ function ActionsDropdown({ school }: { school: School }) {
     useEffect(() => {
         const checkStudents = async () => {
             if (!school.id) return;
-            const q = query(collection(db, "students"), where("schoolId", "==", school.id));
+            const q = query(collection(db, "students"), where("encryptedData", ">=", ""));
             const querySnapshot = await getDocs(q);
-            setStudentCount(querySnapshot.size);
+            let count = 0;
+            querySnapshot.forEach(doc => {
+                const decryptedData = decryptObjectValues(doc.data());
+                if (decryptedData && decryptedData.schoolId === school.id) {
+                    count++;
+                }
+            });
+            setStudentCount(count);
         };
         checkStudents();
     }, [school.id]);
@@ -780,7 +914,7 @@ export default function SchoolsPage() {
                 if (data) {
                     schoolsData.push({ 
                         id: doc.id,
-                        status: 'Ativa', 
+                        status: data.status || 'Ativa', 
                         ...data 
                     } as School);
                 }
@@ -883,6 +1017,7 @@ export default function SchoolsPage() {
               <TableHead>Nome da Escola</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Endereço</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>
                 <span className="sr-only">Ações</span>
               </TableHead>
@@ -890,15 +1025,19 @@ export default function SchoolsPage() {
           </TableHeader>
           <TableBody>
             {filteredSchools.map((school) => (
-              <TableRow key={school.id} className={school.status === 'Inativa' ? 'bg-muted/50 text-muted-foreground' : ''}>
+              <TableRow key={school.id} className={school.status === 'Inativa' ? 'text-muted-foreground' : ''}>
                 <TableCell className="font-medium">
                     <button onClick={() => handleSchoolClick(school)} data-school-id={school.id} className="hover:underline text-primary disabled:text-muted-foreground disabled:no-underline" disabled={school.status === 'Inativa'}>
                         {school.name}
                     </button>
-                    {school.status === 'Inativa' && <Badge variant="secondary" className="ml-2">Inativa</Badge>}
                 </TableCell>
                 <TableCell>{school.schoolType}</TableCell>
                 <TableCell>{school.address}</TableCell>
+                <TableCell>
+                  <Badge variant={school.status === 'Ativa' ? 'default' : 'secondary'} className={school.status === 'Ativa' ? 'bg-green-600' : ''}>
+                    {school.status}
+                  </Badge>
+                </TableCell>
                 <TableCell>
                   <ActionsDropdown school={school} />
                 </TableCell>
@@ -921,3 +1060,4 @@ export default function SchoolsPage() {
     
 
     
+
