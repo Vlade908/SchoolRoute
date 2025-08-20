@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { MoreHorizontal, PlusCircle, Copy, Search, Trash2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Copy, Search, Trash2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -361,16 +361,22 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
 }
 
 function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () => void }) {
+    const [editedSchool, setEditedSchool] = useState<School>(school);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+    const [isEditing, setIsEditing] = useState(false);
     const { toast } = useToast();
+
+    useEffect(() => {
+      setEditedSchool(school);
+    }, [school]);
 
     useEffect(() => {
         if (!school?.hash) return;
         
-        const q = query(collection(db, "users"), where("encryptedData", ">=", "")); // A dummy where to allow orderBy
+        const q = query(collection(db, "users"), where("encryptedData", ">=", ""));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const schoolEmployees: Employee[] = [];
             querySnapshot.forEach((doc) => {
@@ -428,12 +434,23 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
 
         await updateDoc(schoolDocRef, encryptedUpdate);
         toast({ title: 'Sucesso!', description: 'Dados da escola atualizados.'});
+        if(isEditing){
+          setIsEditing(false);
+        }
       } catch (error) {
         console.error("Error updating school:", error);
         toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível atualizar os dados da escola.'});
       }
     }
 
+    const handleEditChange = (field: keyof School, value: string) => {
+      setEditedSchool(prev => ({...prev, [field]: value}));
+    }
+
+    const handleSaveEdits = () => {
+      const { name, schoolType, address } = editedSchool;
+      updateSchoolData({ name, schoolType, address });
+    }
 
     const handleSaveEmployee = async (updatedEmployee: Employee) => {
         if (!updatedEmployee.uid) return;
@@ -442,7 +459,6 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
           const roleString = updatedEmployee.role;
           const roleNumber = typeof roleString === 'string' && roleString.startsWith('Nível') ? parseInt(roleString.split(' ')[1], 10) : updatedEmployee.role;
 
-          // Fetch current data to merge
           const currentDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', updatedEmployee.uid)));
           if (currentDoc.empty) throw new Error("Funcionário não encontrado.");
           
@@ -480,8 +496,16 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
     return (
         <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
-                <DialogTitle>{school.name}</DialogTitle>
-                <DialogDescription>{school.address}</DialogDescription>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <DialogTitle>{school.name}</DialogTitle>
+                        <DialogDescription>{school.address}</DialogDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setIsEditing(!isEditing)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        {isEditing ? 'Cancelar' : 'Editar'}
+                    </Button>
+                </div>
             </DialogHeader>
             <Tabs defaultValue="info">
                 <TabsList className="grid w-full grid-cols-3">
@@ -492,16 +516,53 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                 <TabsContent value="info" className="pt-4">
                     <Card>
                         <CardContent className="space-y-4 pt-6">
-                            <p><span className="font-semibold">ID:</span> {school.id}</p>
-                            <p><span className="font-semibold">Nome:</span> {school.name}</p>
-                            <p><span className="font-semibold">Tipo:</span> {school.schoolType}</p>
-                            <p><span className="font-semibold">Endereço:</span> {school.address}</p>
-                            <p className="flex items-center gap-2"><span className="font-semibold">Chave Hash:</span> <span className="font-mono text-muted-foreground">{school.hash}</span>
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigator.clipboard.writeText(school.hash)}>
-                                    <Copy className="h-3 w-3" />
-                                </Button>
-                            </p>
-                            <AddressMap initialAddress={school.address} markerType="school" />
+                            {isEditing ? (
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="name-edit" className="text-right">Nome</Label>
+                                  <Input id="name-edit" value={editedSchool.name} onChange={(e) => handleEditChange('name', e.target.value)} className="col-span-3" />
+                                </div>
+                                 <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="schoolType-edit" className="text-right">Tipo</Label>
+                                    <Select value={editedSchool.schoolType} onValueChange={(value) => handleEditChange('schoolType', value)}>
+                                        <SelectTrigger id="schoolType-edit" className="col-span-3">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="MUNICIPAL">MUNICIPAL</SelectItem>
+                                            <SelectItem value="ESTADUAL">ESTADUAL</SelectItem>
+                                            <SelectItem value="MUNICIPALIZADA">MUNICIPALIZADA</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                 </div>
+                                <div className="grid grid-cols-4 items-start gap-4">
+                                    <Label className="text-right pt-2">Endereço</Label>
+                                    <div className="col-span-3">
+                                      <AddressMap 
+                                        initialAddress={editedSchool.address} 
+                                        onAddressSelect={(addr) => handleEditChange('address', addr)}
+                                        markerType="school" 
+                                      />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end">
+                                    <Button onClick={handleSaveEdits}>Salvar Alterações</Button>
+                                </div>
+                              </div>
+                            ) : (
+                                <>
+                                    <p><span className="font-semibold">ID:</span> {school.id}</p>
+                                    <p><span className="font-semibold">Nome:</span> {school.name}</p>
+                                    <p><span className="font-semibold">Tipo:</span> {school.schoolType}</p>
+                                    <p><span className="font-semibold">Endereço:</span> {school.address}</p>
+                                    <p className="flex items-center gap-2"><span className="font-semibold">Chave Hash:</span> <span className="font-mono text-muted-foreground">{school.hash}</span>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigator.clipboard.writeText(school.hash)}>
+                                            <Copy className="h-3 w-3" />
+                                        </Button>
+                                    </p>
+                                    <AddressMap initialAddress={school.address} markerType="school" />
+                                </>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -607,16 +668,12 @@ function ActionsDropdown({ school }: { school: School }) {
     useEffect(() => {
         const checkStudents = async () => {
             if (!school.id) return;
-            // This is a simplified check. In a real app, you might want to query where schoolId matches.
-            // But since students are linked by name, we can't reliably query by ID here without changing student schema.
-            // For now, let's assume we can query by school name, though this is not ideal.
-            // A better approach would be to store schoolId in the student document.
-            // Given the current schema, we can't implement this perfectly.
-            // We will simulate this check and allow deletion for now. A more robust implementation is needed.
-            setStudentCount(0); // For demonstration, assuming no students.
+            const q = query(collection(db, "students"), where("schoolId", "==", school.id));
+            const querySnapshot = await getDocs(q);
+            setStudentCount(querySnapshot.size);
         };
         checkStudents();
-    }, [school.id, school.name]);
+    }, [school.id]);
 
     const updateSchoolStatus = async (status: 'Ativa' | 'Inativa') => {
         try {
@@ -648,12 +705,6 @@ function ActionsDropdown({ school }: { school: School }) {
         }
     }
     
-    const handleDetailsClick = (school: School) => {
-        // This is managed by the parent component, but we need to stop propagation
-        // to avoid any conflicts with the AlertDialog trigger.
-    }
-
-
     return (
         <AlertDialog>
             <DropdownMenu>
@@ -730,7 +781,7 @@ export default function SchoolsPage() {
                 if (data) {
                     schoolsData.push({ 
                         id: doc.id,
-                        status: 'Ativa', // Default status if not present
+                        status: 'Ativa', 
                         ...data 
                     } as School);
                 }
@@ -867,3 +918,5 @@ export default function SchoolsPage() {
     </>
   );
 }
+
+    
