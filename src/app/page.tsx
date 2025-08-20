@@ -24,13 +24,9 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      if (userCredential.user) {
-        // onAuthStateChanged in DashboardLayout will handle the redirect and user data fetching
-        router.push('/dashboard');
-      } else {
-         throw new Error("Usuário não encontrado.");
-      }
+      await signInWithEmailAndPassword(auth, email, password);
+      // onAuthStateChanged in DashboardLayout will handle the redirect.
+      router.push('/dashboard');
     } catch (error: any) {
       console.error("Login failed:", error);
       let description = "Ocorreu um erro. Por favor, tente novamente.";
