@@ -5,7 +5,7 @@ import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
 import { Input } from './ui/input';
 import { Skeleton } from './ui/skeleton';
-import { MapPin, School } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -25,9 +25,11 @@ const libraries: ('places' | 'drawing' | 'geometry' | 'localContext' | 'visualiz
 interface AddressMapProps {
   onAddressSelect?: (address: string, position?: { lat: number; lng: number }) => void;
   initialAddress?: string;
+  markerType?: 'school' | 'student';
 }
 
-function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
+
+function MapComponent({ onAddressSelect, initialAddress, markerType = 'school' }: AddressMapProps) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [center, setCenter] = useState(defaultCenter);
   const [markerPosition, setMarkerPosition] = useState<google.maps.LatLngLiteral | null>(null);
@@ -40,8 +42,20 @@ function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
     strokeWeight: 0,
     rotation: 0,
     scale: 1.2,
-    anchor: new google.maps.Point(12, 12),
+    anchor: new window.google.maps.Point(12, 12),
   };
+
+  const studentIcon = {
+      path: "m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", // Lucide Home icon path
+      fillColor: 'hsl(var(--accent))',
+      fillOpacity: 1,
+      strokeWeight: 0,
+      rotation: 0,
+      scale: 1.2,
+      anchor: new window.google.maps.Point(12, 12),
+  }
+
+  const selectedIcon = markerType === 'school' ? schoolIcon : studentIcon;
 
   const {
     ready,
@@ -181,7 +195,7 @@ function MapComponent({ onAddressSelect, initialAddress }: AddressMapProps) {
             mapTypeControl: false,
         }}
       >
-        {markerPosition && <Marker position={markerPosition} icon={schoolIcon} />}
+        {markerPosition && <Marker position={markerPosition} icon={selectedIcon} />}
       </GoogleMap>
     </div>
   );

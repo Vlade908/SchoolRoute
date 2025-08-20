@@ -169,7 +169,7 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
             Endereço
           </Label>
           <div className="col-span-3 space-y-2">
-            <AddressMap onAddressSelect={(addr) => handleDataChange('address', addr)} />
+            <AddressMap onAddressSelect={(addr) => handleDataChange('address', addr)} markerType="school" />
           </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
@@ -307,7 +307,7 @@ function SchoolDetailsDialog({ school }: { school: School }) {
                                     <Copy className="h-3 w-3" />
                                 </Button>
                             </p>
-                            <AddressMap initialAddress={school.address} />
+                            <AddressMap initialAddress={school.address} markerType="school" />
                         </CardContent>
                     </Card>
                 </TabsContent>

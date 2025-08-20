@@ -305,7 +305,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
         </div>
          <div className="space-y-4">
              <Input id="school" placeholder="Escola" value={studentData.school} onChange={handleChange}/>
-             <AddressMap onAddressSelect={handleAddressSelect} />
+             <AddressMap onAddressSelect={handleAddressSelect} markerType="student" />
          </div>
       </div>
        <Button type="submit" className="w-full" onClick={handleSave}>Salvar Aluno</Button>
