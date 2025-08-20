@@ -95,22 +95,15 @@ export default function TransportPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // We run this check inside useEffect to ensure it only happens on the client-side,
-    // after the component has mounted and the user context is available.
-    // We also wait for loading to be false before making a decision.
     if (!loading && (!user || user.role < 3)) {
       router.push('/dashboard');
     }
   }, [user, loading, router]);
 
-  // While waiting for user data or if the user doesn't have the right role,
-  // we can show a loading/access denied message. This prevents the main content
-  // from rendering prematurely or for unauthorized users.
   if (loading || !user || user.role < 3) {
     return <p>Carregando ou acesso negado...</p>;
   }
 
-  // If the user has the correct role, we render the full component.
   return (
     <Tabs defaultValue="pending">
       <div className="flex items-center">
