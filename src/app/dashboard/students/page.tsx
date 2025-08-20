@@ -134,6 +134,7 @@ function StudentProfileDialog({
         }
       });
       setSchools(schoolsData);
+      
       if (student) {
         const school = schoolsData.find(s => s.id === student.schoolId);
         setSelectedSchool(school || null);
@@ -143,8 +144,8 @@ function StudentProfileDialog({
   }, [isOpen, student]);
   
   const selectedGradeObj = useMemo(() => {
-    if (!selectedSchool || !editedStudent) return null;
-    return selectedSchool?.grades?.find(g => g.name === editedStudent.grade);
+    if (!selectedSchool || !editedStudent?.grade) return null;
+    return selectedSchool.grades?.find(g => g.name === editedStudent.grade);
   }, [selectedSchool, editedStudent?.grade]);
 
   const handleClose = () => {
@@ -172,7 +173,7 @@ function StudentProfileDialog({
     let { value } = e.target;
     value = value.replace(/\D/g, ''); // Remove non-digits
     if (value.length === 13) {
-      const formatted = value.replace(/(\d{2})(\d{2})(\d{8})(\d{1})/, '$1.$2.$3-$4');
+      const formatted = value.replace(/(\d{2})(\d{2})(\d{8})(\d{1})/, '$1.$2.$3.$4');
       setEditedStudent(prev => prev ? { ...prev, souCardNumber: formatted } : null);
     }
   }
@@ -503,7 +504,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     let { value } = e.target;
     value = value.replace(/\D/g, ''); // Use \D to remove non-digits
     if (value.length === 13) {
-      const formatted = value.replace(/(\d{2})(\d{2})(\d{8})(\d{1})/, '$1.$2.$3-$4');
+      const formatted = value.replace(/(\d{2})(\d{2})(\d{8})(\d{1})/, '$1.$2.$3.$4');
       setStudentData(prev => ({...prev, souCardNumber: formatted}));
     }
   }
@@ -1013,3 +1014,5 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
+    
