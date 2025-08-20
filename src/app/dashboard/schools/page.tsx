@@ -224,7 +224,9 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
 function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdate: (updatedGrades: SchoolGrade[]) => void }) {
   const [grades, setGrades] = useState<SchoolGrade[]>(school.grades || []);
   const [newGradeName, setNewGradeName] = useState('');
-  const [editingClass, setEditingClass] = useState<{gradeIndex: number, classData: SchoolClass, className: string, classPeriod: SchoolClass['period']} | null>(null);
+  const [editingClass, setEditingClass] = useState<{gradeIndex: number; period: SchoolClass['period']; className: string;} | null>(null);
+
+  const periods: SchoolClass['period'][] = ['Manhã', 'Tarde', 'Noite', 'Integral'];
 
   const handleAddGrade = () => {
     if (newGradeName.trim() && !grades.find(g => g.name.toLowerCase() === newGradeName.trim().toLowerCase())) {
@@ -241,16 +243,16 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
     onUpdate(updatedGrades);
   }
 
-  const handleAddClass = (gradeIndex: number) => {
-    setEditingClass({ gradeIndex, classData: {name: '', period: 'Manhã'}, className: '', classPeriod: 'Manhã' });
+  const handleOpenAddClass = (gradeIndex: number, period: SchoolClass['period']) => {
+    setEditingClass({ gradeIndex, period, className: '' });
   }
 
   const handleSaveClass = () => {
     if(!editingClass) return;
-    const { gradeIndex, className, classPeriod } = editingClass;
+    const { gradeIndex, period, className } = editingClass;
     if(className.trim()){
       const updatedGrades = [...grades];
-      const newClass = { name: className.trim(), period: classPeriod };
+      const newClass = { name: className.trim(), period: period };
       updatedGrades[gradeIndex].classes.push(newClass);
       setGrades(updatedGrades);
       onUpdate(updatedGrades);
@@ -264,7 +266,6 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
      setGrades(updatedGrades);
      onUpdate(updatedGrades);
   }
-
 
   return (
     <Card>
@@ -288,38 +289,41 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
                 <span>{grade.name}</span>
               </AccordionTrigger>
               <AccordionContent>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-semibold">Turmas</h4>
-                     <Button variant="outline" size="sm" onClick={() => handleAddClass(gradeIndex)}>
-                      <PlusCircle className="mr-2 h-4 w-4"/> Adicionar Turma
-                     </Button>
+                <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                  {periods.map(period => (
+                    <div key={period}>
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-semibold">{period}</h4>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenAddClass(gradeIndex, period)}>
+                          <PlusCircle className="mr-2 h-4 w-4"/> Adicionar Turma
+                        </Button>
+                      </div>
+                      <Table>
+                        <TableBody>
+                          {grade.classes.filter(c => c.period === period).map((cls, classIndex) => (
+                            <TableRow key={classIndex}>
+                              <TableCell>{cls.name}</TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" onClick={() => handleRemoveClass(gradeIndex, grade.classes.indexOf(cls))}>
+                                  <Trash2 className="h-4 w-4 text-red-500"/>
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {grade.classes.filter(c => c.period === period).length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={2} className="text-sm text-muted-foreground text-center">
+                                Nenhuma turma cadastrada para este período.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ))}
+                  <div className="pt-4 border-t">
+                     <Button variant="destructive" size="sm" onClick={() => handleRemoveGrade(gradeIndex)}>Remover Série</Button>
                   </div>
-                  {grade.classes.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Nome da Turma</TableHead>
-                          <TableHead>Período</TableHead>
-                          <TableHead><span className="sr-only">Ações</span></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {grade.classes.map((cls, classIndex) => (
-                          <TableRow key={classIndex}>
-                            <TableCell>{cls.name}</TableCell>
-                            <TableCell>{cls.period}</TableCell>
-                            <TableCell className="text-right">
-                               <Button variant="ghost" size="icon" onClick={() => handleRemoveClass(gradeIndex, classIndex)}>
-                                <Trash2 className="h-4 w-4 text-red-500"/>
-                               </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : <p className="text-sm text-muted-foreground">Nenhuma turma cadastrada para esta série.</p>}
-                  <Button variant="destructive" size="sm" className="mt-4" onClick={() => handleRemoveGrade(gradeIndex)}>Remover Série</Button>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -331,24 +335,12 @@ function GradesAndClassesManager({ school, onUpdate }: { school: School, onUpdat
             <DialogHeader>
                 <DialogTitle>Adicionar Nova Turma</DialogTitle>
                 <DialogDescription>
-                    Para a série: {editingClass && grades[editingClass.gradeIndex].name}
+                  Para a série: {editingClass && grades[editingClass.gradeIndex].name} - Período: {editingClass?.period}
                 </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <Label htmlFor="className">Nome da Turma (Ex: A, B, Única)</Label>
-                <Input id="className" value={editingClass?.className} onChange={(e) => setEditingClass(prev => prev ? {...prev, className: e.target.value} : null)} />
-                <Label htmlFor="classPeriod">Período</Label>
-                 <Select value={editingClass?.classPeriod} onValueChange={(value) => setEditingClass(prev => prev ? {...prev, classPeriod: value as SchoolClass['period']} : null)}>
-                    <SelectTrigger id="classPeriod">
-                        <SelectValue placeholder="Selecione o período" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Manhã">Manhã</SelectItem>
-                        <SelectItem value="Tarde">Tarde</SelectItem>
-                        <SelectItem value="Noite">Noite</SelectItem>
-                        <SelectItem value="Integral">Integral</SelectItem>
-                    </SelectContent>
-                </Select>
+                <Input id="className" value={editingClass?.className || ''} onChange={(e) => setEditingClass(prev => prev ? {...prev, className: e.target.value} : null)} />
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingClass(null)}>Cancelar</Button>
@@ -918,5 +910,7 @@ export default function SchoolsPage() {
     </>
   );
 }
+
+    
 
     
