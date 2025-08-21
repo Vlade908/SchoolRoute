@@ -87,6 +87,7 @@ type TransportRequest = {
     id: string;
     studentId: string;
     createdAt: Timestamp;
+    updatedAt?: Timestamp;
     type: string;
     status: string;
     executor?: string;
@@ -181,6 +182,7 @@ function StudentProfileDialog({
                         id: doc.id,
                         studentId: data.studentId,
                         createdAt: createdAt,
+                        updatedAt: data.updatedAt,
                         type: data.type,
                         status: data.status,
                         executor: data.executor,
@@ -520,7 +522,8 @@ function StudentProfileDialog({
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Data</TableHead>
+                                    <TableHead>Data Solicitação</TableHead>
+                                    <TableHead>Data Análise</TableHead>
                                     <TableHead>Tipo</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Executor</TableHead>
@@ -528,11 +531,12 @@ function StudentProfileDialog({
                             </TableHeader>
                             <TableBody>
                                 {loadingRequests ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center">Carregando...</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="text-center">Carregando...</TableCell></TableRow>
                                 ) : filteredRequests.length > 0 ? (
                                     filteredRequests.map(req => (
                                         <TableRow key={req.id}>
                                             <TableCell>{req.createdAt.toDate().toLocaleDateString('pt-BR')}</TableCell>
+                                            <TableCell>{req.updatedAt ? req.updatedAt.toDate().toLocaleDateString('pt-BR') : '—'}</TableCell>
                                             <TableCell>{req.type}</TableCell>
                                             <TableCell>
                                                 <Badge variant={req.status === 'Aprovado' ? 'default' : req.status === 'Pendente' ? 'secondary' : 'destructive'} 
@@ -544,7 +548,7 @@ function StudentProfileDialog({
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={4} className="text-center">Nenhuma solicitação encontrada.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="text-center">Nenhuma solicitação encontrada.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

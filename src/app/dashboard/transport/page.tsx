@@ -33,7 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
 
@@ -45,6 +45,8 @@ type TransportRequest = {
     status: 'Pendente' | 'Aprovado' | 'Reprovado';
     school: string;
     distance: string;
+    createdAt: Timestamp;
+    updatedAt?: Timestamp;
     approvalStatus?: 'aguardando' | 'aprovado' | 'reprovado';
     executor?: 'emtu' | 'municipio' | 'de' | 'fde' | '';
     hasAgreement?: 'sim' | 'nao';
@@ -87,11 +89,20 @@ function ApprovalRequestDialog({ request, isOpen, onOpenChange, onSave }: { requ
         };
        onSave(updatedRequestData);
     }
+    
+    const formatDate = (timestamp: Timestamp | undefined) => {
+        if (!timestamp) return 'N/A';
+        return timestamp.toDate().toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    }
 
     return (
         <DialogContent className="sm:max-w-xl">
             <DialogHeader>
-                <DialogTitle>Detalhes da Solicitação - #{request.id}</DialogTitle>
+                <DialogTitle>Detalhes da Solicitação - #{request.id.substring(0,6)}</DialogTitle>
                 <DialogDescription>
                     Analise os dados da solicitação para o aluno {request.studentName}.
                 </DialogDescription>
@@ -113,7 +124,8 @@ function ApprovalRequestDialog({ request, isOpen, onOpenChange, onSave }: { requ
                     <CardContent className="space-y-2">
                         <p><span className="font-semibold">Tipo:</span> {request.type}</p>
                         <p><span className="font-semibold">Distância Casa-Escola:</span> {request.distance}</p>
-                        <p><span className="font-semibold">Data da Solicitação:</span> {new Date().toLocaleDateString('pt-BR')}</p>
+                        <p><span className="font-semibold">Data da Solicitação:</span> {formatDate(request.createdAt)}</p>
+                        {request.updatedAt && <p><span className="font-semibold">Data da Análise:</span> {formatDate(request.updatedAt)}</p>}
                     </CardContent>
                 </Card>
                  <Card>
@@ -192,8 +204,7 @@ export default function TransportPage() {
       const unsubscribe = onSnapshot(collection(db, "transport-requests"), (snapshot) => {
         const requestsData: TransportRequest[] = [];
         snapshot.forEach((doc) => {
-            const encryptedData = doc.data();
-            const data = decryptObjectValues(encryptedData) as any;
+            const data = decryptObjectValues(doc.data()) as any;
             if (data) {
                 requestsData.push({ id: doc.id, ...data } as TransportRequest);
             }
@@ -222,10 +233,18 @@ export default function TransportPage() {
         const currentData = decryptObjectValues(requestDoc.data());
         if(!currentData) throw new Error("Não foi possível ler os dados da solicitação.");
         
-        const dataToUpdate = { ...currentData, ...updatedData };
+        const dataToUpdate = { 
+            ...currentData, 
+            ...updatedData,
+            updatedAt: serverTimestamp() // Always update the timestamp
+        };
+
         const encryptedUpdate = encryptObjectValues(dataToUpdate);
         
-        await updateDoc(requestDocRef, encryptedUpdate);
+        await updateDoc(requestDocRef, {
+             ...encryptedUpdate,
+             studentUid: selectedRequest.studentUid, // Ensure non-encrypted field is preserved
+        });
         
         toast({
             title: "Alterações Salvas!",
@@ -377,5 +396,3 @@ export default function TransportPage() {
     </Tabs>
   );
 }
-
-    
