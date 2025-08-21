@@ -172,20 +172,18 @@ function StudentProfileDialog({
           snapshot.forEach((doc) => {
             const data = decryptObjectValues(doc.data());
             if (data) {
-                let { createdAt, updatedAt } = data;
-                // Re-hydrate Firestore Timestamps if they were serialized
-                if (createdAt && typeof createdAt.seconds === 'number') {
-                    createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
-                }
-                if (updatedAt && typeof updatedAt.seconds === 'number') {
-                    updatedAt = new Timestamp(updatedAt.seconds, updatedAt.nanoseconds);
-                }
               
+              // Ensure Timestamps are correctly hydrated
+              if (data.createdAt && typeof data.createdAt.seconds === 'number') {
+                  data.createdAt = new Timestamp(data.createdAt.seconds, data.createdAt.nanoseconds);
+              }
+              if (data.updatedAt && typeof data.updatedAt.seconds === 'number') {
+                  data.updatedAt = new Timestamp(data.updatedAt.seconds, data.updatedAt.nanoseconds);
+              }
+
               studentRequests.push({
                 id: doc.id,
                 ...data,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
               } as TransportRequest);
             }
           });
