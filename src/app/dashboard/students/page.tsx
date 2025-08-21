@@ -162,9 +162,7 @@ function StudentProfileDialog({
     if(isOpen && student?.id) {
         setLoadingRequests(true);
         const requestsRef = collection(db, "transport-requests");
-        // This won't work because student.id is not encrypted and the field in firestore is
         const q = query(requestsRef);
-
 
         getDocs(q).then(snapshot => {
             const studentRequests: TransportRequest[] = [];
@@ -172,11 +170,9 @@ function StudentProfileDialog({
                 const data = decryptObjectValues(doc.data()) as any;
                 if(data && data.studentId === student.id){
                     let createdAt = data.createdAt;
-                    // Ensure createdAt is a Firestore Timestamp object
                     if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
                         createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
                     } else if (!createdAt) {
-                        // If createdAt is missing, skip or handle as an error
                         return;
                     }
                     
@@ -1298,4 +1294,5 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
 
