@@ -53,7 +53,7 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
                         <p><span className="font-semibold">Nome:</span> {request.studentName}</p>
                         <p><span className="font-semibold">RA:</span> {request.ra}</p>
                         <p><span className="font-semibold">Escola:</span> {request.school}</p>
-                        <p><span className="font-semibold">Status Atual:</span> <Badge>{request.status}</Badge></p>
+                        <div><span className="font-semibold">Status Atual:</span> <Badge>{request.status}</Badge></div>
                     </CardContent>
                 </Card>
                  <Card>
