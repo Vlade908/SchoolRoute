@@ -760,32 +760,32 @@ export default function StudentsPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('all');
-
   
   const [lastVisible, setLastVisible] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [firstVisible, setFirstVisible] = useState<any>(null);
+  const [page, setPage] = useState(1);
   const [totalStudents, setTotalStudents] = useState(0);
   const itemsPerPage = 10;
   
   const totalPages = Math.ceil(totalStudents / itemsPerPage);
 
-  const fetchStudents = useCallback(async (options: { newQuery?: boolean } = {}) => {
+  const fetchStudents = useCallback(async (direction: 'next' | 'prev' | 'new' = 'new') => {
     setLoading(true);
     try {
         const studentsRef = collection(db, "students");
-        
         let constraints: QueryConstraint[] = [];
-        
-        const schoolId = user?.role === 3 ? schoolFilter : user?.schoolId;
 
-        if (schoolId && schoolId !== 'all') {
-            constraints.push(where("schoolId", "==", schoolId));
+        if(direction === 'new') {
+            setPage(1);
+            setLastVisible(null);
+            setFirstVisible(null);
+            setAllStudents([]);
         }
 
-        if (!options.newQuery && lastVisible) {
+        if (direction === 'next' && lastVisible) {
             constraints.push(startAfter(lastVisible));
         }
-        
+
         constraints.push(limit(itemsPerPage));
 
         const q = query(studentsRef, ...constraints);
@@ -803,38 +803,33 @@ export default function StudentsPage() {
                 enrollmentDate: enrollmentDateStr,
             } as Student;
         });
-
-        if (options.newQuery) {
-            setAllStudents(fetchedStudents);
-            setCurrentPage(1);
-        } else {
-            setAllStudents(prev => [...prev, ...fetchedStudents]);
-        }
         
+        // This is a full read, which can be slow, but necessary for client-side filtering with encrypted data
+        setAllStudents(fetchedStudents);
         setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
+        setFirstVisible(documentSnapshots.docs[0]);
 
-        // Get total count for pagination
-        const countQueryConstraints = schoolId && schoolId !== 'all' ? [where("schoolId", "==", schoolId)] : [];
-        const countQuery = query(collection(db, "students"), ...countQueryConstraints);
+        // Get total count for pagination - this should be for all documents, not just filtered ones for now
+        const countQuery = query(collection(db, "students"));
         const countSnapshot = await getCountFromServer(countQuery);
         setTotalStudents(countSnapshot.data().count);
 
     } catch (error) {
         console.error("Error fetching students:", error);
-        toast({ variant: 'destructive', title: 'Erro ao buscar alunos', description: 'Pode ser necessário criar um índice no Firestore. Verifique o console.' });
+        toast({ variant: 'destructive', title: 'Erro ao buscar alunos', description: 'Ocorreu um erro ao carregar os dados dos alunos.' });
     } finally {
         setLoading(false);
     }
-  }, [toast, lastVisible, schoolFilter, user]);
+  }, [toast, lastVisible]);
   
   useEffect(() => {
     if (user?.role === 3) {
       const fetchSchools = async () => {
         const schoolsCollection = collection(db, 'schools');
-        const snapshot = await getDocs(query(schoolsCollection, orderBy('name')));
+        const snapshot = await getDocs(query(schoolsCollection));
         const schoolsData: School[] = snapshot.docs.map(doc => {
              const decryptedData = decryptObjectValues(doc.data()) as any;
-             return { id: doc.id, name: decryptedData.name };
+             return { id: doc.id, name: decryptedData.name, schoolType: decryptedData.schoolType };
         });
         setSchools(schoolsData);
       };
@@ -842,8 +837,23 @@ export default function StudentsPage() {
     }
   }, [user]);
 
+  // Initial fetch
+  useEffect(() => {
+    fetchStudents('new');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  
   const filteredStudents = useMemo(() => {
     let studentsToFilter = allStudents;
+    
+    // Filter by school if admin
+    if (user?.role === 3 && schoolFilter !== 'all') {
+        studentsToFilter = studentsToFilter.filter(student => student.schoolId === schoolFilter);
+    }
+     // Filter for non-admin users
+    if (user?.role < 3) {
+        studentsToFilter = studentsToFilter.filter(student => student.schoolId === user?.schoolId);
+    }
 
     // Filter by active tab
     if (activeTab === 'active') {
@@ -863,13 +873,8 @@ export default function StudentsPage() {
     }
 
     return studentsToFilter;
-  }, [allStudents, searchTerm, activeTab]);
+  }, [allStudents, searchTerm, activeTab, schoolFilter, user]);
 
-
-  useEffect(() => {
-    fetchStudents({ newQuery: true });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schoolFilter]);
   
   const handleOpenProfileDialog = (student: Student, editMode: boolean) => {
     setActiveStudent(student);
@@ -895,7 +900,7 @@ export default function StudentsPage() {
         const encryptedStudent = encryptObjectValues(dataToUpdate);
         await updateDoc(studentDocRef, encryptedStudent);
         toast({ title: "Sucesso!", description: "Aluno atualizado." });
-        fetchStudents({ newQuery: true });
+        fetchStudents('new');
     } catch(error) {
         console.error("Error updating student:", error);
         toast({ variant: 'destructive', title: "Erro!", description: "Não foi possível atualizar o aluno." });
@@ -918,7 +923,7 @@ export default function StudentsPage() {
         const encryptedStudent = encryptObjectValues(studentToAdd);
         await addDoc(collection(db, "students"), encryptedStudent);
         toast({ title: "Sucesso!", description: "Aluno cadastrado." });
-        fetchStudents({ newQuery: true });
+        fetchStudents('new');
     } catch(error) {
         console.error("Error adding student:", error);
         toast({ variant: 'destructive', title: "Erro!", description: "Não foi possível cadastrar o aluno." });
@@ -931,7 +936,7 @@ export default function StudentsPage() {
     try {
       await deleteDoc(doc(db, "students", studentId));
       toast({ title: "Sucesso!", description: "Aluno excluído." });
-      fetchStudents({ newQuery: true });
+      fetchStudents('new');
     } catch (error) {
       console.error("Error deleting student: ", error);
       toast({ variant: "destructive", title: "Erro!", description: "Não foi possível excluir o aluno." });
@@ -947,16 +952,17 @@ export default function StudentsPage() {
   };
   
   const handleNextPage = () => {
-    if ((currentPage * itemsPerPage) < totalStudents) {
-      fetchStudents({});
-      setCurrentPage(prev => prev + 1);
+    if (page < totalPages) {
+        setPage(prev => prev + 1);
+        fetchStudents('next');
     }
   }
 
   const handlePreviousPage = () => {
-     // This is a simplified previous page, it just resets to the first page.
-     // A true "prev" would require more complex cursor management.
-    fetchStudents({ newQuery: true });
+     // This is not a true previous page with cursors, it just refetches the first page.
+     // To implement true previous, we'd need to store page cursors.
+    setPage(1);
+    fetchStudents('new');
   }
 
   return (
@@ -972,7 +978,7 @@ export default function StudentsPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Buscar por RA, CPF, Nome..."
+              placeholder="Buscar por Nome, RA, CPF..."
               className="w-full rounded-lg bg-card pl-8 md:w-[200px] lg:w-[320px]"
               value={searchTerm}
               onChange={handleSearchChange}
@@ -1115,13 +1121,13 @@ export default function StudentsPage() {
             </div>
             <div className="ml-auto flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
-                    Página {currentPage} de {totalPages}
+                    Página {page} de {totalPages}
                 </span>
                 <Button
                     variant="outline"
                     size="sm"
                     onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
+                    disabled={page === 1}
                 >
                     <ChevronLeft className="h-4 w-4" />
                     Anterior
@@ -1130,7 +1136,7 @@ export default function StudentsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleNextPage}
-                    disabled={!lastVisible || (currentPage * itemsPerPage) >= totalStudents}
+                    disabled={!lastVisible || (page * itemsPerPage) >= totalStudents}
                 >
                     Próxima
                     <ChevronRight className="h-4 w-4" />
@@ -1151,4 +1157,3 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
-
