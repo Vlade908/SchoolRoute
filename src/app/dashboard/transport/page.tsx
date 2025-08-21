@@ -40,6 +40,7 @@ import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 type TransportRequest = {
     id: string;
     studentName: string;
+    studentUid: string;
     ra: string;
     type: string;
     status: 'Pendente' | 'Aprovado' | 'Reprovado';
@@ -92,6 +93,14 @@ function ApprovalRequestDialog({ request, isOpen, onOpenChange, onSave }: { requ
     
     const formatDate = (timestamp: Timestamp | undefined) => {
         if (!timestamp) return 'N/A';
+        // Firestore Timestamps lose their methods when serialized, so we reconstruct if necessary.
+        if (timestamp.seconds && typeof timestamp.toDate !== 'function') {
+            return new Timestamp(timestamp.seconds, timestamp.nanoseconds).toDate().toLocaleDateString('pt-BR', {
+                 day: '2-digit',
+                 month: '2-digit',
+                 year: 'numeric'
+            });
+        }
         return timestamp.toDate().toLocaleDateString('pt-BR', {
             day: '2-digit',
             month: '2-digit',
@@ -125,7 +134,7 @@ function ApprovalRequestDialog({ request, isOpen, onOpenChange, onSave }: { requ
                         <p><span className="font-semibold">Tipo:</span> {request.type}</p>
                         <p><span className="font-semibold">Distância Casa-Escola:</span> {request.distance}</p>
                         <p><span className="font-semibold">Data da Solicitação:</span> {formatDate(request.createdAt)}</p>
-                        {request.updatedAt && <p><span className="font-semibold">Data da Análise:</span> {formatDate(request.updatedAt)}</p>}
+                        {<p><span className="font-semibold">Data da Análise:</span> {formatDate(request.updatedAt)}</p>}
                     </CardContent>
                 </Card>
                  <Card>
@@ -206,6 +215,13 @@ export default function TransportPage() {
         snapshot.forEach((doc) => {
             const data = decryptObjectValues(doc.data()) as any;
             if (data) {
+                // Re-hydrate Firestore Timestamps if they were serialized
+                if (data.createdAt && typeof data.createdAt.seconds === 'number') {
+                    data.createdAt = new Timestamp(data.createdAt.seconds, data.createdAt.nanoseconds);
+                }
+                if (data.updatedAt && typeof data.updatedAt.seconds === 'number') {
+                    data.updatedAt = new Timestamp(data.updatedAt.seconds, data.updatedAt.nanoseconds);
+                }
                 requestsData.push({ id: doc.id, ...data } as TransportRequest);
             }
         });

@@ -86,6 +86,7 @@ type Student = {
 type TransportRequest = {
     id: string;
     studentId: string;
+    studentUid: string;
     createdAt: Timestamp;
     updatedAt?: Timestamp;
     type: string;
@@ -171,22 +172,15 @@ function StudentProfileDialog({
           snapshot.forEach((doc) => {
             const data = decryptObjectValues(doc.data());
             if (data) {
-              let createdAt = data.createdAt;
-              if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
-                  createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
-              }
-
-              let updatedAt;
-              if (data.updatedAt && typeof data.updatedAt.seconds === 'number' && typeof data.updatedAt.nanoseconds === 'number' && !(data.updatedAt instanceof Timestamp)) {
-                updatedAt = new Timestamp(data.updatedAt.seconds, data.updatedAt.nanoseconds);
-              } else {
-                updatedAt = data.updatedAt;
-              }
+                let { createdAt, updatedAt } = data;
+                // Re-hydrate Firestore Timestamps if they were serialized
+                if (createdAt && typeof createdAt.seconds === 'number') {
+                    createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
+                }
+                if (updatedAt && typeof updatedAt.seconds === 'number') {
+                    updatedAt = new Timestamp(updatedAt.seconds, updatedAt.nanoseconds);
+                }
               
-              if (!createdAt || !(createdAt instanceof Timestamp)) {
-                  return;
-              }
-
               studentRequests.push({
                 id: doc.id,
                 ...data,
@@ -195,7 +189,7 @@ function StudentProfileDialog({
               } as TransportRequest);
             }
           });
-          setRequests(studentRequests);
+          setRequests(studentRequests.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
         }).catch((err) => {
           console.error("Error fetching requests: ", err);
         }).finally(() => {
@@ -209,19 +203,18 @@ function StudentProfileDialog({
       requests
         .map(r => {
           if (r.createdAt && r.createdAt.toDate) {
-            const year = r.createdAt.toDate().getFullYear();
-            return isNaN(year) ? null : year;
+            return r.createdAt.toDate().getFullYear();
           }
           return null;
         })
-        .filter((year): year is number => year !== null && !isNaN(year))
+        .filter((year): year is number => year !== null)
     );
     return Array.from(years).sort((a, b) => b - a);
   }, [requests]);
   
   const filteredRequests = useMemo(() => {
       return requests.filter(r => {
-          if (!(r.createdAt instanceof Timestamp)) return false;
+          if (!r.createdAt?.toDate) return false;
           const yearMatch = yearFilter === 'all' || r.createdAt.toDate().getFullYear().toString() === yearFilter;
           const typeMatch = typeFilter === 'all' || r.type === typeFilter;
           return yearMatch && typeMatch;
