@@ -166,7 +166,7 @@ export default function TransportPage() {
             <CardDescription>
               Lista de todas as solicitações que já foram aprovadas.
             </CardDescription>
-          </Header>
+          </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
