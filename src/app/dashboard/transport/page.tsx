@@ -1,5 +1,6 @@
 
 'use client';
+import { useState, useEffect } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogFooter, D
 import { Label } from '@/components/ui/label';
 import { useUser } from '@/contexts/user-context';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+
 
 const requests = [
   { id: 'REQ001', studentName: 'João Pereira', ra: 'RA2024001', type: 'Passe Escolar', status: 'Pendente', school: 'Escola Estadual A', distance: '3.2 km' },
@@ -38,6 +41,11 @@ const requests = [
 ];
 
 function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
+    const [approvalStatus, setApprovalStatus] = useState<'aguardando' | 'aprovado' | 'reprovado'>('aguardando');
+    const [executor, setExecutor] = useState('');
+    const [hasAgreement, setHasAgreement] = useState('');
+    const [rejectionReason, setRejectionReason] = useState('');
+
     return (
         <DialogContent className="sm:max-w-xl">
             <DialogHeader>
@@ -67,24 +75,68 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
                  <Card>
                     <CardHeader><CardTitle>Análise e Aprovação</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <input type="checkbox" id="docOk" />
-                            <Label htmlFor="docOk">Documentação verificada</Label>
+                         <div>
+                            <Label htmlFor="approval-status">Status de Aprovação</Label>
+                            <Select value={approvalStatus} onValueChange={(value) => setApprovalStatus(value as any)}>
+                                <SelectTrigger id="approval-status">
+                                    <SelectValue placeholder="Selecione o status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="aguardando">Aguardando Análise</SelectItem>
+                                    <SelectItem value="aprovado">Aprovado</SelectItem>
+                                    <SelectItem value="reprovado">Reprovado</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <input type="checkbox" id="distOk" />
-                            <Label htmlFor="distOk">Distância mínima atendida</Label>
-                        </div>
-                         <div className="flex items-center space-x-2">
-                            <input type="checkbox" id="matriculaOk" />
-                            <Label htmlFor="matriculaOk">Matrícula ativa</Label>
-                        </div>
+
+                        {approvalStatus === 'aprovado' && (
+                            <>
+                                <div>
+                                    <Label htmlFor="executor">Executor</Label>
+                                    <Select value={executor} onValueChange={setExecutor}>
+                                        <SelectTrigger id="executor">
+                                            <SelectValue placeholder="Selecione o executor" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="emtu">EMTU</SelectItem>
+                                            <SelectItem value="municipio">Município</SelectItem>
+                                            <SelectItem value="de">D.E</SelectItem>
+                                            <SelectItem value="fde">FDE</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label htmlFor="has-agreement">Tem Convênio</Label>
+                                    <Select value={hasAgreement} onValueChange={setHasAgreement}>
+                                        <SelectTrigger id="has-agreement">
+                                            <SelectValue placeholder="Selecione" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="sim">Sim</SelectItem>
+                                            <SelectItem value="nao">Não</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </>
+                        )}
+
+                        {approvalStatus === 'reprovado' && (
+                            <div>
+                                <Label htmlFor="rejection-reason">Motivo da Recusa</Label>
+                                <Textarea 
+                                    id="rejection-reason" 
+                                    placeholder="Descreva o motivo pelo qual a solicitação foi negada..."
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                />
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-2">
-                <Button variant="destructive" className="w-full sm:w-auto">Negar Solicitação</Button>
-                <Button variant="default" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Aprovar Solicitação</Button>
+                <Button variant="outline" className="w-full sm:w-auto">Cancelar</Button>
+                <Button variant="default" className="w-full sm:w-auto">Salvar Alterações</Button>
             </DialogFooter>
         </DialogContent>
     )
