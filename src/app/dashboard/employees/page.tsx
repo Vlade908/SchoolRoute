@@ -59,7 +59,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, updateDoc, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 

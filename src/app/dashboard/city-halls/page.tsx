@@ -34,7 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
@@ -211,35 +211,41 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
      useEffect(() => {
         if (!cityHall?.hash) return;
         
-        const q = query(collection(db, "users"), where("encryptedData", ">=", ""));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchEmployees = async () => {
+          try {
+            const usersRef = collection(db, "users");
+            // This query might require a composite index on (encryptedData.hash, encryptedData.status)
+            // Firestore will provide a link in the console error to create it if needed.
+            let q = query(usersRef);
+
+            const querySnapshot = await getDocs(q);
             const cityHallEmployees: Employee[] = [];
             querySnapshot.forEach((doc) => {
-                try {
-                    const encryptedData = doc.data();
-                    const data = decryptObjectValues(encryptedData) as any;
-                    
-                    if(data && data.hash === cityHall.hash) {
-                        cityHallEmployees.push({
-                            id: doc.id,
-                            uid: data.uid,
-                            name: data.name,
-                            email: data.email,
-                            role: data.role,
-                            status: data.status,
-                            hash: data.hash,
-                            creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
-                        });
-                    }
-                } catch (e) {
-                    console.error("Error processing user document:", doc.id, e)
+                const encryptedData = doc.data();
+                const data = decryptObjectValues(encryptedData) as any;
+                
+                if (data && data.hash === cityHall.hash) {
+                    cityHallEmployees.push({
+                        id: doc.id,
+                        uid: data.uid,
+                        name: data.name,
+                        email: data.email,
+                        role: data.role,
+                        status: data.status,
+                        hash: data.hash,
+                        creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                    });
                 }
             });
             setEmployees(cityHallEmployees);
-        });
+          } catch(e) {
+            console.error("Error fetching employees:", e);
+            toast({ variant: "destructive", title: "Erro", description: "Não foi possível carregar os funcionários. Verifique o console para mais detalhes." });
+          }
+        };
 
-        return () => unsubscribe();
-    }, [cityHall]);
+        fetchEmployees();
+    }, [cityHall, toast]);
 
     const filteredEmployees = useMemo(() => {
         let filtered = employees;
@@ -264,10 +270,10 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
       try {
         const employeeDocRef = doc(db, 'users', updatedEmployee.uid);
         
-        const currentDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', updatedEmployee.uid)));
-        if (currentDoc.empty) throw new Error("Funcionário não encontrado.");
+        const employeeDoc = await getDoc(employeeDocRef);
+        if (!employeeDoc.exists()) throw new Error("Funcionário não encontrado.");
         
-        const encryptedData = currentDoc.docs[0].data();
+        const encryptedData = employeeDoc.data();
         const decryptedData = decryptObjectValues(encryptedData);
         if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
           
@@ -284,6 +290,7 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
         await updateDoc(employeeDocRef, encryptedUpdate);
 
         toast({ title: 'Sucesso!', description: 'Funcionário atualizado.'});
+        setEmployees(prev => prev.map(e => e.uid === updatedEmployee.uid ? { ...e, status: updatedEmployee.status, role: roleNumber } : e));
       } catch(error) {
         console.error("Error updating employee:", error);
         toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível atualizar o funcionário.'});

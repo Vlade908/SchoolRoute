@@ -485,32 +485,43 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
     }, [school]);
 
     useEffect(() => {
-        if (!school?.hash) return;
-        
-        const q = query(collection(db, "users"), where("encryptedData", ">=", ""));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const schoolEmployees: Employee[] = [];
-            querySnapshot.forEach((doc) => {
-                const encryptedData = doc.data();
-                const data = decryptObjectValues(encryptedData) as any;
-                if (data && data.hash === school.hash) {
-                    schoolEmployees.push({
-                        id: doc.id,
-                        uid: data.uid,
-                        name: data.name,
-                        email: data.email,
-                        role: data.role,
-                        status: data.status,
-                        hash: data.hash,
-                        creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
-                    });
-                }
-            });
-            setEmployees(schoolEmployees);
-        });
-
-        return () => unsubscribe();
-    }, [school]);
+      if (!school?.hash) return;
+      
+      const fetchEmployees = async () => {
+        try {
+          const usersRef = collection(db, "users");
+          // This query will be slow if there are many users.
+          // A better approach would be to have a 'schoolHash' field to query directly.
+          // Assuming 'hash' field exists inside encryptedData.
+          const q = query(usersRef);
+          
+          const querySnapshot = await getDocs(q);
+          const schoolEmployees: Employee[] = [];
+          querySnapshot.forEach((doc) => {
+              const encryptedData = doc.data();
+              const data = decryptObjectValues(encryptedData) as any;
+              if (data && data.hash === school.hash) {
+                  schoolEmployees.push({
+                      id: doc.id,
+                      uid: data.uid,
+                      name: data.name,
+                      email: data.email,
+                      role: data.role,
+                      status: data.status,
+                      hash: data.hash,
+                      creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                  });
+              }
+          });
+          setEmployees(schoolEmployees);
+        } catch (e) {
+          console.error("Error fetching employees:", e);
+          toast({ variant: "destructive", title: "Erro", description: "Não foi possível carregar os funcionários." });
+        }
+      };
+      
+      fetchEmployees();
+    }, [school, toast]);
 
     const filteredEmployees = useMemo(() => {
         let filtered = employees;
@@ -570,10 +581,10 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
           const roleString = updatedEmployee.role;
           const roleNumber = typeof roleString === 'string' && roleString.startsWith('Nível') ? parseInt(roleString.split(' ')[1], 10) : updatedEmployee.role;
 
-          const currentDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', updatedEmployee.uid)));
-          if (currentDoc.empty) throw new Error("Funcionário não encontrado.");
+          const employeeDoc = await getDoc(employeeDocRef);
+          if (!employeeDoc.exists()) throw new Error("Funcionário não encontrado.");
           
-          const encryptedData = currentDoc.docs[0].data();
+          const encryptedData = employeeDoc.data();
           const decryptedData = decryptObjectValues(encryptedData);
           if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
           
@@ -587,6 +598,7 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
 
           await updateDoc(employeeDocRef, encryptedUpdate);
           toast({ title: 'Sucesso!', description: 'Funcionário atualizado.'});
+          setEmployees(prev => prev.map(e => e.uid === updatedEmployee.uid ? {...e, status: updatedEmployee.status, role: roleNumber } : e))
         } catch(error) {
           console.error("Error updating employee:", error);
           toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível atualizar o funcionário.'});
@@ -799,7 +811,7 @@ function ActionsDropdown({ school }: { school: School }) {
     useEffect(() => {
         const checkStudents = async () => {
             if (!school.id) return;
-            const q = query(collection(db, "students"), where("encryptedData", ">=", ""));
+            const q = query(collection(db, "students"));
             const querySnapshot = await getDocs(q);
             let count = 0;
             querySnapshot.forEach(doc => {
