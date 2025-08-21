@@ -29,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, doc, updateDoc, onSnapshot, query, where, serverTimestamp, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, onSnapshot, query, where, Timestamp, deleteDoc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { AddressMap } from '@/components/address-map';
@@ -834,7 +834,7 @@ function ActionsDropdown({ school }: { school: School }) {
             const decryptedData = decryptObjectValues(schoolDoc.data());
             if (!decryptedData) throw new Error("Falha ao descriptografar dados da escola.");
 
-            const updatedData = { ...decryptedData, status };
+            const updatedData = { ...decryptedData, status, updatedAt: Timestamp.now() };
             const encryptedUpdate = encryptObjectValues(updatedData);
             
             await updateDoc(schoolDocRef, encryptedUpdate);
@@ -963,7 +963,7 @@ export default function SchoolsPage() {
 
     const handleSaveSchool = async (schoolData: Omit<School, 'id' | 'status'>) => {
         try {
-            const newSchoolData = { ...schoolData, status: 'Ativa' as const };
+            const newSchoolData = { ...schoolData, status: 'Ativa' as const, createdAt: Timestamp.now() };
             const encryptedSchool = encryptObjectValues(newSchoolData);
             await addDoc(collection(db, "schools"), encryptedSchool);
             setAddSchoolModalOpen(false);
@@ -1077,4 +1077,5 @@ export default function SchoolsPage() {
     </>
   );
 }
+
 
