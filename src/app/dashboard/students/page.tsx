@@ -24,7 +24,6 @@ import {
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -162,13 +161,13 @@ function StudentProfileDialog({
     if(isOpen && student?.id) {
         setLoadingRequests(true);
         const requestsRef = collection(db, "transport-requests");
-        const q = query(requestsRef);
+        const q = query(requestsRef, where("studentUid", "==", student.id));
 
         getDocs(q).then(snapshot => {
             const studentRequests: TransportRequest[] = [];
             snapshot.forEach(doc => {
                 const data = decryptObjectValues(doc.data()) as any;
-                if(data && data.studentId === student.id){
+                if(data){
                     let createdAt = data.createdAt;
                     if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
                         createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
@@ -1294,5 +1293,6 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
 
 

@@ -163,7 +163,10 @@ export default function PassRequestsPage() {
                     distance: 'N/A', // Or calculate if needed
                  };
                  const encryptedRequest = encryptObjectValues(requestData);
-                 await addDoc(collection(db, "transport-requests"), encryptedRequest);
+                 await addDoc(collection(db, "transport-requests"), {
+                    ...encryptedRequest,
+                    studentUid: student.id // Add non-encrypted field for querying
+                 });
             }
 
             toast({
