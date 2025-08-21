@@ -24,7 +24,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useUser } from '@/contexts/user-context';
 import { useRouter } from 'next/navigation';
@@ -39,15 +39,15 @@ const requests = [
 
 function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
     return (
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="sm:max-w-xl">
             <DialogHeader>
                 <DialogTitle>Detalhes da Solicitação - #{request.id}</DialogTitle>
                 <DialogDescription>
                     Analise os dados da solicitação para o aluno {request.studentName}.
                 </DialogDescription>
             </DialogHeader>
-            <div className="grid md:grid-cols-3 gap-6 py-4">
-                <Card className="col-span-3 md:col-span-1">
+            <div className="flex flex-col gap-4 py-4">
+                <Card>
                     <CardHeader><CardTitle>Informações do Aluno</CardTitle></CardHeader>
                     <CardContent className="space-y-2">
                         <p><span className="font-semibold">Nome:</span> {request.studentName}</p>
@@ -56,7 +56,7 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
                         <p><span className="font-semibold">Status Atual:</span> <Badge>{request.status}</Badge></p>
                     </CardContent>
                 </Card>
-                 <Card className="col-span-3 md:col-span-1">
+                 <Card>
                     <CardHeader><CardTitle>Detalhes da Solicitação</CardTitle></CardHeader>
                     <CardContent className="space-y-2">
                         <p><span className="font-semibold">Tipo:</span> {request.type}</p>
@@ -64,7 +64,7 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
                         <p><span className="font-semibold">Data da Solicitação:</span> {new Date().toLocaleDateString('pt-BR')}</p>
                     </CardContent>
                 </Card>
-                 <Card className="col-span-3 md:col-span-1">
+                 <Card>
                     <CardHeader><CardTitle>Análise e Aprovação</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center space-x-2">
