@@ -215,9 +215,7 @@ function StudentProfileDialog({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px]">
-        {!student || !editedStudent ? (
-           <div>Carregando...</div>
-        ) : (
+        {student && editedStudent ? (
           <>
             <DialogHeader>
               <DialogTitle>{isEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
@@ -447,6 +445,11 @@ function StudentProfileDialog({
               )}
             </DialogFooter>
           </>
+        ) : (
+          <DialogHeader>
+            <DialogTitle>Carregando...</DialogTitle>
+            <DialogDescription>Aguarde enquanto os dados do aluno são carregados.</DialogDescription>
+          </DialogHeader>
         )}
       </DialogContent>
     </Dialog>
