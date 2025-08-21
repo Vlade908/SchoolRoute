@@ -59,7 +59,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
@@ -177,14 +177,13 @@ export default function EmployeesPage() {
     }
     
     const handleSaveEmployee = async (updatedEmployee: Employee) => {
-        if (!updatedEmployee.uid) return;
+        if (!updatedEmployee.id) return;
         try {
-            const employeeDocRef = doc(db, 'users', updatedEmployee.uid);
+            const employeeDocRef = doc(db, 'users', updatedEmployee.id);
+            const currentDoc = await getDoc(employeeDocRef);
+            if (!currentDoc.exists()) throw new Error("Funcionário não encontrado.");
             
-            const currentDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', updatedEmployee.uid)));
-            if (currentDoc.empty) throw new Error("Funcionário não encontrado.");
-            
-            const encryptedData = currentDoc.docs[0].data();
+            const encryptedData = currentDoc.data();
             const decryptedData = decryptObjectValues(encryptedData);
             if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
             
@@ -209,14 +208,14 @@ export default function EmployeesPage() {
     
     const handleDeactivate = async (employeeId: string) => {
         const employeeToUpdate = employees.find(emp => emp.id === employeeId);
-        if (!employeeToUpdate?.uid) return;
+        if (!employeeToUpdate?.id) return;
 
         try {
-            const employeeDocRef = doc(db, 'users', employeeToUpdate.uid);
-            const currentDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', employeeToUpdate.uid)));
-            if (currentDoc.empty) throw new Error("Funcionário não encontrado.");
+            const employeeDocRef = doc(db, 'users', employeeToUpdate.id);
+            const currentDoc = await getDoc(employeeDocRef);
+            if (!currentDoc.exists()) throw new Error("Funcionário não encontrado.");
 
-            const encryptedData = currentDoc.docs[0].data();
+            const encryptedData = currentDoc.data();
             const decryptedData = decryptObjectValues(encryptedData);
             if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
             
