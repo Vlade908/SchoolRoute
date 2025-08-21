@@ -45,6 +45,15 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
     const [executor, setExecutor] = useState('');
     const [hasAgreement, setHasAgreement] = useState('');
     const [rejectionReason, setRejectionReason] = useState('');
+    
+    const handleExecutorChange = (value: string) => {
+        setExecutor(value);
+        if (value === 'emtu') {
+            setHasAgreement('sim');
+        } else {
+            setHasAgreement('nao');
+        }
+    }
 
     return (
         <DialogContent className="sm:max-w-xl">
@@ -61,7 +70,9 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
                         <p><span className="font-semibold">Nome:</span> {request.studentName}</p>
                         <p><span className="font-semibold">RA:</span> {request.ra}</p>
                         <p><span className="font-semibold">Escola:</span> {request.school}</p>
-                        <div><span className="font-semibold">Status Atual:</span> <Badge>{request.status}</Badge></div>
+                        <div>
+                            <span className="font-semibold">Status Atual:</span> <Badge>{request.status}</Badge>
+                        </div>
                     </CardContent>
                 </Card>
                  <Card>
@@ -93,7 +104,7 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
                             <>
                                 <div>
                                     <Label htmlFor="executor">Executor</Label>
-                                    <Select value={executor} onValueChange={setExecutor}>
+                                    <Select value={executor} onValueChange={handleExecutorChange}>
                                         <SelectTrigger id="executor">
                                             <SelectValue placeholder="Selecione o executor" />
                                         </SelectTrigger>
@@ -102,18 +113,6 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
                                             <SelectItem value="municipio">Município</SelectItem>
                                             <SelectItem value="de">D.E</SelectItem>
                                             <SelectItem value="fde">FDE</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label htmlFor="has-agreement">Tem Convênio</Label>
-                                    <Select value={hasAgreement} onValueChange={setHasAgreement}>
-                                        <SelectTrigger id="has-agreement">
-                                            <SelectValue placeholder="Selecione" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="sim">Sim</SelectItem>
-                                            <SelectItem value="nao">Não</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
