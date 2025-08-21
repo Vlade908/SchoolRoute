@@ -41,7 +41,13 @@ export const decryptObjectValues = (encryptedObj: Record<string, any>): Record<s
 
     // Cenário 1: O objeto inteiro está criptografado em 'encryptedData'
     if (encryptedObj.encryptedData && typeof encryptedObj.encryptedData === 'string') {
-        return decryptData(encryptedObj.encryptedData);
+        const decryptedPayload = decryptData(encryptedObj.encryptedData);
+        if (!decryptedPayload) return null;
+        
+        // Mantém outros campos de nível superior (como 'studentUid')
+        const finalObject = { ...encryptedObj, ...decryptedPayload };
+        delete finalObject.encryptedData; // Remove o campo de dados brutos
+        return finalObject;
     }
 
     // Cenário 2 (Legado): Tenta descriptografar cada valor do objeto.
