@@ -51,7 +51,7 @@ import { useUser } from '@/contexts/user-context';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, query, where, limit, startAfter, orderBy, getCountFromServer } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, query, where, limit, startAfter, orderBy, getCountFromServer, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { AddressMap } from '@/components/address-map';
@@ -136,6 +136,9 @@ function StudentProfileDialog({
                 const currentSchool = schoolsData.find(s => s.id === student.schoolId);
                 setSelectedSchool(currentSchool || null);
                 setEditedStudent(student);
+            } else {
+                 setEditedStudent(null);
+                 setSelectedSchool(null);
             }
         });
     }
@@ -747,7 +750,6 @@ export default function StudentsPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
   const [activeStudent, setActiveStudent] = useState<Student | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isProfileDialogOpen, setProfileDialogOpen] = useState(false);
@@ -762,104 +764,124 @@ export default function StudentsPage() {
   });
   
   const [lastVisible, setLastVisible] = useState<any>(null);
-  const [firstVisible, setFirstVisible] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalStudents, setTotalStudents] = useState(0);
   const itemsPerPage = 10;
   
   const totalPages = Math.ceil(totalStudents / itemsPerPage);
 
-  const fetchStudents = useCallback(async (direction: 'next' | 'prev' | 'new' = 'new') => {
-      setLoading(true);
-      try {
-          const studentsRef = collection(db, "students");
-          let queries = [];
+  const fetchStudents = useCallback(async (direction: 'next' | 'prev' | 'new' = 'new', page: number = 1) => {
+    setLoading(true);
+    try {
+        const studentsRef = collection(db, "students");
+        
+        let baseQueries = [];
+        if (activeTab === 'active') {
+            baseQueries.push(where("status", "==", "Homologado"));
+        } else if (activeTab === 'draft') {
+            baseQueries.push(where("status", "==", "Não Homologado"));
+        }
 
-          if (activeTab === 'active') {
-              queries.push(where("status", "==", "Homologado"));
-          } else if (activeTab === 'draft') {
-              queries.push(where("status", "==", "Não Homologado"));
-          }
+        let schoolTypeClauses = [];
+        if (schoolTypeFilter.estaduais) schoolTypeClauses.push("ESTADUAL");
+        if (schoolTypeFilter.municipais) {
+          schoolTypeClauses.push("MUNICIPAL");
+          schoolTypeClauses.push("MUNICIPALIZADA");
+        }
+        if(schoolTypeClauses.length > 0 && schoolTypeClauses.length < 3) {
+          baseQueries.push(where("schoolType", "in", schoolTypeClauses));
+        }
 
-          if (searchTerm) {
-              // Note: Firestore doesn't support full-text search. This searches for exact matches on specific fields.
-              // For a better search experience, a dedicated search service like Algolia would be needed.
-              // This is a simplified search for demonstration.
-              // queries.push(where("name", ">=", searchTerm), where("name", "<=", searchTerm + '\uf8ff'));
-          }
-          
-          let schoolTypeClauses = [];
-          if (schoolTypeFilter.estaduais) schoolTypeClauses.push("ESTADUAL");
-          if (schoolTypeFilter.municipais) {
-            schoolTypeClauses.push("MUNICIPAL");
-            schoolTypeClauses.push("MUNICIPALIZADA");
-          }
+        let finalStudents: Student[] = [];
+        let documentSnapshots;
 
-          if(schoolTypeClauses.length > 0 && schoolTypeClauses.length < 3) {
-            queries.push(where("schoolType", "in", schoolTypeClauses));
-          }
+        // If searchTerm exists, we perform a more specific query.
+        // As we cannot use different inequality filters on multiple fields, 
+        // we will check for RA or CPF. Name search will be client-side for now.
+        if (searchTerm) {
+            const raQuery = query(studentsRef, ...baseQueries, where("ra", "==", searchTerm));
+            const cpfQuery = query(studentsRef, ...baseQueries, where("cpf", "==", searchTerm));
+            
+            const [raSnapshot, cpfSnapshot] = await Promise.all([getDocs(raQuery), getDocs(cpfQuery)]);
+            
+            const studentMap = new Map<string, Student>();
+            
+            const processSnapshot = (snapshot: any) => {
+                 snapshot.forEach((docSnap: any) => {
+                    const decryptedData = decryptObjectValues(docSnap.data()) as any;
+                    if(decryptedData) {
+                        let enrollmentDateStr = 'N/A';
+                        if (decryptedData.enrollmentDate?.seconds) {
+                            enrollmentDateStr = new Timestamp(decryptedData.enrollmentDate.seconds, decryptedData.enrollmentDate.nanoseconds).toDate().toLocaleDateString('pt-BR');
+                        }
+                        const student: Student = {
+                            id: docSnap.id,
+                            ...decryptedData,
+                            enrollmentDate: enrollmentDateStr,
+                        };
+                        studentMap.set(docSnap.id, student);
+                    }
+                 });
+            }
 
+            processSnapshot(raSnapshot);
+            processSnapshot(cpfSnapshot);
+            finalStudents = Array.from(studentMap.values());
+            setTotalStudents(finalStudents.length);
+            setLastVisible(null); // No pagination for specific search
 
-          let q = query(studentsRef, ...queries, orderBy("name"), limit(itemsPerPage));
-          
-          if(direction === 'next' && lastVisible) {
-            q = query(studentsRef, ...queries, orderBy("name"), startAfter(lastVisible), limit(itemsPerPage));
-          }
-          
-          // Note: "prev" pagination is complex with cursors. For simplicity, we'll reset to page 1.
-          if(direction === 'prev') {
-             // A true 'prev' would require orderBy descending and endBefore, which gets complicated.
-             // Resetting or managing a stack of previous cursors is an option.
-             // For this implementation, we will just disable 'prev' button on page 1.
-             // A full implementation would be more complex.
-          }
-          
-          const documentSnapshots = await getDocs(q);
-          const studentsData: Student[] = [];
-          documentSnapshots.forEach(docSnap => {
-              const encryptedData = docSnap.data();
-              const data = decryptObjectValues(encryptedData) as any;
-              if (data) {
-                  let enrollmentDateStr = 'N/A';
-                  if (data.enrollmentDate?.seconds) {
-                      enrollmentDateStr = new Timestamp(data.enrollmentDate.seconds, data.enrollmentDate.nanoseconds).toDate().toLocaleDateString('pt-BR');
-                  }
-                  
-                  // This is a temporary fix as client-side filtering by name is needed because Firestore is case-sensitive
-                  if (!searchTerm || data.name.toLowerCase().includes(searchTerm.toLowerCase()) || data.ra.includes(searchTerm) || data.cpf.includes(searchTerm)) {
-                    studentsData.push({
-                        id: docSnap.id,
-                        ...data,
-                        enrollmentDate: enrollmentDateStr,
-                    } as Student);
-                  }
-              }
-          });
+        } else {
+            // General pagination and filtering
+            let q = query(studentsRef, ...baseQueries, orderBy("name"), limit(itemsPerPage));
+            if(direction === 'next' && lastVisible) {
+              q = query(studentsRef, ...baseQueries, orderBy("name"), startAfter(lastVisible), limit(itemsPerPage));
+            }
+            
+            documentSnapshots = await getDocs(q);
+            finalStudents = documentSnapshots.docs.map(docSnap => {
+                const decryptedData = decryptObjectValues(docSnap.data()) as any;
+                let enrollmentDateStr = 'N/A';
+                if (decryptedData.enrollmentDate?.seconds) {
+                    enrollmentDateStr = new Timestamp(decryptedData.enrollmentDate.seconds, decryptedData.enrollmentDate.nanoseconds).toDate().toLocaleDateString('pt-BR');
+                }
+                return {
+                    id: docSnap.id,
+                    ...decryptedData,
+                    enrollmentDate: enrollmentDateStr,
+                } as Student;
+            });
+            
+            setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
 
-          setStudents(studentsData);
-          setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
-          setFirstVisible(documentSnapshots.docs[0]);
-          
-          // Get total count for pagination
-          const countQuery = query(studentsRef, ...queries);
-          const countSnapshot = await getCountFromServer(countQuery);
-          setTotalStudents(countSnapshot.data().count);
+            // Get total count for pagination
+            const countQuery = query(studentsRef, ...baseQueries);
+            const countSnapshot = await getCountFromServer(countQuery);
+            setTotalStudents(countSnapshot.data().count);
+        }
 
-      } catch (error) {
-          console.error("Error fetching students:", error);
-          toast({ variant: 'destructive', title: 'Erro ao buscar alunos', description: 'Pode ser necessário criar um índice no Firestore. Verifique o console.' });
-      } finally {
-          setLoading(false);
-      }
-  }, [activeTab, searchTerm, schoolTypeFilter, toast, lastVisible]);
+        setStudents(finalStudents);
+
+    } catch (error) {
+        console.error("Error fetching students:", error);
+        toast({ variant: 'destructive', title: 'Erro ao buscar alunos', description: 'Pode ser necessário criar um índice no Firestore. Verifique o console.' });
+    } finally {
+        setLoading(false);
+    }
+  }, [activeTab, schoolTypeFilter, toast, lastVisible, searchTerm]);
   
+  const clientSideFilteredStudents = useMemo(() => {
+    if (!searchTerm) return students;
+    // Client-side search for name, as server-side is complex with encryption
+    return students.filter(student => student.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [students, searchTerm]);
+
+
   useEffect(() => {
-    fetchStudents('new');
+    fetchStudents('new', 1);
     setCurrentPage(1);
     setLastVisible(null);
-    setFirstVisible(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, searchTerm, schoolTypeFilter]);
+  }, [activeTab, schoolTypeFilter, searchTerm]); // re-fetch when filters change
   
   const handleOpenProfileDialog = (student: Student, editMode: boolean) => {
     setActiveStudent(student);
@@ -876,8 +898,14 @@ export default function StudentsPage() {
   const handleSaveStudent = async (updatedStudent: Student) => {
     try {
         const { id, ...studentData } = updatedStudent;
-        const encryptedStudent = encryptObjectValues(studentData);
-        await updateDoc(doc(db, "students", id), encryptedStudent);
+        const studentDocRef = doc(db, "students", id);
+        const currentDoc = await getDoc(studentDocRef);
+        const decryptedCurrent = decryptObjectValues(currentDoc.data() || {});
+        
+        const dataToUpdate = { ...decryptedCurrent, ...studentData };
+        
+        const encryptedStudent = encryptObjectValues(dataToUpdate);
+        await updateDoc(studentDocRef, encryptedStudent);
         toast({ title: "Sucesso!", description: "Aluno atualizado." });
         fetchStudents('new');
     } catch(error) {
@@ -928,6 +956,7 @@ export default function StudentsPage() {
   
   const handleTabChange = (value: string) => {
     setActiveTab(value);
+    setSearchTerm(''); // Reset search on tab change
   }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -936,7 +965,7 @@ export default function StudentsPage() {
   
   const handleNextPage = () => {
     if (currentPage < totalPages) {
-      fetchStudents('next');
+      fetchStudents('next', currentPage + 1);
       setCurrentPage(prev => prev + 1);
     }
   }
@@ -944,9 +973,9 @@ export default function StudentsPage() {
   const handlePreviousPage = () => {
     if (currentPage > 1) {
        // This is a simplified "previous". A full implementation is more complex.
-       // We'll refetch from the beginning for this page.
-       fetchStudents('new'); 
-       setCurrentPage(prev => prev - 1); // This will look odd if not on page 2
+       // We'll refetch from the beginning.
+       fetchStudents('new', 1); 
+       setCurrentPage(1);
     }
   }
 
@@ -1049,8 +1078,8 @@ export default function StudentsPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow><TableCell colSpan={7} className="text-center">Carregando...</TableCell></TableRow>
-                  ) : students.length > 0 ? (
-                    students.map((student) => (
+                  ) : clientSideFilteredStudents.length > 0 ? (
+                    clientSideFilteredStudents.map((student) => (
                       <TableRow key={student.id}>
                           <TableCell className="font-medium">{student.name}</TableCell>
                           <TableCell>
@@ -1097,7 +1126,7 @@ export default function StudentsPage() {
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
-                Mostrando <strong>{students.length}</strong> de <strong>{totalStudents}</strong> alunos.
+                Mostrando <strong>{clientSideFilteredStudents.length}</strong> de <strong>{totalStudents}</strong> alunos.
             </div>
             <div className="ml-auto flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
@@ -1107,7 +1136,7 @@ export default function StudentsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
+                    disabled={currentPage === 1 || !!searchTerm}
                 >
                     <ChevronLeft className="h-4 w-4" />
                     Anterior
@@ -1116,7 +1145,7 @@ export default function StudentsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleNextPage}
-                    disabled={currentPage === totalPages}
+                    disabled={currentPage === totalPages || !!searchTerm}
                 >
                     Próxima
                     <ChevronRight className="h-4 w-4" />
@@ -1125,7 +1154,7 @@ export default function StudentsPage() {
           </CardFooter>
         </Card>
       </TabsContent>
-      {activeStudent && (
+      {isProfileDialogOpen && (
         <StudentProfileDialog 
             student={activeStudent}
             isEditing={isEditing}
@@ -1137,3 +1166,5 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
+    
