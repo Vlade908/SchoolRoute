@@ -170,10 +170,11 @@ function StudentProfileDialog({
                 const data = decryptObjectValues(doc.data()) as any;
                 if(data){
                     let createdAt = data.createdAt;
+                    // Ensure createdAt is a Firestore Timestamp
                     if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
                         createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
                     } else if (!createdAt) {
-                        return;
+                        return; // Skip if no valid timestamp
                     }
                     
                     studentRequests.push({
@@ -1294,6 +1295,7 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
 
 
 
