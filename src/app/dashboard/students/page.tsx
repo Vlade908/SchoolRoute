@@ -162,7 +162,10 @@ function StudentProfileDialog({
     if(isOpen && student?.id) {
         setLoadingRequests(true);
         const requestsRef = collection(db, "transport-requests");
+        // This won't work because student.id is not encrypted and the field in firestore is
+        // const q = query(requestsRef, where("studentId", "==", student.id));
         const q = query(requestsRef);
+
 
         getDocs(q).then(snapshot => {
             const studentRequests: TransportRequest[] = [];
@@ -173,6 +176,9 @@ function StudentProfileDialog({
                     // Ensure createdAt is a Firestore Timestamp object
                     if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
                         createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
+                    } else if (!createdAt) {
+                        // If createdAt is missing, skip or handle as an error
+                        return;
                     }
                     
                     studentRequests.push({
@@ -195,7 +201,7 @@ function StudentProfileDialog({
   }, [isOpen, student]);
   
   const availableYears = useMemo(() => {
-      const years = new Set(requests.map(r => r.createdAt instanceof Timestamp ? r.createdAt.toDate().getFullYear() : new Date().getFullYear()));
+      const years = new Set(requests.map(r => r.createdAt instanceof Timestamp ? r.createdAt.toDate().getFullYear() : new Date(r.createdAt).getFullYear()));
       return Array.from(years).sort((a,b) => b - a);
   }, [requests]);
   
