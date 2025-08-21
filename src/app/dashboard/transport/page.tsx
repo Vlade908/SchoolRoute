@@ -25,12 +25,13 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useUser } from '@/contexts/user-context';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
 
 const requests = [
@@ -40,12 +41,23 @@ const requests = [
   { id: 'REQ004', studentName: 'Sofia Almeida', ra: 'RA2024004', type: 'Passe Escolar', status: 'Aprovado', school: 'Escola Estadual A', distance: '7.5 km' },
 ];
 
-function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
+function ApprovalRequestDialog({ request, isOpen, onOpenChange }: { request: typeof requests[0], isOpen: boolean, onOpenChange: (open: boolean) => void }) {
     const [approvalStatus, setApprovalStatus] = useState<'aguardando' | 'aprovado' | 'reprovado'>('aguardando');
     const [executor, setExecutor] = useState('');
     const [hasAgreement, setHasAgreement] = useState('');
     const [rejectionReason, setRejectionReason] = useState('');
+    const { toast } = useToast();
     
+    useEffect(() => {
+        // Reset state when a new request is viewed
+        if (isOpen) {
+            setApprovalStatus('aguardando');
+            setExecutor('');
+            setHasAgreement('');
+            setRejectionReason('');
+        }
+    }, [isOpen, request]);
+
     const handleExecutorChange = (value: string) => {
         setExecutor(value);
         if (value === 'emtu') {
@@ -53,6 +65,22 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
         } else {
             setHasAgreement('nao');
         }
+    }
+    
+    const handleSaveChanges = () => {
+        // Here you would typically save the data to your backend
+        console.log({
+            requestId: request.id,
+            approvalStatus,
+            executor,
+            hasAgreement,
+            rejectionReason
+        });
+        toast({
+            title: "Alterações Salvas!",
+            description: `A solicitação de ${request.studentName} foi atualizada.`,
+        });
+        onOpenChange(false);
     }
 
     return (
@@ -134,8 +162,8 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
                 </Card>
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-2">
-                <Button variant="outline" className="w-full sm:w-auto">Cancelar</Button>
-                <Button variant="default" className="w-full sm:w-auto">Salvar Alterações</Button>
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                <Button variant="default" className="w-full sm:w-auto" onClick={handleSaveChanges}>Salvar Alterações</Button>
             </DialogFooter>
         </DialogContent>
     )
@@ -144,6 +172,8 @@ function ApprovalRequestDialog({ request }: { request: typeof requests[0] }) {
 export default function TransportPage() {
   const { user, loading } = useUser();
   const router = useRouter();
+  const [selectedRequest, setSelectedRequest] = useState<typeof requests[0] | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || user.role < 3)) {
@@ -153,6 +183,11 @@ export default function TransportPage() {
 
   if (loading || !user || user.role < 3) {
     return <p>Carregando ou acesso negado...</p>;
+  }
+
+  const handleOpenDialog = (request: typeof requests[0]) => {
+    setSelectedRequest(request);
+    setIsDialogOpen(true);
   }
 
   return (
@@ -188,21 +223,16 @@ export default function TransportPage() {
                 </TableHeader>
                 <TableBody>
                   {requests.filter(r => r.status === 'Pendente').map((request) => (
-                    <Dialog key={request.id}>
-                      <TableRow>
+                      <TableRow key={request.id}>
                         <TableCell className="font-medium">{request.id}</TableCell>
                         <TableCell>{request.studentName}</TableCell>
                         <TableCell className="hidden sm:table-cell">{request.ra}</TableCell>
                         <TableCell className="hidden md:table-cell">{request.school}</TableCell>
                         <TableCell className="hidden lg:table-cell">{request.distance}</TableCell>
                         <TableCell>
-                          <DialogTrigger asChild>
-                              <Button variant="outline" size="sm">Analisar</Button>
-                          </DialogTrigger>
+                            <Button variant="outline" size="sm" onClick={() => handleOpenDialog(request)}>Analisar</Button>
                         </TableCell>
                       </TableRow>
-                      <ApprovalRequestDialog request={request} />
-                    </Dialog>
                   ))}
                 </TableBody>
               </Table>
@@ -234,20 +264,15 @@ export default function TransportPage() {
                 </TableHeader>
                 <TableBody>
                   {requests.filter(r => r.status === 'Aprovado').map((request) => (
-                     <Dialog key={request.id}>
-                      <TableRow>
+                      <TableRow key={request.id}>
                         <TableCell className="font-medium">{request.id}</TableCell>
                         <TableCell>{request.studentName}</TableCell>
                         <TableCell className="hidden sm:table-cell">{request.ra}</TableCell>
                         <TableCell className="hidden md:table-cell">{request.school}</TableCell>
                         <TableCell>
-                         <DialogTrigger asChild>
-                             <Button variant="outline" size="sm">Ver Detalhes</Button>
-                         </DialogTrigger>
+                            <Button variant="outline" size="sm" onClick={() => handleOpenDialog(request)}>Ver Detalhes</Button>
                         </TableCell>
                       </TableRow>
-                      <ApprovalRequestDialog request={request} />
-                     </Dialog>
                   ))}
                 </TableBody>
               </Table>
@@ -255,6 +280,9 @@ export default function TransportPage() {
           </CardContent>
         </Card>
       </TabsContent>
+       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          {selectedRequest && <ApprovalRequestDialog request={selectedRequest} isOpen={isDialogOpen} onOpenChange={setIsDialogOpen} />}
+      </Dialog>
     </Tabs>
   );
 }
