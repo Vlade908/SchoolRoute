@@ -9,6 +9,7 @@ type User = {
   email: string | null;
   role: number;
   schoolId: string | null;
+  schoolName: string | null;
 };
 
 type UserContextType = {

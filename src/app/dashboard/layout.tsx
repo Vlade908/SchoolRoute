@@ -32,6 +32,7 @@ type User = {
   email: string | null;
   role: number;
   schoolId: string | null;
+  schoolName: string | null;
 };
 
 function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
@@ -39,16 +40,31 @@ function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
   const pathname = usePathname();
 
   if (!user) return null;
-
-  const navLinks = [
+  
+  const commonLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, minRole: 1 },
     { href: '/dashboard/students', label: 'Alunos', icon: Users, minRole: 1 },
+  ];
+  
+  const schoolUserLinks = [
+      { href: '/dashboard/pass-requests', label: 'Solicitar Passes', icon: Bus, minRole: 2 },
+  ];
+
+  const adminLinks = [
     { href: '/dashboard/schools', label: 'Escolas', icon: SchoolIcon, minRole: 3 },
     { href: '/dashboard/city-halls', label: 'Prefeituras', icon: Building, minRole: 3 },
     { href: '/dashboard/employees', label: 'Funcionários', icon: UserPlus, minRole: 3 },
     { href: '/dashboard/transport', label: 'Solicitações', icon: Bus, minRole: 3 },
     { href: '/dashboard/orders', label: 'Pedidos', icon: FileText, minRole: 3 },
-  ].filter(link => user.role >= link.minRole);
+  ];
+
+  const navLinks = [
+    ...commonLinks,
+    ...(user.role >= 2 ? schoolUserLinks : []),
+    ...(user.role >=3 ? adminLinks : [])
+  ].filter(link => user.role >= link.minRole)
+   .filter((link, index, self) => index === self.findIndex((l) => l.href === link.href)); // Remove duplicates
+
 
   return (
     <nav className={cn('flex flex-col gap-2', className)}>
@@ -154,15 +170,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             if (userDoc.exists()) {
               const encryptedData = userDoc.data();
               const userData = decryptObjectValues(encryptedData) as any;
+              
               if (userData) {
+                let schoolName = null;
+                if(userData.schoolId) {
+                    const schoolDocRef = doc(db, 'schools', userData.schoolId);
+                    const schoolDoc = await getDoc(schoolDocRef);
+                    if(schoolDoc.exists()){
+                        const schoolData = decryptObjectValues(schoolDoc.data());
+                        schoolName = schoolData?.name || null;
+                    }
+                }
+
                 const userProfile = {
                   uid: firebaseUser.uid,
                   name: userData.name,
                   email: firebaseUser.email,
                   role: userData.role,
                   schoolId: userData.schoolId || null,
+                  schoolName: schoolName,
                 };
                 setUser(userProfile);
+
               } else {
                  // Decryption failed or data malformed
                  throw new Error("Failed to decrypt user data.");
