@@ -82,6 +82,15 @@ type Student = {
   souCardNumber?: string;
 };
 
+type TransportRequest = {
+    id: string;
+    studentId: string;
+    createdAt: Timestamp;
+    type: string;
+    status: string;
+    executor?: string;
+};
+
 type SchoolClass = {
   name: string;
   period: 'Manhã' | 'Tarde' | 'Noite' | 'Integral';
@@ -117,6 +126,11 @@ function StudentProfileDialog({
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [isSchoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
+  const [requests, setRequests] = useState<TransportRequest[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [yearFilter, setYearFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+
   
   useEffect(() => {
     if (isOpen) {
@@ -143,6 +157,49 @@ function StudentProfileDialog({
         });
     }
   }, [isOpen, student]);
+  
+  useEffect(() => {
+    if(isOpen && student?.id) {
+        setLoadingRequests(true);
+        const requestsRef = collection(db, "transport-requests");
+        const q = query(requestsRef);
+
+        getDocs(q).then(snapshot => {
+            const studentRequests: TransportRequest[] = [];
+            snapshot.forEach(doc => {
+                const data = decryptObjectValues(doc.data()) as any;
+                if(data && data.studentId === student.id){
+                    studentRequests.push({
+                        id: doc.id,
+                        studentId: data.studentId,
+                        createdAt: data.createdAt,
+                        type: data.type,
+                        status: data.status,
+                        executor: data.executor,
+                    });
+                }
+            });
+            setRequests(studentRequests);
+            setLoadingRequests(false);
+        }).catch(err => {
+            console.error("Error fetching requests: ", err);
+            setLoadingRequests(false);
+        });
+    }
+  }, [isOpen, student]);
+  
+  const availableYears = useMemo(() => {
+      const years = new Set(requests.map(r => r.createdAt.toDate().getFullYear()));
+      return Array.from(years).sort((a,b) => b - a);
+  }, [requests]);
+  
+  const filteredRequests = useMemo(() => {
+      return requests.filter(r => {
+          const yearMatch = yearFilter === 'all' || r.createdAt.toDate().getFullYear().toString() === yearFilter;
+          const typeMatch = typeFilter === 'all' || r.type === typeFilter;
+          return yearMatch && typeMatch;
+      });
+  }, [requests, yearFilter, typeFilter]);
 
 
   const selectedGradeObj = useMemo(() => {
@@ -226,10 +283,11 @@ function StudentProfileDialog({
               <DialogDescription>{student.name} - {student.ra}</DialogDescription>
             </DialogHeader>
             <Tabs defaultValue="data">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="data">Dados</TabsTrigger>
                 <TabsTrigger value="documents">Documentos</TabsTrigger>
                 <TabsTrigger value="enrollments">Matrículas</TabsTrigger>
+                <TabsTrigger value="requests">Solicitações</TabsTrigger>
                 <TabsTrigger value="history">Histórico</TabsTrigger>
               </TabsList>
               <TabsContent value="data" className="pt-4">
@@ -410,6 +468,71 @@ function StudentProfileDialog({
                     </CardContent>
                   </Card>
               </TabsContent>
+               <TabsContent value="requests" className="pt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Histórico de Solicitações</CardTitle>
+                       <div className="flex items-center gap-2">
+                            <Select value={yearFilter} onValueChange={setYearFilter}>
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue placeholder="Ano" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos Anos</SelectItem>
+                                    {availableYears.map(year => (
+                                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                             <Select value={typeFilter} onValueChange={setTypeFilter}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos Tipos</SelectItem>
+                                    <SelectItem value="Passe Escolar">Passe Escolar</SelectItem>
+                                    <SelectItem value="Transporte Fretado">Transporte Fretado</SelectItem>
+                                </SelectContent>
+                            </Select>
+                       </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Data</TableHead>
+                                    <TableHead>Tipo</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Executor</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loadingRequests ? (
+                                    <TableRow><TableCell colSpan={4} className="text-center">Carregando...</TableCell></TableRow>
+                                ) : filteredRequests.length > 0 ? (
+                                    filteredRequests.map(req => (
+                                        <TableRow key={req.id}>
+                                            <TableCell>{req.createdAt.toDate().toLocaleDateString('pt-BR')}</TableCell>
+                                            <TableCell>{req.type}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={req.status === 'Aprovado' ? 'default' : req.status === 'Pendente' ? 'secondary' : 'destructive'} 
+                                                    className={req.status === 'Aprovado' ? 'bg-green-600' : ''}>
+                                                    {req.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>{req.executor || 'N/A'}</TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow><TableCell colSpan={4} className="text-center">Nenhuma solicitação encontrada.</TableCell></TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+               </TabsContent>
                <TabsContent value="history" className="pt-4">
                   <Card>
                     <CardHeader>
@@ -779,48 +902,37 @@ export default function StudentsPage() {
             setPage(1);
             setLastVisible(null);
             setFirstVisible(null);
-            setAllStudents([]);
         }
 
-        if (direction === 'next' && lastVisible) {
-            constraints.push(startAfter(lastVisible));
-        }
-
-        constraints.push(limit(itemsPerPage));
-
-        const q = query(studentsRef, ...constraints);
-        
+        // We fetch all students for client-side filtering because of encryption
+        const q = query(studentsRef);
         const documentSnapshots = await getDocs(q);
-        const fetchedStudents = documentSnapshots.docs.map(docSnap => {
+        
+        const fetchedStudents: Student[] = [];
+        documentSnapshots.forEach(docSnap => {
             const decryptedData = decryptObjectValues(docSnap.data()) as any;
-            let enrollmentDateStr = 'N/A';
-            if (decryptedData.enrollmentDate?.seconds) {
-                enrollmentDateStr = new Timestamp(decryptedData.enrollmentDate.seconds, decryptedData.enrollmentDate.nanoseconds).toDate().toLocaleDateString('pt-BR');
+            if (decryptedData) {
+              let enrollmentDateStr = 'N/A';
+              if (decryptedData.enrollmentDate?.seconds) {
+                  enrollmentDateStr = new Timestamp(decryptedData.enrollmentDate.seconds, decryptedData.enrollmentDate.nanoseconds).toDate().toLocaleDateString('pt-BR');
+              }
+              fetchedStudents.push({
+                  id: docSnap.id,
+                  ...decryptedData,
+                  enrollmentDate: enrollmentDateStr,
+              } as Student);
             }
-            return {
-                id: docSnap.id,
-                ...decryptedData,
-                enrollmentDate: enrollmentDateStr,
-            } as Student;
         });
         
-        // This is a full read, which can be slow, but necessary for client-side filtering with encrypted data
         setAllStudents(fetchedStudents);
-        setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
-        setFirstVisible(documentSnapshots.docs[0]);
-
-        // Get total count for pagination - this should be for all documents, not just filtered ones for now
-        const countQuery = query(collection(db, "students"));
-        const countSnapshot = await getCountFromServer(countQuery);
-        setTotalStudents(countSnapshot.data().count);
-
+        
     } catch (error) {
         console.error("Error fetching students:", error);
         toast({ variant: 'destructive', title: 'Erro ao buscar alunos', description: 'Ocorreu um erro ao carregar os dados dos alunos.' });
     } finally {
         setLoading(false);
     }
-  }, [toast, lastVisible]);
+  }, [toast]);
   
   useEffect(() => {
     if (user?.role === 3) {
@@ -871,9 +983,11 @@ export default function StudentsPage() {
             (student.cpf && student.cpf.toLowerCase().includes(lowerCaseSearch))
         );
     }
+    
+    setTotalStudents(studentsToFilter.length);
 
-    return studentsToFilter;
-  }, [allStudents, searchTerm, activeTab, schoolFilter, user]);
+    return studentsToFilter.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  }, [allStudents, searchTerm, activeTab, schoolFilter, user, page]);
 
   
   const handleOpenProfileDialog = (student: Student, editMode: boolean) => {
@@ -945,24 +1059,29 @@ export default function StudentsPage() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
+    setPage(1);
+  }
+  
+  const handleSchoolFilterChange = (schoolId: string) => {
+    setSchoolFilter(schoolId);
+    setPage(1);
   }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+    setPage(1);
   };
   
   const handleNextPage = () => {
     if (page < totalPages) {
         setPage(prev => prev + 1);
-        fetchStudents('next');
     }
   }
 
   const handlePreviousPage = () => {
-     // This is not a true previous page with cursors, it just refetches the first page.
-     // To implement true previous, we'd need to store page cursors.
-    setPage(1);
-    fetchStudents('new');
+    if (page > 1) {
+        setPage(prev => prev - 1);
+    }
   }
 
   return (
@@ -999,7 +1118,7 @@ export default function StudentsPage() {
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem 
                   checked={schoolFilter === 'all'}
-                  onCheckedChange={() => setSchoolFilter('all')}
+                  onCheckedChange={() => handleSchoolFilterChange('all')}
                 >
                   Todas as escolas
                 </DropdownMenuCheckboxItem>
@@ -1007,7 +1126,7 @@ export default function StudentsPage() {
                    <DropdownMenuCheckboxItem 
                     key={school.id}
                     checked={schoolFilter === school.id}
-                    onCheckedChange={() => setSchoolFilter(school.id)}
+                    onCheckedChange={() => handleSchoolFilterChange(school.id)}
                   >
                     {school.name}
                   </DropdownMenuCheckboxItem>
@@ -1136,7 +1255,7 @@ export default function StudentsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleNextPage}
-                    disabled={!lastVisible || (page * itemsPerPage) >= totalStudents}
+                    disabled={page >= totalPages}
                 >
                     Próxima
                     <ChevronRight className="h-4 w-4" />
