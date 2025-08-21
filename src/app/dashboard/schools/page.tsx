@@ -314,18 +314,18 @@ function GradesAndClassesManager({ school, onUpdate, isEditing, onViewClass }: {
                       if (classesForPeriod.length === 0 && !isEditing) return null;
 
                       return (
-                       <AccordionItem value={`${grade.name}-${period}`} key={period} className="bg-background rounded-md border px-4">
-                           <AccordionTrigger className="py-2 no-underline">
-                               <div className="flex justify-between items-center w-full">
-                                    <h4 className="font-semibold text-sm">{period}</h4>
-                                    {isEditing && (
-                                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenAddClass(gradeIndex, period);}}>
-                                          <PlusCircle className="mr-2 h-3 w-3"/> Adicionar Turma
-                                      </Button>
-                                    )}
-                               </div>
-                           </AccordionTrigger>
-                           <AccordionContent className="pb-2">
+                       <AccordionItem value={`${grade.name}-${period}`} key={period} className="bg-background rounded-md border">
+                           <div className="flex items-center justify-between px-4">
+                             <AccordionTrigger className="py-2 no-underline flex-1">
+                                 <h4 className="font-semibold text-sm">{period}</h4>
+                             </AccordionTrigger>
+                              {isEditing && (
+                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenAddClass(gradeIndex, period);}}>
+                                    <PlusCircle className="mr-2 h-3 w-3"/> Adicionar Turma
+                                </Button>
+                              )}
+                           </div>
+                           <AccordionContent className="pb-2 px-4">
                                 <div className="overflow-x-auto">
                                     <Table>
                                     <TableBody>
@@ -1077,3 +1077,4 @@ export default function SchoolsPage() {
     </>
   );
 }
+
