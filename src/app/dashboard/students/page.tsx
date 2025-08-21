@@ -189,7 +189,11 @@ function StudentProfileDialog({
               } as TransportRequest);
             }
           });
-          setRequests(studentRequests.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+          setRequests(studentRequests.sort((a, b) => {
+              const timeA = a.createdAt?.toMillis() || 0;
+              const timeB = b.createdAt?.toMillis() || 0;
+              return timeB - timeA;
+          }));
         }).catch((err) => {
           console.error("Error fetching requests: ", err);
         }).finally(() => {
