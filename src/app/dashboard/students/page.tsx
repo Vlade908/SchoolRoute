@@ -161,42 +161,48 @@ function StudentProfileDialog({
   }, [isOpen, student]);
   
   useEffect(() => {
-    if(isOpen && student?.id) {
-        setLoadingRequests(true);
-        const requestsRef = collection(db, "transport-requests");
-        const q = query(requestsRef, where("studentUid", "==", student.id));
+    if (isOpen && student?.id) {
+      setLoadingRequests(true);
+      const requestsRef = collection(db, "transport-requests");
+      const q = query(requestsRef, where("studentUid", "==", student.id));
 
-        getDocs(q).then(snapshot => {
-            const studentRequests: TransportRequest[] = [];
-            snapshot.forEach(doc => {
-                const data = decryptObjectValues(doc.data());
-                if(data){
-                    let createdAt = data.createdAt;
-                    if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
-                        createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
-                    } else if (!createdAt || !(createdAt instanceof Timestamp)) {
-                         return; 
-                    }
-                    
-                    studentRequests.push({
-                        id: doc.id,
-                        studentId: data.studentId,
-                        createdAt: createdAt,
-                        updatedAt: data.updatedAt,
-                        type: data.type,
-                        status: data.status,
-                        executor: data.executor,
-                    } as TransportRequest);
-                }
-            });
-            setRequests(studentRequests);
-            setLoadingRequests(false);
-        }).catch(err => {
-            console.error("Error fetching requests: ", err);
-            setLoadingRequests(false);
+      getDocs(q).then((snapshot) => {
+          const studentRequests: TransportRequest[] = [];
+          snapshot.forEach((doc) => {
+            const data = decryptObjectValues(doc.data());
+            if (data) {
+              let createdAt = data.createdAt;
+              if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
+                  createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
+              }
+
+              let updatedAt;
+              if (data.updatedAt && typeof data.updatedAt.seconds === 'number' && typeof data.updatedAt.nanoseconds === 'number' && !(data.updatedAt instanceof Timestamp)) {
+                updatedAt = new Timestamp(data.updatedAt.seconds, data.updatedAt.nanoseconds);
+              } else {
+                updatedAt = data.updatedAt;
+              }
+              
+              if (!createdAt || !(createdAt instanceof Timestamp)) {
+                  return;
+              }
+
+              studentRequests.push({
+                id: doc.id,
+                ...data,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              } as TransportRequest);
+            }
+          });
+          setRequests(studentRequests);
+        }).catch((err) => {
+          console.error("Error fetching requests: ", err);
+        }).finally(() => {
+          setLoadingRequests(false);
         });
     }
-  }, [isOpen, student]);
+  }, [isOpen, student?.id]);
   
   const availableYears = useMemo(() => {
     const years = new Set(
@@ -489,7 +495,7 @@ function StudentProfileDialog({
                     </CardContent>
                   </Card>
               </TabsContent>
-               <TabsContent value="requests" className="pt-4">
+              <TabsContent value="requests" className="pt-4">
                   <Card>
                     <CardHeader>
                       <CardTitle>Histórico de Solicitações</CardTitle>
@@ -539,8 +545,14 @@ function StudentProfileDialog({
                                             <TableCell>{req.updatedAt ? req.updatedAt.toDate().toLocaleDateString('pt-BR') : '—'}</TableCell>
                                             <TableCell>{req.type}</TableCell>
                                             <TableCell>
-                                                <Badge variant={req.status === 'Aprovado' ? 'default' : req.status === 'Pendente' ? 'secondary' : 'destructive'} 
-                                                    className={req.status === 'Aprovado' ? 'bg-green-600' : ''}>
+                                                <Badge 
+                                                    variant={req.status === 'Aprovado' ? 'default' : req.status === 'Pendente' ? 'secondary' : 'destructive'} 
+                                                    className={cn(
+                                                      req.status === 'Aprovado' && 'bg-green-600',
+                                                      req.status === 'Pendente' && 'bg-orange-500',
+                                                      req.status === 'Reprovado' && 'bg-red-600'
+                                                    )}
+                                                  >
                                                     {req.status}
                                                 </Badge>
                                             </TableCell>
@@ -1304,3 +1316,4 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
