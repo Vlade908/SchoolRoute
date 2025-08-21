@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, doc, getDocs, query, setDoc, serverTimestamp, where } from "firebase/firestore";
+import { collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
@@ -83,7 +83,7 @@ export default function SignupEmployeePage() {
         hash: hash,
         role: hash.startsWith('pm') ? 0 : 1, // Default role, 0 for pending secretary, 1 for pending school
         status: 'Pendente',
-        creationDate: serverTimestamp()
+        creationDate: Timestamp.now()
       };
       
       const encryptedProfile = encryptObjectValues(userProfile);

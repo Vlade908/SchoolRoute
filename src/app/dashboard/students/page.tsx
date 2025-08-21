@@ -51,7 +51,7 @@ import { useUser } from '@/contexts/user-context';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, query, where, limit, startAfter, orderBy, getCountFromServer, getDoc, QueryConstraint } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, Timestamp, query, where, limit, startAfter, orderBy, getCountFromServer, getDoc, QueryConstraint } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { AddressMap } from '@/components/address-map';
@@ -1081,7 +1081,7 @@ export default function StudentsPage() {
             ...newStudentData,
             schoolType: schoolData?.schoolType || 'N/A',
             status: 'Não Homologado',
-            enrollmentDate: serverTimestamp(),
+            enrollmentDate: Timestamp.now(),
             uid: `student_${Date.now()}` // Placeholder UID, should be replaced with auth UID if students login
         };
         const encryptedStudent = encryptObjectValues(studentToAdd);

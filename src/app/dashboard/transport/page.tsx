@@ -33,7 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
 
@@ -255,7 +255,7 @@ export default function TransportPage() {
         const dataToUpdate = { 
             ...currentData, 
             ...updatedData,
-            updatedAt: serverTimestamp() // Always update the timestamp
+            updatedAt: Timestamp.now()
         };
 
         const encryptedUpdate = encryptObjectValues(dataToUpdate);

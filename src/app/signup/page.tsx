@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, doc, getDocs, query, setDoc, serverTimestamp, where } from "firebase/firestore";
+import { collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
@@ -56,7 +56,7 @@ export default function SignupPage() {
         hash: 'admin-seed', // Use a placeholder hash
         role: 3, 
         status: 'Ativo',
-        creationDate: serverTimestamp()
+        creationDate: Timestamp.now()
       };
       
       const encryptedProfile = encryptObjectValues(userProfile);

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/contexts/user-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -55,9 +55,12 @@ export default function PassRequestsPage() {
             try {
                 // Fetch all schools for the filter
                 const schoolsSnapshot = await getDocs(collection(db, 'schools'));
-                const schoolsData: School[] = schoolsSnapshot.docs.map(doc => {
+                const schoolsData: School[] = [];
+                schoolsSnapshot.forEach(doc => {
                     const data = decryptObjectValues(doc.data()) as any;
-                    return { id: doc.id, name: data.name };
+                    if (data) {
+                       schoolsData.push({ id: doc.id, name: data.name });
+                    }
                 });
                 setSchools(schoolsData);
 
@@ -150,8 +153,8 @@ export default function PassRequestsPage() {
             
             for (const student of selectedStudentData) {
                  const school = schools.find(s => s.id === student.schoolId);
-                 if (!school) {
-                     console.warn(`Escola com ID ${student.schoolId} não encontrada para o aluno ${student.name}. Pulando.`);
+                 if (!school || !school.name) {
+                     console.warn(`Escola com ID ${student.schoolId} não encontrada ou sem nome para o aluno ${student.name}. Pulando.`);
                      continue; 
                  }
 
@@ -164,7 +167,7 @@ export default function PassRequestsPage() {
                     status: 'Pendente',
                     requesterId: user.uid,
                     requesterName: user.name,
-                    createdAt: serverTimestamp(),
+                    createdAt: Timestamp.now(),
                     type: 'Passe Escolar',
                     distance: 'N/A',
                  };
