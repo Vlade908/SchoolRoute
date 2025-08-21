@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 
 type Student = {
     id: string;
+    uid: string; // Ensure UID is part of the student type
     name: string;
     ra: string;
     cpf: string;
@@ -73,6 +74,7 @@ export default function PassRequestsPage() {
                     if (decryptedData) {
                         studentData.push({
                             id: doc.id,
+                            uid: decryptedData.uid, // Make sure to get the UID
                             name: decryptedData.name,
                             ra: decryptedData.ra,
                             cpf: decryptedData.cpf,
@@ -150,7 +152,7 @@ export default function PassRequestsPage() {
             for (const student of selectedStudentData) {
                  const school = schools.find(s => s.id === student.schoolId) || { name: 'N/A' };
                  const requestData = {
-                    studentId: student.id,
+                    studentId: student.id, // Keep the document ID if needed
                     studentName: student.name,
                     ra: student.ra,
                     schoolId: student.schoolId,
@@ -165,7 +167,7 @@ export default function PassRequestsPage() {
                  const encryptedRequest = encryptObjectValues(requestData);
                  await addDoc(collection(db, "transport-requests"), {
                     ...encryptedRequest,
-                    studentUid: student.id // Add non-encrypted field for querying
+                    studentUid: student.uid // Use student's auth UID for querying
                  });
             }
 

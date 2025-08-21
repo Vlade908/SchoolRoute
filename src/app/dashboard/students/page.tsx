@@ -62,6 +62,7 @@ import { cn } from '@/lib/utils';
 
 type Student = {
   id: string; // Firestore document ID
+  uid: string; // Firebase Auth UID
   name: string;
   ra: string;
   cpf: string;
@@ -159,10 +160,11 @@ function StudentProfileDialog({
   }, [isOpen, student]);
   
   useEffect(() => {
-    if(isOpen && student?.id) {
+    if(isOpen && student?.uid) {
         setLoadingRequests(true);
         const requestsRef = collection(db, "transport-requests");
-        const q = query(requestsRef, where("studentUid", "==", student.id));
+        // This query now uses the student's auth UID
+        const q = query(requestsRef, where("studentUid", "==", student.uid));
 
         getDocs(q).then(snapshot => {
             const studentRequests: TransportRequest[] = [];
@@ -170,11 +172,10 @@ function StudentProfileDialog({
                 const data = decryptObjectValues(doc.data()) as any;
                 if(data){
                     let createdAt = data.createdAt;
-                    // Ensure createdAt is a Firestore Timestamp
                     if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
                         createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
-                    } else if (!createdAt) {
-                        return; // Skip if no valid timestamp
+                    } else if (!createdAt || !(createdAt instanceof Timestamp)) {
+                         return; 
                     }
                     
                     studentRequests.push({
@@ -605,7 +606,7 @@ function StudentProfileDialog({
 function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Student, 'id' | 'enrollmentDate' | 'status'>) => void, onOpenChange: (open: boolean) => void }) {
   const { user } = useUser();
   const [studentData, setStudentData] = useState({
-    name: '', cpf: '', ra: '', rg: '', grade: '', className: '', classPeriod: '', responsibleName: '', contactEmail: '', contactPhone: '', address: '', schoolId: '', schoolName: '', rgIssueDate: '', hasPass: 'Não' as 'Sim' | 'Não', souCardNumber: ''
+    name: '', cpf: '', ra: '', rg: '', grade: '', className: '', classPeriod: '', responsibleName: '', contactEmail: '', contactPhone: '', address: '', schoolId: '', schoolName: '', rgIssueDate: '', hasPass: 'Não' as 'Sim' | 'Não', souCardNumber: '', uid: ''
   });
 
   const [schools, setSchools] = useState<School[]>([]);
@@ -752,6 +753,10 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
     if (dataToValidate.hasPass === 'Não') {
       delete dataToValidate.souCardNumber;
     }
+     if (dataToValidate.uid) { // uid is not part of the form, it's auto-generated.
+      delete dataToValidate.uid;
+    }
+
 
     for (const key in dataToValidate) {
         if (dataToValidate[key as keyof typeof dataToValidate] === '') {
@@ -1051,7 +1056,8 @@ export default function StudentsPage() {
             ...newStudentData,
             schoolType: schoolData?.schoolType || 'N/A',
             status: 'Não Homologado',
-            enrollmentDate: serverTimestamp()
+            enrollmentDate: serverTimestamp(),
+            uid: `student_${Date.now()}` // Placeholder UID, should be replaced with auth UID if students login
         };
         const encryptedStudent = encryptObjectValues(studentToAdd);
         await addDoc(collection(db, "students"), encryptedStudent);
@@ -1295,6 +1301,7 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
 
 
 
