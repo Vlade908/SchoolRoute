@@ -13,7 +13,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
 import { Input } from '@/components/ui/input';
-import { Search, Send } from 'lucide-react';
+import { Search, Send, ListFilter } from 'lucide-react';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
 
 type Student = {
     id: string;
@@ -21,67 +23,106 @@ type Student = {
     ra: string;
     cpf: string;
     status: string;
+    schoolId: string;
 };
+
+type School = {
+    id: string;
+    name: string;
+}
 
 export default function PassRequestsPage() {
     const { user, loading: userLoading } = useUser();
     const router = useRouter();
     const { toast } = useToast();
-    const [students, setStudents] = useState<Student[]>([]);
+    const [allStudents, setAllStudents] = useState<Student[]>([]);
+    const [schools, setSchools] = useState<School[]>([]);
     const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [schoolFilter, setSchoolFilter] = useState('all');
 
     useEffect(() => {
-        if (!userLoading) {
-            if (!user || user.role < 2) {
-                router.push('/dashboard');
-                return;
-            }
+        if (userLoading) return;
+        if (!user || user.role < 2) {
+            router.push('/dashboard');
+            return;
+        }
 
-            if (user.schoolId) {
-                const fetchStudents = async () => {
-                    try {
-                        const studentsRef = collection(db, "students");
-                        const q = query(studentsRef);
-                        const querySnapshot = await getDocs(q);
+        const fetchSchoolsAndStudents = async () => {
+            setLoading(true);
+            try {
+                // Fetch all schools for the filter
+                if (user.role >= 3) {
+                    const schoolsSnapshot = await getDocs(collection(db, 'schools'));
+                    const schoolsData: School[] = schoolsSnapshot.docs.map(doc => {
+                        const data = decryptObjectValues(doc.data()) as any;
+                        return { id: doc.id, name: data.name };
+                    });
+                    setSchools(schoolsData);
+                }
 
-                        const schoolStudents: Student[] = [];
-                        querySnapshot.forEach(doc => {
-                            const decryptedData = decryptObjectValues(doc.data()) as any;
-                            if (decryptedData && decryptedData.schoolId === user.schoolId) {
-                                schoolStudents.push({
-                                    id: doc.id,
-                                    name: decryptedData.name,
-                                    ra: decryptedData.ra,
-                                    cpf: decryptedData.cpf,
-                                    status: decryptedData.status,
-                                });
-                            }
+                // Fetch all students
+                const studentsRef = collection(db, "students");
+                const q = query(studentsRef);
+                const querySnapshot = await getDocs(q);
+
+                const studentData: Student[] = [];
+                querySnapshot.forEach(doc => {
+                    const decryptedData = decryptObjectValues(doc.data()) as any;
+                    if (decryptedData) {
+                        studentData.push({
+                            id: doc.id,
+                            name: decryptedData.name,
+                            ra: decryptedData.ra,
+                            cpf: decryptedData.cpf,
+                            status: decryptedData.status,
+                            schoolId: decryptedData.schoolId,
                         });
-                        setStudents(schoolStudents);
-                    } catch (error) {
-                        console.error("Error fetching students:", error);
-                        toast({ variant: 'destructive', title: "Erro", description: "Não foi possível carregar os alunos." });
-                    } finally {
-                        setLoading(false);
                     }
-                };
-                fetchStudents();
-            } else {
+                });
+                setAllStudents(studentData);
+
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                toast({ variant: 'destructive', title: "Erro", description: "Não foi possível carregar os dados." });
+            } finally {
                 setLoading(false);
             }
-        }
+        };
+        fetchSchoolsAndStudents();
+
     }, [user, userLoading, router, toast]);
 
     const filteredStudents = useMemo(() => {
-        if (!searchTerm) return students;
-        return students.filter(student =>
-            student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            student.ra.includes(searchTerm) ||
-            student.cpf.includes(searchTerm)
-        );
-    }, [students, searchTerm]);
+        let students = allStudents;
+        
+        // Filter by school
+        if (user?.role === 2) {
+            students = students.filter(student => student.schoolId === user.schoolId);
+        } else if (user?.role >= 3 && schoolFilter !== 'all') {
+            students = students.filter(student => student.schoolId === schoolFilter);
+        }
+
+        // Filter by search term
+        if (searchTerm) {
+            const lowerCaseSearch = searchTerm.toLowerCase();
+            students = students.filter(student =>
+                student.name.toLowerCase().includes(lowerCaseSearch) ||
+                student.ra.includes(lowerCaseSearch) ||
+                student.cpf.includes(lowerCaseSearch)
+            );
+        }
+
+        return students;
+    }, [allStudents, searchTerm, schoolFilter, user]);
+    
+    const selectedSchoolName = useMemo(() => {
+        if (user?.role === 2) return user.schoolName;
+        if (schoolFilter === 'all' || !schools.length) return "todas as escolas";
+        return schools.find(s => s.id === schoolFilter)?.name || "escola selecionada";
+    }, [user, schoolFilter, schools]);
+
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
@@ -104,15 +145,16 @@ export default function PassRequestsPage() {
 
         try {
             setLoading(true);
-            const selectedStudentData = students.filter(s => selectedStudents.includes(s.id));
+            const selectedStudentData = allStudents.filter(s => selectedStudents.includes(s.id));
             
             for (const student of selectedStudentData) {
+                 const school = schools.find(s => s.id === student.schoolId) || { name: 'N/A' };
                  const requestData = {
                     studentId: student.id,
                     studentName: student.name,
                     ra: student.ra,
-                    schoolId: user.schoolId,
-                    school: user.schoolName,
+                    schoolId: student.schoolId,
+                    school: school.name,
                     status: 'Pendente',
                     requesterId: user.uid,
                     requesterName: user.name,
@@ -145,7 +187,7 @@ export default function PassRequestsPage() {
         return <p>Acesso negado.</p>;
     }
     
-    if (!user.schoolId) {
+    if (user.role === 2 && !user.schoolId) {
         return (
              <Card>
                 <CardHeader>
@@ -164,21 +206,45 @@ export default function PassRequestsPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex-1">
                         <CardTitle>Solicitar Passe Escolar</CardTitle>
-                        <CardDescription>Selecione os alunos da sua escola ({user.schoolName}) para solicitar o passe.</CardDescription>
+                        <CardDescription>Selecione os alunos de {selectedSchoolName} para solicitar o passe.</CardDescription>
                     </div>
                     <Button onClick={handleSubmitRequest} disabled={selectedStudents.length === 0 || loading}>
                         <Send className="mr-2 h-4 w-4" />
                         Criar Solicitação ({selectedStudents.length})
                     </Button>
                 </div>
-                 <div className="relative mt-4">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Buscar por nome, RA ou CPF..."
-                        className="pl-8"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                 <div className="flex flex-col sm:flex-row items-center gap-2 mt-4">
+                    <div className="relative flex-1 w-full">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Buscar por nome, RA ou CPF..."
+                            className="pl-8"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    {user.role >= 3 && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="w-full sm:w-auto gap-1">
+                                    <ListFilter className="h-3.5 w-3.5" />
+                                    Filtrar por Escola
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Selecione uma escola</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuCheckboxItem checked={schoolFilter === 'all'} onCheckedChange={() => setSchoolFilter('all')}>
+                                    Todas as Escolas
+                                </DropdownMenuCheckboxItem>
+                                {schools.map(school => (
+                                    <DropdownMenuCheckboxItem key={school.id} checked={schoolFilter === school.id} onCheckedChange={() => setSchoolFilter(school.id)}>
+                                        {school.name}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                 </div>
             </CardHeader>
             <CardContent>
@@ -188,7 +254,7 @@ export default function PassRequestsPage() {
                             <TableRow>
                                 <TableHead className="w-[50px]">
                                     <Checkbox
-                                        checked={selectedStudents.length > 0 && selectedStudents.length === filteredStudents.length}
+                                        checked={filteredStudents.length > 0 && selectedStudents.length === filteredStudents.length}
                                         onCheckedChange={(checked) => handleSelectAll(!!checked)}
                                     />
                                 </TableHead>
@@ -223,7 +289,7 @@ export default function PassRequestsPage() {
             </CardContent>
              <CardFooter>
                 <div className="text-xs text-muted-foreground">
-                    Mostrando <strong>{filteredStudents.length}</strong> de <strong>{students.length}</strong> alunos.
+                    Mostrando <strong>{filteredStudents.length}</strong> de <strong>{allStudents.length}</strong> alunos.
                 </div>
             </CardFooter>
         </Card>
