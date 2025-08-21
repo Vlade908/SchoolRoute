@@ -51,7 +51,7 @@ import { useUser } from '@/contexts/user-context';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, query, where, limit, startAfter, orderBy, getCountFromServer, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, query, where, limit, startAfter, orderBy, getCountFromServer, getDoc, QueryConstraint } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { AddressMap } from '@/components/address-map';
@@ -267,7 +267,7 @@ function StudentProfileDialog({
                                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-[370px] p-0">
+                                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
                                         <Command>
                                             <CommandInput placeholder="Buscar escola..." />
                                             <CommandList>
@@ -749,7 +749,6 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
 export default function StudentsPage() {
   const { user } = useUser();
   const { toast } = useToast();
-  const [students, setStudents] = useState<Student[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [activeStudent, setActiveStudent] = useState<Student | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -776,12 +775,7 @@ export default function StudentsPage() {
     try {
         const studentsRef = collection(db, "students");
         
-        let baseQueries = [];
-        if (activeTab === 'active') {
-            baseQueries.push(where("status", "==", "Homologado"));
-        } else if (activeTab === 'draft') {
-            baseQueries.push(where("status", "==", "Não Homologado"));
-        }
+        let baseQueries: QueryConstraint[] = [];
 
         let schoolTypeClauses = [];
         if (schoolTypeFilter.estaduais) schoolTypeClauses.push("ESTADUAL");
@@ -794,6 +788,7 @@ export default function StudentsPage() {
         }
 
         let q = query(studentsRef, ...baseQueries, limit(itemsPerPage));
+
         if (direction === 'next' && lastVisible) {
           q = query(studentsRef, ...baseQueries, startAfter(lastVisible), limit(itemsPerPage));
         }
@@ -816,7 +811,7 @@ export default function StudentsPage() {
         setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
 
         // Get total count for pagination
-        const countQuery = query(studentsRef, ...baseQueries);
+        const countQuery = query(collection(db, "students"), ...baseQueries);
         const countSnapshot = await getCountFromServer(countQuery);
         setTotalStudents(countSnapshot.data().count);
 
@@ -826,18 +821,30 @@ export default function StudentsPage() {
     } finally {
         setLoading(false);
     }
-  }, [activeTab, schoolTypeFilter, toast, lastVisible]);
+  }, [toast, lastVisible, schoolTypeFilter]);
   
   const filteredStudents = useMemo(() => {
-    if (!searchTerm) return allStudents;
+    let studentsToFilter = allStudents;
 
-    const lowerCaseSearch = searchTerm.toLowerCase();
-    return allStudents.filter(student => 
-        student.name.toLowerCase().includes(lowerCaseSearch) ||
-        student.ra.toLowerCase().includes(lowerCaseSearch) ||
-        student.cpf.toLowerCase().includes(lowerCaseSearch)
-    );
-  }, [allStudents, searchTerm]);
+    // Filter by active tab
+    if (activeTab === 'active') {
+        studentsToFilter = studentsToFilter.filter(student => student.status === 'Homologado');
+    } else if (activeTab === 'draft') {
+        studentsToFilter = studentsToFilter.filter(student => student.status === 'Não Homologado');
+    }
+    
+    // Filter by search term
+    if (searchTerm) {
+        const lowerCaseSearch = searchTerm.toLowerCase();
+        studentsToFilter = studentsToFilter.filter(student => 
+            student.name.toLowerCase().includes(lowerCaseSearch) ||
+            student.ra.toLowerCase().includes(lowerCaseSearch) ||
+            student.cpf.toLowerCase().includes(lowerCaseSearch)
+        );
+    }
+
+    return studentsToFilter;
+  }, [allStudents, searchTerm, activeTab]);
 
 
   useEffect(() => {
@@ -845,7 +852,7 @@ export default function StudentsPage() {
     setCurrentPage(1);
     setLastVisible(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, schoolTypeFilter]);
+  }, [schoolTypeFilter]);
   
   const handleOpenProfileDialog = (student: Student, editMode: boolean) => {
     setActiveStudent(student);
@@ -934,10 +941,9 @@ export default function StudentsPage() {
   }
 
   const handlePreviousPage = () => {
-    // A proper "previous" is complex without storing all previous cursors.
-    // For now, we go back to the start. A more robust solution might be needed for large datasets.
     fetchStudents('new'); 
     setCurrentPage(1);
+    setLastVisible(null);
   }
 
   return (
