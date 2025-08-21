@@ -169,10 +169,16 @@ function StudentProfileDialog({
             snapshot.forEach(doc => {
                 const data = decryptObjectValues(doc.data()) as any;
                 if(data && data.studentId === student.id){
+                    let createdAt = data.createdAt;
+                    // Ensure createdAt is a Firestore Timestamp object
+                    if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
+                        createdAt = new Timestamp(createdAt.seconds, createdAt.nanoseconds);
+                    }
+                    
                     studentRequests.push({
                         id: doc.id,
                         studentId: data.studentId,
-                        createdAt: data.createdAt,
+                        createdAt: createdAt,
                         type: data.type,
                         status: data.status,
                         executor: data.executor,
@@ -189,12 +195,13 @@ function StudentProfileDialog({
   }, [isOpen, student]);
   
   const availableYears = useMemo(() => {
-      const years = new Set(requests.map(r => r.createdAt.toDate().getFullYear()));
+      const years = new Set(requests.map(r => r.createdAt instanceof Timestamp ? r.createdAt.toDate().getFullYear() : new Date().getFullYear()));
       return Array.from(years).sort((a,b) => b - a);
   }, [requests]);
   
   const filteredRequests = useMemo(() => {
       return requests.filter(r => {
+          if (!(r.createdAt instanceof Timestamp)) return false;
           const yearMatch = yearFilter === 'all' || r.createdAt.toDate().getFullYear().toString() === yearFilter;
           const typeMatch = typeFilter === 'all' || r.type === typeFilter;
           return yearMatch && typeMatch;
@@ -1276,3 +1283,4 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
