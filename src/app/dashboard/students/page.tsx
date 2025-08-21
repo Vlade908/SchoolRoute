@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Check,
   ChevronsUpDown,
-  DropdownMenuContent
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -29,6 +28,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuContent,
 } from '@/components/ui/dropdown-menu';
 import {
   Table,
@@ -206,7 +206,7 @@ function StudentProfileDialog({
           }
           return null;
         })
-        .filter((year): year is number => year !== null)
+        .filter((year): year is number => year !== null && !isNaN(year))
     );
     return Array.from(years).sort((a, b) => b - a);
   }, [requests]);
