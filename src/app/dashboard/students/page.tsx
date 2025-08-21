@@ -10,7 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  DropdownMenuContent
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -23,7 +24,6 @@ import {
 } from '@/components/ui/card';
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,

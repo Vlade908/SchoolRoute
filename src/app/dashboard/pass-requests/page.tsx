@@ -54,14 +54,13 @@ export default function PassRequestsPage() {
             setLoading(true);
             try {
                 // Fetch all schools for the filter
-                if (user.role >= 3) {
-                    const schoolsSnapshot = await getDocs(collection(db, 'schools'));
-                    const schoolsData: School[] = schoolsSnapshot.docs.map(doc => {
-                        const data = decryptObjectValues(doc.data()) as any;
-                        return { id: doc.id, name: data.name };
-                    });
-                    setSchools(schoolsData);
-                }
+                const schoolsSnapshot = await getDocs(collection(db, 'schools'));
+                const schoolsData: School[] = schoolsSnapshot.docs.map(doc => {
+                    const data = decryptObjectValues(doc.data()) as any;
+                    return { id: doc.id, name: data.name };
+                });
+                setSchools(schoolsData);
+
 
                 // Fetch all students
                 const studentsRef = collection(db, "students");
@@ -74,7 +73,7 @@ export default function PassRequestsPage() {
                     if (decryptedData) {
                         studentData.push({
                             id: doc.id,
-                            uid: decryptedData.uid, // Make sure to get the UID
+                            uid: decryptedData.uid, 
                             name: decryptedData.name,
                             ra: decryptedData.ra,
                             cpf: decryptedData.cpf,
@@ -144,15 +143,21 @@ export default function PassRequestsPage() {
 
     const handleSubmitRequest = async () => {
         if (!user || selectedStudents.length === 0) return;
-
+    
         try {
             setLoading(true);
             const selectedStudentData = allStudents.filter(s => selectedStudents.includes(s.id));
             
             for (const student of selectedStudentData) {
-                 const school = schools.find(s => s.id === student.schoolId) || { name: 'N/A' };
+                 const school = schools.find(s => s.id === student.schoolId);
+                 if (!school) {
+                     console.warn(`Escola com ID ${student.schoolId} não encontrada para o aluno ${student.name}. Pulando.`);
+                     continue; 
+                 }
+
                  const requestData = {
                     studentName: student.name,
+                    studentId: student.id,
                     ra: student.ra,
                     schoolId: student.schoolId,
                     school: school.name,
@@ -161,15 +166,17 @@ export default function PassRequestsPage() {
                     requesterName: user.name,
                     createdAt: serverTimestamp(),
                     type: 'Passe Escolar',
-                    distance: 'N/A', // Or calculate if needed
+                    distance: 'N/A',
                  };
+
                  const encryptedRequest = encryptObjectValues(requestData);
+                 
                  await addDoc(collection(db, "transport-requests"), {
                     ...encryptedRequest,
                     studentUid: student.id 
                  });
             }
-
+    
             toast({
                 title: "Solicitação Enviada!",
                 description: `Solicitação para ${selectedStudents.length} aluno(s) foi enviada com sucesso.`
