@@ -152,7 +152,6 @@ export default function PassRequestsPage() {
             for (const student of selectedStudentData) {
                  const school = schools.find(s => s.id === student.schoolId) || { name: 'N/A' };
                  const requestData = {
-                    studentId: student.id, // Keep the document ID if needed
                     studentName: student.name,
                     ra: student.ra,
                     schoolId: student.schoolId,
