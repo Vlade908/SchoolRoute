@@ -292,6 +292,21 @@ function StudentProfileDialog({
     setEditedStudent(prev => prev ? ({ ...prev, className: className }) : null);
   }
 
+  const formatRequestDate = (timestamp: Timestamp | undefined) => {
+    if (!timestamp) return '—';
+    
+    let date: Date;
+    if (timestamp.seconds && typeof timestamp.toDate !== 'function') {
+        date = new Timestamp(timestamp.seconds, timestamp.nanoseconds).toDate();
+    } else if (timestamp.toDate) {
+        date = timestamp.toDate();
+    } else {
+        return 'Data inválida';
+    }
+
+    return date.toLocaleDateString('pt-BR');
+  }
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -534,8 +549,8 @@ function StudentProfileDialog({
                                 ) : filteredRequests.length > 0 ? (
                                     filteredRequests.map(req => (
                                         <TableRow key={req.id}>
-                                            <TableCell>{req.createdAt.toDate().toLocaleDateString('pt-BR')}</TableCell>
-                                            <TableCell>{req.updatedAt ? req.updatedAt.toDate().toLocaleDateString('pt-BR') : '—'}</TableCell>
+                                            <TableCell>{formatRequestDate(req.createdAt)}</TableCell>
+                                            <TableCell>{formatRequestDate(req.updatedAt)}</TableCell>
                                             <TableCell>{req.type}</TableCell>
                                             <TableCell>
                                                 <Badge 
@@ -1309,4 +1324,3 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
-

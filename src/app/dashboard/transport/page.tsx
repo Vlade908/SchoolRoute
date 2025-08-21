@@ -93,15 +93,18 @@ function ApprovalRequestDialog({ request, isOpen, onOpenChange, onSave }: { requ
     
     const formatDate = (timestamp: Timestamp | undefined) => {
         if (!timestamp) return 'N/A';
+        
+        let date: Date;
         // Firestore Timestamps lose their methods when serialized, so we reconstruct if necessary.
         if (timestamp.seconds && typeof timestamp.toDate !== 'function') {
-            return new Timestamp(timestamp.seconds, timestamp.nanoseconds).toDate().toLocaleDateString('pt-BR', {
-                 day: '2-digit',
-                 month: '2-digit',
-                 year: 'numeric'
-            });
+            date = new Timestamp(timestamp.seconds, timestamp.nanoseconds).toDate();
+        } else if (timestamp.toDate) {
+            date = timestamp.toDate();
+        } else {
+            return 'Data inválida';
         }
-        return timestamp.toDate().toLocaleDateString('pt-BR', {
+
+        return date.toLocaleDateString('pt-BR', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
