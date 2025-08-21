@@ -163,42 +163,46 @@ function StudentProfileDialog({
   
   useEffect(() => {
     if (isOpen && student?.id) {
-      setLoadingRequests(true);
-      const requestsRef = collection(db, "transport-requests");
-      const q = query(requestsRef, where("studentUid", "==", student.id));
+        setLoadingRequests(true);
+        const requestsRef = collection(db, "transport-requests");
+        const q = query(requestsRef, where("studentUid", "==", student.id));
 
-      getDocs(q).then((snapshot) => {
-          const studentRequests: TransportRequest[] = [];
-          snapshot.forEach((doc) => {
-            const data = decryptObjectValues(doc.data());
-            if (data) {
-              
-              // Ensure Timestamps are correctly hydrated
-              if (data.createdAt && typeof data.createdAt.seconds === 'number') {
-                  data.createdAt = new Timestamp(data.createdAt.seconds, data.createdAt.nanoseconds);
-              }
-              if (data.updatedAt && typeof data.updatedAt.seconds === 'number') {
-                  data.updatedAt = new Timestamp(data.updatedAt.seconds, data.updatedAt.nanoseconds);
-              }
+        getDocs(q).then((snapshot) => {
+            const studentRequests: TransportRequest[] = [];
+            snapshot.forEach((doc) => {
+                const data = decryptObjectValues(doc.data());
+                if (data) {
+                    // Ensure Timestamps are correctly hydrated
+                    if (data.createdAt && typeof data.createdAt.seconds === 'number') {
+                        data.createdAt = new Timestamp(data.createdAt.seconds, data.createdAt.nanoseconds);
+                    }
+                    if (data.updatedAt && typeof data.updatedAt.seconds === 'number') {
+                        data.updatedAt = new Timestamp(data.updatedAt.seconds, data.updatedAt.nanoseconds);
+                    }
 
-              studentRequests.push({
-                id: doc.id,
-                ...data,
-              } as TransportRequest);
-            }
-          });
-          setRequests(studentRequests.sort((a, b) => {
+                    studentRequests.push({
+                        id: doc.id,
+                        ...data,
+                    } as TransportRequest);
+                }
+            });
+            
+            studentRequests.sort((a, b) => {
               const timeA = a.createdAt?.toMillis() || 0;
               const timeB = b.createdAt?.toMillis() || 0;
               return timeB - timeA;
-          }));
+            });
+
+            setRequests(studentRequests);
+
         }).catch((err) => {
-          console.error("Error fetching requests: ", err);
+            console.error("Error fetching requests: ", err);
         }).finally(() => {
-          setLoadingRequests(false);
+            setLoadingRequests(false);
         });
     }
-  }, [isOpen, student?.id]);
+}, [isOpen, student?.id]);
+
   
   const availableYears = useMemo(() => {
     const years = new Set(
@@ -630,6 +634,7 @@ function StudentProfileDialog({
 
 function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Student, 'id' | 'enrollmentDate' | 'status'>) => void, onOpenChange: (open: boolean) => void }) {
   const { user } = useUser();
+  const { toast } = useToast();
   const [studentData, setStudentData] = useState({
     name: '', cpf: '', ra: '', rg: '', grade: '', className: '', classPeriod: '', responsibleName: '', contactEmail: '', contactPhone: '', address: '', schoolId: '', schoolName: '', rgIssueDate: '', hasPass: 'Não' as 'Sim' | 'Não', souCardNumber: '', uid: ''
   });
@@ -785,7 +790,11 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
 
     for (const key in dataToValidate) {
         if (dataToValidate[key as keyof typeof dataToValidate] === '') {
-            alert(`Por favor, preencha o campo: ${key}`);
+            toast({
+              variant: 'destructive',
+              title: 'Campo Obrigatório',
+              description: `Por favor, preencha o campo: ${key}`
+            });
             return;
         }
     }
@@ -963,7 +972,8 @@ export default function StudentsPage() {
             if (decryptedData) {
               let enrollmentDateStr = 'N/A';
               if (decryptedData.enrollmentDate?.seconds) {
-                  enrollmentDateStr = new Timestamp(decryptedData.enrollmentDate.seconds, decryptedData.enrollmentDate.nanoseconds).toDate().toLocaleDateString('pt-BR');
+                  decryptedData.enrollmentDate = new Timestamp(decryptedData.enrollmentDate.seconds, decryptedData.enrollmentDate.nanoseconds);
+                  enrollmentDateStr = decryptedData.enrollmentDate.toDate().toLocaleDateString('pt-BR');
               }
               fetchedStudents.push({
                   id: docSnap.id,
@@ -1330,3 +1340,4 @@ export default function StudentsPage() {
     
 
     
+
