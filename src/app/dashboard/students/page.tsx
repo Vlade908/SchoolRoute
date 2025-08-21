@@ -750,6 +750,7 @@ export default function StudentsPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [activeStudent, setActiveStudent] = useState<Student | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isProfileDialogOpen, setProfileDialogOpen] = useState(false);
@@ -770,7 +771,7 @@ export default function StudentsPage() {
   
   const totalPages = Math.ceil(totalStudents / itemsPerPage);
 
-  const fetchStudents = useCallback(async (direction: 'next' | 'prev' | 'new' = 'new', page: number = 1) => {
+  const fetchStudents = useCallback(async (direction: 'next' | 'prev' | 'new' = 'new') => {
     setLoading(true);
     try {
         const studentsRef = collection(db, "students");
@@ -792,74 +793,32 @@ export default function StudentsPage() {
           baseQueries.push(where("schoolType", "in", schoolTypeClauses));
         }
 
-        let finalStudents: Student[] = [];
-        let documentSnapshots;
-
-        // If searchTerm exists, we perform a more specific query.
-        // As we cannot use different inequality filters on multiple fields, 
-        // we will check for RA or CPF. Name search will be client-side for now.
-        if (searchTerm) {
-            const raQuery = query(studentsRef, ...baseQueries, where("ra", "==", searchTerm));
-            const cpfQuery = query(studentsRef, ...baseQueries, where("cpf", "==", searchTerm));
-            
-            const [raSnapshot, cpfSnapshot] = await Promise.all([getDocs(raQuery), getDocs(cpfQuery)]);
-            
-            const studentMap = new Map<string, Student>();
-            
-            const processSnapshot = (snapshot: any) => {
-                 snapshot.forEach((docSnap: any) => {
-                    const decryptedData = decryptObjectValues(docSnap.data()) as any;
-                    if(decryptedData) {
-                        let enrollmentDateStr = 'N/A';
-                        if (decryptedData.enrollmentDate?.seconds) {
-                            enrollmentDateStr = new Timestamp(decryptedData.enrollmentDate.seconds, decryptedData.enrollmentDate.nanoseconds).toDate().toLocaleDateString('pt-BR');
-                        }
-                        const student: Student = {
-                            id: docSnap.id,
-                            ...decryptedData,
-                            enrollmentDate: enrollmentDateStr,
-                        };
-                        studentMap.set(docSnap.id, student);
-                    }
-                 });
-            }
-
-            processSnapshot(raSnapshot);
-            processSnapshot(cpfSnapshot);
-            finalStudents = Array.from(studentMap.values());
-            setTotalStudents(finalStudents.length);
-            setLastVisible(null); // No pagination for specific search
-
-        } else {
-            // General pagination and filtering
-            let q = query(studentsRef, ...baseQueries, orderBy("name"), limit(itemsPerPage));
-            if(direction === 'next' && lastVisible) {
-              q = query(studentsRef, ...baseQueries, orderBy("name"), startAfter(lastVisible), limit(itemsPerPage));
-            }
-            
-            documentSnapshots = await getDocs(q);
-            finalStudents = documentSnapshots.docs.map(docSnap => {
-                const decryptedData = decryptObjectValues(docSnap.data()) as any;
-                let enrollmentDateStr = 'N/A';
-                if (decryptedData.enrollmentDate?.seconds) {
-                    enrollmentDateStr = new Timestamp(decryptedData.enrollmentDate.seconds, decryptedData.enrollmentDate.nanoseconds).toDate().toLocaleDateString('pt-BR');
-                }
-                return {
-                    id: docSnap.id,
-                    ...decryptedData,
-                    enrollmentDate: enrollmentDateStr,
-                } as Student;
-            });
-            
-            setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
-
-            // Get total count for pagination
-            const countQuery = query(studentsRef, ...baseQueries);
-            const countSnapshot = await getCountFromServer(countQuery);
-            setTotalStudents(countSnapshot.data().count);
+        let q = query(studentsRef, ...baseQueries, limit(itemsPerPage));
+        if (direction === 'next' && lastVisible) {
+          q = query(studentsRef, ...baseQueries, startAfter(lastVisible), limit(itemsPerPage));
         }
+        
+        const documentSnapshots = await getDocs(q);
+        const fetchedStudents = documentSnapshots.docs.map(docSnap => {
+            const decryptedData = decryptObjectValues(docSnap.data()) as any;
+            let enrollmentDateStr = 'N/A';
+            if (decryptedData.enrollmentDate?.seconds) {
+                enrollmentDateStr = new Timestamp(decryptedData.enrollmentDate.seconds, decryptedData.enrollmentDate.nanoseconds).toDate().toLocaleDateString('pt-BR');
+            }
+            return {
+                id: docSnap.id,
+                ...decryptedData,
+                enrollmentDate: enrollmentDateStr,
+            } as Student;
+        });
+        
+        setAllStudents(fetchedStudents);
+        setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
 
-        setStudents(finalStudents);
+        // Get total count for pagination
+        const countQuery = query(studentsRef, ...baseQueries);
+        const countSnapshot = await getCountFromServer(countQuery);
+        setTotalStudents(countSnapshot.data().count);
 
     } catch (error) {
         console.error("Error fetching students:", error);
@@ -867,21 +826,26 @@ export default function StudentsPage() {
     } finally {
         setLoading(false);
     }
-  }, [activeTab, schoolTypeFilter, toast, lastVisible, searchTerm]);
+  }, [activeTab, schoolTypeFilter, toast, lastVisible]);
   
-  const clientSideFilteredStudents = useMemo(() => {
-    if (!searchTerm) return students;
-    // Client-side search for name, as server-side is complex with encryption
-    return students.filter(student => student.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [students, searchTerm]);
+  const filteredStudents = useMemo(() => {
+    if (!searchTerm) return allStudents;
+
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    return allStudents.filter(student => 
+        student.name.toLowerCase().includes(lowerCaseSearch) ||
+        student.ra.toLowerCase().includes(lowerCaseSearch) ||
+        student.cpf.toLowerCase().includes(lowerCaseSearch)
+    );
+  }, [allStudents, searchTerm]);
 
 
   useEffect(() => {
-    fetchStudents('new', 1);
+    fetchStudents('new');
     setCurrentPage(1);
     setLastVisible(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, schoolTypeFilter, searchTerm]); // re-fetch when filters change
+  }, [activeTab, schoolTypeFilter]);
   
   const handleOpenProfileDialog = (student: Student, editMode: boolean) => {
     setActiveStudent(student);
@@ -956,7 +920,6 @@ export default function StudentsPage() {
   
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    setSearchTerm(''); // Reset search on tab change
   }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -965,18 +928,16 @@ export default function StudentsPage() {
   
   const handleNextPage = () => {
     if (currentPage < totalPages) {
-      fetchStudents('next', currentPage + 1);
+      fetchStudents('next');
       setCurrentPage(prev => prev + 1);
     }
   }
 
   const handlePreviousPage = () => {
-    if (currentPage > 1) {
-       // This is a simplified "previous". A full implementation is more complex.
-       // We'll refetch from the beginning.
-       fetchStudents('new', 1); 
-       setCurrentPage(1);
-    }
+    // A proper "previous" is complex without storing all previous cursors.
+    // For now, we go back to the start. A more robust solution might be needed for large datasets.
+    fetchStudents('new'); 
+    setCurrentPage(1);
   }
 
   return (
@@ -1078,8 +1039,8 @@ export default function StudentsPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow><TableCell colSpan={7} className="text-center">Carregando...</TableCell></TableRow>
-                  ) : clientSideFilteredStudents.length > 0 ? (
-                    clientSideFilteredStudents.map((student) => (
+                  ) : filteredStudents.length > 0 ? (
+                    filteredStudents.map((student) => (
                       <TableRow key={student.id}>
                           <TableCell className="font-medium">{student.name}</TableCell>
                           <TableCell>
@@ -1126,7 +1087,7 @@ export default function StudentsPage() {
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
-                Mostrando <strong>{clientSideFilteredStudents.length}</strong> de <strong>{totalStudents}</strong> alunos.
+                Mostrando <strong>{filteredStudents.length}</strong> de <strong>{totalStudents}</strong> alunos.
             </div>
             <div className="ml-auto flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
@@ -1136,7 +1097,7 @@ export default function StudentsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handlePreviousPage}
-                    disabled={currentPage === 1 || !!searchTerm}
+                    disabled={currentPage === 1}
                 >
                     <ChevronLeft className="h-4 w-4" />
                     Anterior
@@ -1145,7 +1106,7 @@ export default function StudentsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleNextPage}
-                    disabled={currentPage === totalPages || !!searchTerm}
+                    disabled={currentPage === totalPages || !lastVisible}
                 >
                     Próxima
                     <ChevronRight className="h-4 w-4" />
@@ -1166,5 +1127,3 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
-
-    
