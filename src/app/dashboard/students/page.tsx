@@ -755,13 +755,12 @@ export default function StudentsPage() {
   const [isProfileDialogOpen, setProfileDialogOpen] = useState(false);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [schools, setSchools] = useState<School[]>([]);
 
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [schoolTypeFilter, setSchoolTypeFilter] = useState({
-    estaduais: true,
-    municipais: true,
-  });
+  const [schoolFilter, setSchoolFilter] = useState('all');
+
   
   const [lastVisible, setLastVisible] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -770,28 +769,26 @@ export default function StudentsPage() {
   
   const totalPages = Math.ceil(totalStudents / itemsPerPage);
 
-  const fetchStudents = useCallback(async (direction: 'next' | 'prev' | 'new' = 'new') => {
+  const fetchStudents = useCallback(async (options: { newQuery?: boolean } = {}) => {
     setLoading(true);
     try {
         const studentsRef = collection(db, "students");
         
-        let baseQueries: QueryConstraint[] = [];
+        let constraints: QueryConstraint[] = [];
+        
+        const schoolId = user?.role === 3 ? schoolFilter : user?.schoolId;
 
-        let schoolTypeClauses = [];
-        if (schoolTypeFilter.estaduais) schoolTypeClauses.push("ESTADUAL");
-        if (schoolTypeFilter.municipais) {
-          schoolTypeClauses.push("MUNICIPAL");
-          schoolTypeClauses.push("MUNICIPALIZADA");
-        }
-        if(schoolTypeClauses.length > 0 && schoolTypeClauses.length < 3) {
-          baseQueries.push(where("schoolType", "in", schoolTypeClauses));
+        if (schoolId && schoolId !== 'all') {
+            constraints.push(where("schoolId", "==", schoolId));
         }
 
-        let q = query(studentsRef, ...baseQueries, limit(itemsPerPage));
-
-        if (direction === 'next' && lastVisible) {
-          q = query(studentsRef, ...baseQueries, startAfter(lastVisible), limit(itemsPerPage));
+        if (!options.newQuery && lastVisible) {
+            constraints.push(startAfter(lastVisible));
         }
+        
+        constraints.push(limit(itemsPerPage));
+
+        const q = query(studentsRef, ...constraints);
         
         const documentSnapshots = await getDocs(q);
         const fetchedStudents = documentSnapshots.docs.map(docSnap => {
@@ -806,12 +803,19 @@ export default function StudentsPage() {
                 enrollmentDate: enrollmentDateStr,
             } as Student;
         });
+
+        if (options.newQuery) {
+            setAllStudents(fetchedStudents);
+            setCurrentPage(1);
+        } else {
+            setAllStudents(prev => [...prev, ...fetchedStudents]);
+        }
         
-        setAllStudents(fetchedStudents);
         setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
 
         // Get total count for pagination
-        const countQuery = query(collection(db, "students"), ...baseQueries);
+        const countQueryConstraints = schoolId && schoolId !== 'all' ? [where("schoolId", "==", schoolId)] : [];
+        const countQuery = query(collection(db, "students"), ...countQueryConstraints);
         const countSnapshot = await getCountFromServer(countQuery);
         setTotalStudents(countSnapshot.data().count);
 
@@ -821,8 +825,23 @@ export default function StudentsPage() {
     } finally {
         setLoading(false);
     }
-  }, [toast, lastVisible, schoolTypeFilter]);
+  }, [toast, lastVisible, schoolFilter, user]);
   
+  useEffect(() => {
+    if (user?.role === 3) {
+      const fetchSchools = async () => {
+        const schoolsCollection = collection(db, 'schools');
+        const snapshot = await getDocs(query(schoolsCollection, orderBy('name')));
+        const schoolsData: School[] = snapshot.docs.map(doc => {
+             const decryptedData = decryptObjectValues(doc.data()) as any;
+             return { id: doc.id, name: decryptedData.name };
+        });
+        setSchools(schoolsData);
+      };
+      fetchSchools();
+    }
+  }, [user]);
+
   const filteredStudents = useMemo(() => {
     let studentsToFilter = allStudents;
 
@@ -838,8 +857,8 @@ export default function StudentsPage() {
         const lowerCaseSearch = searchTerm.toLowerCase();
         studentsToFilter = studentsToFilter.filter(student => 
             student.name.toLowerCase().includes(lowerCaseSearch) ||
-            student.ra.toLowerCase().includes(lowerCaseSearch) ||
-            student.cpf.toLowerCase().includes(lowerCaseSearch)
+            (student.ra && student.ra.toLowerCase().includes(lowerCaseSearch)) ||
+            (student.cpf && student.cpf.toLowerCase().includes(lowerCaseSearch))
         );
     }
 
@@ -848,11 +867,9 @@ export default function StudentsPage() {
 
 
   useEffect(() => {
-    fetchStudents('new');
-    setCurrentPage(1);
-    setLastVisible(null);
+    fetchStudents({ newQuery: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schoolTypeFilter]);
+  }, [schoolFilter]);
   
   const handleOpenProfileDialog = (student: Student, editMode: boolean) => {
     setActiveStudent(student);
@@ -878,7 +895,7 @@ export default function StudentsPage() {
         const encryptedStudent = encryptObjectValues(dataToUpdate);
         await updateDoc(studentDocRef, encryptedStudent);
         toast({ title: "Sucesso!", description: "Aluno atualizado." });
-        fetchStudents('new');
+        fetchStudents({ newQuery: true });
     } catch(error) {
         console.error("Error updating student:", error);
         toast({ variant: 'destructive', title: "Erro!", description: "Não foi possível atualizar o aluno." });
@@ -901,7 +918,7 @@ export default function StudentsPage() {
         const encryptedStudent = encryptObjectValues(studentToAdd);
         await addDoc(collection(db, "students"), encryptedStudent);
         toast({ title: "Sucesso!", description: "Aluno cadastrado." });
-        fetchStudents('new');
+        fetchStudents({ newQuery: true });
     } catch(error) {
         console.error("Error adding student:", error);
         toast({ variant: 'destructive', title: "Erro!", description: "Não foi possível cadastrar o aluno." });
@@ -914,17 +931,13 @@ export default function StudentsPage() {
     try {
       await deleteDoc(doc(db, "students", studentId));
       toast({ title: "Sucesso!", description: "Aluno excluído." });
-      fetchStudents('new');
+      fetchStudents({ newQuery: true });
     } catch (error) {
       console.error("Error deleting student: ", error);
       toast({ variant: "destructive", title: "Erro!", description: "Não foi possível excluir o aluno." });
     }
   }
 
-  const handleSchoolTypeChange = (type: 'estaduais' | 'municipais', checked: boolean) => {
-    setSchoolTypeFilter(prev => ({ ...prev, [type]: checked }));
-  }
-  
   const handleTabChange = (value: string) => {
     setActiveTab(value);
   }
@@ -934,16 +947,16 @@ export default function StudentsPage() {
   };
   
   const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      fetchStudents('next');
+    if ((currentPage * itemsPerPage) < totalStudents) {
+      fetchStudents({});
       setCurrentPage(prev => prev + 1);
     }
   }
 
   const handlePreviousPage = () => {
-    fetchStudents('new'); 
-    setCurrentPage(1);
-    setLastVisible(null);
+     // This is a simplified previous page, it just resets to the first page.
+     // A true "prev" would require more complex cursor management.
+    fetchStudents({ newQuery: true });
   }
 
   return (
@@ -965,32 +978,37 @@ export default function StudentsPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-10 gap-1">
-                <ListFilter className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Filtro
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Filtrar por tipo de escola</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem 
-                checked={schoolTypeFilter.estaduais}
-                onCheckedChange={(checked) => handleSchoolTypeChange('estaduais', !!checked)}
-              >
-                Estaduais
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem 
-                checked={schoolTypeFilter.municipais}
-                onCheckedChange={(checked) => handleSchoolTypeChange('municipais', !!checked)}
-              >
-                Municipais
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {user?.role === 3 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-10 gap-1">
+                  <ListFilter className="h-3.5 w-3.5" />
+                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                    Escola
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Filtrar por escola</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem 
+                  checked={schoolFilter === 'all'}
+                  onCheckedChange={() => setSchoolFilter('all')}
+                >
+                  Todas as escolas
+                </DropdownMenuCheckboxItem>
+                {schools.map(school => (
+                   <DropdownMenuCheckboxItem 
+                    key={school.id}
+                    checked={schoolFilter === school.id}
+                    onCheckedChange={() => setSchoolFilter(school.id)}
+                  >
+                    {school.name}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button size="sm" variant="outline" className="h-10 gap-1">
             <File className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-rap">
@@ -1043,7 +1061,7 @@ export default function StudentsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loading ? (
+                  {loading && allStudents.length === 0 ? (
                     <TableRow><TableCell colSpan={7} className="text-center">Carregando...</TableCell></TableRow>
                   ) : filteredStudents.length > 0 ? (
                     filteredStudents.map((student) => (
@@ -1112,7 +1130,7 @@ export default function StudentsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleNextPage}
-                    disabled={currentPage === totalPages || !lastVisible}
+                    disabled={!lastVisible || (currentPage * itemsPerPage) >= totalStudents}
                 >
                     Próxima
                     <ChevronRight className="h-4 w-4" />
@@ -1133,3 +1151,4 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
+
