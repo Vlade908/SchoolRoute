@@ -167,7 +167,7 @@ export default function PassRequestsPage() {
                  const encryptedRequest = encryptObjectValues(requestData);
                  await addDoc(collection(db, "transport-requests"), {
                     ...encryptedRequest,
-                    studentUid: student.uid // Use student's auth UID for querying
+                    studentUid: student.id 
                  });
             }
 

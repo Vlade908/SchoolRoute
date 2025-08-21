@@ -160,16 +160,15 @@ function StudentProfileDialog({
   }, [isOpen, student]);
   
   useEffect(() => {
-    if(isOpen && student?.uid) {
+    if(isOpen && student?.id) {
         setLoadingRequests(true);
         const requestsRef = collection(db, "transport-requests");
-        // This query now uses the student's auth UID
-        const q = query(requestsRef, where("studentUid", "==", student.uid));
+        const q = query(requestsRef, where("studentUid", "==", student.id));
 
         getDocs(q).then(snapshot => {
             const studentRequests: TransportRequest[] = [];
             snapshot.forEach(doc => {
-                const data = decryptObjectValues(doc.data()) as any;
+                const data = decryptObjectValues(doc.data());
                 if(data){
                     let createdAt = data.createdAt;
                     if (createdAt && typeof createdAt.seconds === 'number' && typeof createdAt.nanoseconds === 'number' && !(createdAt instanceof Timestamp)) {
@@ -185,7 +184,7 @@ function StudentProfileDialog({
                         type: data.type,
                         status: data.status,
                         executor: data.executor,
-                    });
+                    } as TransportRequest);
                 }
             });
             setRequests(studentRequests);
@@ -1301,10 +1300,3 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
-
-
-
-
-
-
-
