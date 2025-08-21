@@ -32,33 +32,42 @@ import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
 
-const requests = [
-  { id: 'REQ001', studentName: 'João Pereira', ra: 'RA2024001', type: 'Passe Escolar', status: 'Pendente', school: 'Escola Estadual A', distance: '3.2 km' },
-  { id: 'REQ002', studentName: 'Mariana Costa', ra: 'RA2024002', type: 'Passe Escolar', status: 'Aprovado', school: 'Escola Municipal B', distance: '5.1 km' },
-  { id: 'REQ003', studentName: 'Lucas Martins', ra: 'RA2024003', type: 'Passe Escolar', status: 'Pendente', school: 'Escola Municipalizada C', distance: '1.8 km' },
-  { id: 'REQ004', studentName: 'Sofia Almeida', ra: 'RA2024004', type: 'Passe Escolar', status: 'Aprovado', school: 'Escola Estadual A', distance: '7.5 km' },
-];
+type TransportRequest = {
+    id: string;
+    studentName: string;
+    ra: string;
+    type: string;
+    status: 'Pendente' | 'Aprovado' | 'Reprovado';
+    school: string;
+    distance: string;
+    approvalStatus?: 'aguardando' | 'aprovado' | 'reprovado';
+    executor?: 'emtu' | 'municipio' | 'de' | 'fde' | '';
+    hasAgreement?: 'sim' | 'nao';
+    rejectionReason?: string;
+};
 
-function ApprovalRequestDialog({ request, isOpen, onOpenChange }: { request: typeof requests[0], isOpen: boolean, onOpenChange: (open: boolean) => void }) {
-    const [approvalStatus, setApprovalStatus] = useState<'aguardando' | 'aprovado' | 'reprovado'>('aguardando');
-    const [executor, setExecutor] = useState('');
-    const [hasAgreement, setHasAgreement] = useState('');
-    const [rejectionReason, setRejectionReason] = useState('');
-    const { toast } = useToast();
+
+function ApprovalRequestDialog({ request, isOpen, onOpenChange, onSave }: { request: TransportRequest, isOpen: boolean, onOpenChange: (open: boolean) => void, onSave: (updatedRequest: Partial<TransportRequest>) => void }) {
+    const [approvalStatus, setApprovalStatus] = useState<'aguardando' | 'aprovado' | 'reprovado'>(request.approvalStatus || 'aguardando');
+    const [executor, setExecutor] = useState<'emtu' | 'municipio' | 'de' | 'fde' | ''>(request.executor || '');
+    const [hasAgreement, setHasAgreement] = useState<'sim' | 'nao'>(request.hasAgreement || 'nao');
+    const [rejectionReason, setRejectionReason] = useState(request.rejectionReason || '');
     
     useEffect(() => {
-        // Reset state when a new request is viewed
         if (isOpen) {
-            setApprovalStatus('aguardando');
-            setExecutor('');
-            setHasAgreement('');
-            setRejectionReason('');
+            setApprovalStatus(request.approvalStatus || 'aguardando');
+            setExecutor(request.executor || '');
+            setHasAgreement(request.hasAgreement || 'nao');
+            setRejectionReason(request.rejectionReason || '');
         }
     }, [isOpen, request]);
 
-    const handleExecutorChange = (value: string) => {
+    const handleExecutorChange = (value: 'emtu' | 'municipio' | 'de' | 'fde' | '') => {
         setExecutor(value);
         if (value === 'emtu') {
             setHasAgreement('sim');
@@ -68,19 +77,15 @@ function ApprovalRequestDialog({ request, isOpen, onOpenChange }: { request: typ
     }
     
     const handleSaveChanges = () => {
-        // Here you would typically save the data to your backend
-        console.log({
-            requestId: request.id,
-            approvalStatus,
-            executor,
-            hasAgreement,
-            rejectionReason
-        });
-        toast({
-            title: "Alterações Salvas!",
-            description: `A solicitação de ${request.studentName} foi atualizada.`,
-        });
-        onOpenChange(false);
+        const finalStatus = approvalStatus === 'aprovado' ? 'Aprovado' : approvalStatus === 'reprovado' ? 'Reprovado' : 'Pendente';
+        const updatedRequestData: Partial<TransportRequest> = {
+            status: finalStatus,
+            approvalStatus: approvalStatus,
+            executor: approvalStatus === 'aprovado' ? executor : '',
+            hasAgreement: approvalStatus === 'aprovado' ? hasAgreement : 'nao',
+            rejectionReason: approvalStatus === 'reprovado' ? rejectionReason : '',
+        };
+       onSave(updatedRequestData);
     }
 
     return (
@@ -99,7 +104,7 @@ function ApprovalRequestDialog({ request, isOpen, onOpenChange }: { request: typ
                         <p><span className="font-semibold">RA:</span> {request.ra}</p>
                         <p><span className="font-semibold">Escola:</span> {request.school}</p>
                         <div>
-                            <span className="font-semibold">Status Atual:</span> <Badge>{request.status}</Badge>
+                           <span className="font-semibold">Status Atual:</span> <Badge variant={request.status === 'Aprovado' ? 'default' : request.status === 'Pendente' ? 'secondary' : 'destructive'}>{request.status}</Badge>
                         </div>
                     </CardContent>
                 </Card>
@@ -172,7 +177,9 @@ function ApprovalRequestDialog({ request, isOpen, onOpenChange }: { request: typ
 export default function TransportPage() {
   const { user, loading } = useUser();
   const router = useRouter();
-  const [selectedRequest, setSelectedRequest] = useState<typeof requests[0] | null>(null);
+  const { toast } = useToast();
+  const [requests, setRequests] = useState<TransportRequest[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<TransportRequest | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -180,14 +187,57 @@ export default function TransportPage() {
       router.push('/dashboard');
     }
   }, [user, loading, router]);
+  
+  useEffect(() => {
+      const unsubscribe = onSnapshot(collection(db, "transport-requests"), (snapshot) => {
+        const requestsData: TransportRequest[] = [];
+        snapshot.forEach((doc) => {
+            const encryptedData = doc.data();
+            const data = decryptObjectValues(encryptedData) as any;
+            if (data) {
+                requestsData.push({ id: doc.id, ...data } as TransportRequest);
+            }
+        });
+        setRequests(requestsData);
+      });
+      return () => unsubscribe();
+  }, []);
 
   if (loading || !user || user.role < 3) {
     return <p>Carregando ou acesso negado...</p>;
   }
 
-  const handleOpenDialog = (request: typeof requests[0]) => {
+  const handleOpenDialog = (request: TransportRequest) => {
     setSelectedRequest(request);
     setIsDialogOpen(true);
+  }
+  
+  const handleSaveRequest = async (updatedData: Partial<TransportRequest>) => {
+    if (!selectedRequest) return;
+    try {
+        const requestDocRef = doc(db, 'transport-requests', selectedRequest.id);
+        const requestDoc = await getDoc(requestDocRef);
+        if (!requestDoc.exists()) throw new Error("Solicitação não encontrada.");
+        
+        const currentData = decryptObjectValues(requestDoc.data());
+        if(!currentData) throw new Error("Não foi possível ler os dados da solicitação.");
+        
+        const dataToUpdate = { ...currentData, ...updatedData };
+        const encryptedUpdate = encryptObjectValues(dataToUpdate);
+        
+        await updateDoc(requestDocRef, encryptedUpdate);
+        
+        toast({
+            title: "Alterações Salvas!",
+            description: `A solicitação de ${selectedRequest.studentName} foi atualizada.`,
+        });
+    } catch (error) {
+        console.error("Error updating request:", error);
+        toast({ variant: 'destructive', title: "Erro", description: "Não foi possível salvar as alterações."});
+    } finally {
+        setIsDialogOpen(false);
+        setSelectedRequest(null);
+    }
   }
 
   return (
@@ -196,6 +246,7 @@ export default function TransportPage() {
         <TabsList>
           <TabsTrigger value="pending">Solicitações Pendentes</TabsTrigger>
           <TabsTrigger value="approved">Solicitações Aprovadas</TabsTrigger>
+          <TabsTrigger value="rejected">Solicitações Reprovadas</TabsTrigger>
         </TabsList>
       </div>
       <TabsContent value="pending">
@@ -224,7 +275,7 @@ export default function TransportPage() {
                 <TableBody>
                   {requests.filter(r => r.status === 'Pendente').map((request) => (
                       <TableRow key={request.id}>
-                        <TableCell className="font-medium">{request.id}</TableCell>
+                        <TableCell className="font-medium">{request.id.substring(0, 6)}</TableCell>
                         <TableCell>{request.studentName}</TableCell>
                         <TableCell className="hidden sm:table-cell">{request.ra}</TableCell>
                         <TableCell className="hidden md:table-cell">{request.school}</TableCell>
@@ -240,7 +291,7 @@ export default function TransportPage() {
           </CardContent>
         </Card>
       </TabsContent>
-      <TabsContent value="approved">
+       <TabsContent value="approved">
        <Card>
           <CardHeader>
             <CardTitle>Solicitações Aprovadas</CardTitle>
@@ -256,7 +307,7 @@ export default function TransportPage() {
                     <TableHead>Nº Solicitação</TableHead>
                     <TableHead>Nome do Aluno</TableHead>
                     <TableHead className="hidden sm:table-cell">RA</TableHead>
-                    <TableHead className="hidden md:table-cell">Escola</TableHead>
+                    <TableHead className="hidden md:table-cell">Executor</TableHead>
                     <TableHead>
                       <span className="sr-only">Ações</span>
                     </TableHead>
@@ -265,10 +316,50 @@ export default function TransportPage() {
                 <TableBody>
                   {requests.filter(r => r.status === 'Aprovado').map((request) => (
                       <TableRow key={request.id}>
-                        <TableCell className="font-medium">{request.id}</TableCell>
+                        <TableCell className="font-medium">{request.id.substring(0,6)}</TableCell>
                         <TableCell>{request.studentName}</TableCell>
                         <TableCell className="hidden sm:table-cell">{request.ra}</TableCell>
-                        <TableCell className="hidden md:table-cell">{request.school}</TableCell>
+                        <TableCell className="hidden md:table-cell">{request.executor?.toUpperCase()}</TableCell>
+                        <TableCell>
+                            <Button variant="outline" size="sm" onClick={() => handleOpenDialog(request)}>Ver Detalhes</Button>
+                        </TableCell>
+                      </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+       <TabsContent value="rejected">
+       <Card>
+          <CardHeader>
+            <CardTitle>Solicitações Reprovadas</CardTitle>
+            <CardDescription>
+              Lista de todas as solicitações que foram negadas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nº Solicitação</TableHead>
+                    <TableHead>Nome do Aluno</TableHead>
+                    <TableHead className="hidden sm:table-cell">RA</TableHead>
+                     <TableHead className="hidden md:table-cell">Motivo</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Ações</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requests.filter(r => r.status === 'Reprovado').map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell className="font-medium">{request.id.substring(0,6)}</TableCell>
+                        <TableCell>{request.studentName}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{request.ra}</TableCell>
+                        <TableCell className="hidden md:table-cell truncate max-w-xs">{request.rejectionReason}</TableCell>
                         <TableCell>
                             <Button variant="outline" size="sm" onClick={() => handleOpenDialog(request)}>Ver Detalhes</Button>
                         </TableCell>
@@ -281,8 +372,10 @@ export default function TransportPage() {
         </Card>
       </TabsContent>
        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          {selectedRequest && <ApprovalRequestDialog request={selectedRequest} isOpen={isDialogOpen} onOpenChange={setIsDialogOpen} />}
+          {selectedRequest && <ApprovalRequestDialog request={selectedRequest} isOpen={isDialogOpen} onOpenChange={setIsDialogOpen} onSave={handleSaveRequest} />}
       </Dialog>
     </Tabs>
   );
 }
+
+    
