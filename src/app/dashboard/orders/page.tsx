@@ -74,12 +74,12 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         const fetchStudents = async () => {
             try {
                 setLoading(true);
-                const q = query(collection(db, "students"), where("status", "==", "Homologado"));
+                const q = query(collection(db, "students"));
                 const querySnapshot = await getDocs(q);
                 const studentsData: Student[] = [];
                 querySnapshot.forEach(doc => {
                     const data = decryptObjectValues(doc.data()) as any;
-                    if(data) {
+                    if(data && data.status === 'Homologado') {
                         studentsData.push({ id: doc.id, name: data.name, cpf: data.cpf, schoolName: data.schoolName });
                     }
                 });
