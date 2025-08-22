@@ -80,7 +80,7 @@ type School = {
 };
 
 
-function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order: Omit<Order, 'id' | 'savedAt' | 'status'>) => void; isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+function GenerateOrderDialog({ onSave, isOpen, onOpenChange, selectedMonth }: { onSave: (order: Omit<Order, 'id' | 'savedAt' | 'status'>) => void; isOpen: boolean, onOpenChange: (open: boolean) => void, selectedMonth: number | null; }) {
     const { user } = useUser();
     const { toast } = useToast();
     const [allStudents, setAllStudents] = useState<Student[]>([]);
@@ -101,6 +101,12 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
         setManualOrderId('');
         setSchoolFilter('all');
     }, []);
+
+    const isNextMonth = useMemo(() => {
+        if(selectedMonth === null) return false;
+        const currentMonth = new Date().getMonth();
+        return selectedMonth > currentMonth;
+    }, [selectedMonth])
 
 
     useEffect(() => {
@@ -302,6 +308,9 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="general">Passe Geral (Alunos Homologados)</SelectItem>
+                            {!isNextMonth && (
+                                <SelectItem value="complementary">Passe Avulso/Complementar</SelectItem>
+                            )}
                         </SelectContent>
                     </Select>
                 </div>
@@ -633,7 +642,8 @@ export default function OrdersPage() {
                                 <GenerateOrderDialog 
                                     onSave={handleSaveOrder} 
                                     isOpen={isAddModalOpen} 
-                                    onOpenChange={setIsAddModalOpen} 
+                                    onOpenChange={setIsAddModalOpen}
+                                    selectedMonth={selectedMonth}
                                 />
                             </Dialog>
                         )}
