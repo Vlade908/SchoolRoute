@@ -69,7 +69,7 @@ type School = {
 };
 
 
-function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Order, 'id'>) => void; onOpenChange: (open: boolean) => void }) {
+function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order: Omit<Order, 'id'>) => void; isOpen: boolean, onOpenChange: (open: boolean) => void }) {
     const { user } = useUser();
     const { toast } = useToast();
     const [allStudents, setAllStudents] = useState<Student[]>([]);
@@ -84,6 +84,8 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
     const [manualOrderId, setManualOrderId] = useState('');
 
     useEffect(() => {
+        if (!isOpen) return;
+
         const fetchData = async () => {
             try {
                 setLoading(true);
@@ -118,7 +120,7 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
             }
         };
         fetchData();
-    }, [toast]);
+    }, [isOpen, toast]);
     
     const filteredStudents = useMemo(() => {
         if (schoolFilter === 'all') {
@@ -126,6 +128,21 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         }
         return allStudents.filter(student => student.schoolId === schoolFilter);
     }, [allStudents, schoolFilter]);
+
+    const resetState = () => {
+        setStep('selection');
+        setSelectedStudents([]);
+        setGeneratedOrder(null);
+        setManualOrderId('');
+        setSchoolFilter('all');
+    }
+
+    const handleClose = (open: boolean) => {
+        if (!open) {
+            resetState();
+        }
+        onOpenChange(open);
+    }
 
     const handleDownloadFiles = () => {
         if (!user || selectedStudents.length === 0) {
@@ -174,19 +191,22 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
 
         const orderDate = new Date();
         const totalValue = studentsForFile.length * valuePerStudent;
-
+        
+        // Only include the first chunk in the saved fileContent to avoid large Firestore documents
         const firstChunkLines = studentsForFile.slice(0, studentsPerFile).map(student => {
             const formattedValue = (valuePerStudent * 100).toFixed(0);
             const unformattedCpf = student.cpf.replace(/[^\d]/g, '');
             return `${unformattedCpf}|2|${formattedValue}|${student.name}|`;
         });
+        const fileContentToSave = "REC|1\n" + firstChunkLines.join('\n');
+
 
         const newOrderData: Omit<Order, 'id' | 'orderId'> = {
             date: orderDate.toISOString().split('T')[0],
             totalValue: totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
             user: user.name,
             studentCount: studentsForFile.length,
-            fileContent: "REC|1\n" + firstChunkLines.join('\n'),
+            fileContent: fileContentToSave,
         };
 
         setGeneratedOrder(newOrderData);
@@ -205,6 +225,7 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         };
 
         onSave(finalOrder);
+        resetState();
         onOpenChange(false);
     }
   
@@ -216,12 +237,6 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         }
     }
 
-    const resetState = () => {
-        setStep('selection');
-        setSelectedStudents([]);
-        setGeneratedOrder(null);
-        setManualOrderId('');
-    }
 
     if (step === 'confirmation' && generatedOrder) {
       return (
@@ -430,7 +445,11 @@ export default function OrdersPage() {
                         Novo Pedido
                     </Button>
                 </DialogTrigger>
-                <GenerateOrderDialog onSave={handleSaveOrder} onOpenChange={setIsAddModalOpen} />
+                <GenerateOrderDialog 
+                    onSave={handleSaveOrder} 
+                    isOpen={isAddModalOpen} 
+                    onOpenChange={setIsAddModalOpen} 
+                />
             </Dialog>
         </div>
       </CardHeader>
@@ -479,6 +498,7 @@ export default function OrdersPage() {
 }
 
     
+
 
 
 
