@@ -69,10 +69,15 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const selectedFile = e.target.files[0];
-            if (selectedFile.type === 'text/csv' || selectedFile.name.endsWith('.xlsx')) {
+            const fileType = selectedFile.type;
+            const fileName = selectedFile.name;
+            const acceptedTypes = ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.oasis.opendocument.spreadsheet'];
+            const acceptedExtensions = ['.csv', '.xlsx', '.ods'];
+
+            if (acceptedTypes.includes(fileType) || acceptedExtensions.some(ext => fileName.endsWith(ext))) {
                 setFile(selectedFile);
             } else {
-                toast({ variant: 'destructive', title: 'Tipo de arquivo inválido', description: 'Por favor, selecione um arquivo .xlsx ou .csv.' });
+                toast({ variant: 'destructive', title: 'Tipo de arquivo inválido', description: 'Por favor, selecione um arquivo .xlsx, .csv ou .ods.' });
             }
         }
     };
@@ -174,22 +179,23 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
 
             {step === 1 && (
                 <div className="py-4">
-                    <Label htmlFor="spreadsheet-file" className="block text-sm font-medium text-gray-700 mb-2">
-                        Passo 1: Selecionar Arquivo (.xlsx ou .csv)
+                    <Label htmlFor="spreadsheet-file" className="block text-sm font-medium text-muted-foreground mb-2">
+                        Passo 1: Selecionar Arquivo (.xlsx, .csv, .ods)
                     </Label>
-                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                        <div className="space-y-1 text-center">
-                            <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
-                            <div className="flex text-sm text-gray-600">
-                                <Label htmlFor="spreadsheet-file" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-focus focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
-                                    <span>Carregar um arquivo</span>
-                                    <Input id="spreadsheet-file" name="spreadsheet-file" type="file" className="sr-only" onChange={handleFileChange} accept=".xlsx, .csv" />
-                                </Label>
-                                <p className="pl-1">ou arraste e solte</p>
-                            </div>
-                            {file ? <p className="text-xs text-gray-500">{file.name}</p> : <p className="text-xs text-gray-500">XLSX, CSV até 10MB</p>}
+                    <Label
+                        htmlFor="spreadsheet-file"
+                        className="relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50 transition-colors"
+                    >
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <UploadCloud className="w-10 h-10 mb-4 text-muted-foreground" />
+                            <p className="mb-2 text-sm text-muted-foreground">
+                                <span className="font-semibold text-primary">Clique para carregar</span> ou arraste e solte
+                            </p>
+                            <p className="text-xs text-muted-foreground">XLSX, CSV ou ODS (MAX. 10MB)</p>
                         </div>
-                    </div>
+                        <Input id="spreadsheet-file" type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.csv,.ods" />
+                    </Label>
+                     {file && <p className="text-sm text-muted-foreground mt-2">Arquivo selecionado: <span className="font-medium text-foreground">{file.name}</span></p>}
                 </div>
             )}
             
@@ -278,4 +284,3 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         </DialogContent>
     );
 }
-
