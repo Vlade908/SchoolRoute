@@ -393,8 +393,24 @@ export default function OrdersPage() {
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
   ];
   
-  const currentMonthIndex = new Date().getFullYear().toString() === selectedYear ? new Date().getMonth() : 11;
-  const availableMonths = months.slice(0, currentMonthIndex + 1);
+  const availableMonths = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear().toString();
+    const currentMonth = now.getMonth(); // 0-11
+    const currentDay = now.getDate(); // 1-31
+
+    if (selectedYear === currentYear) {
+      let monthsToShow = currentMonth + 1; // Show up to the current month by default
+      if (currentDay > 19 && currentMonth < 11) {
+        monthsToShow = currentMonth + 2; // Show next month as well
+      }
+      return months.slice(0, monthsToShow);
+    }
+    
+    // For past years, show all 12 months
+    return months;
+  }, [selectedYear, months]);
+
 
   const availableYears = useMemo(() => {
     const years = new Set(allOrders.map(order => new Date(order.date).getFullYear().toString()));
