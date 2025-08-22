@@ -415,6 +415,12 @@ export default function OrdersPage() {
 
     return selectedMonth >= currentMonth -1 && selectedMonth <= currentMonth + 1;
   }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    if (carouselApi && selectedMonth !== null) {
+      carouselApi.scrollTo(selectedMonth, true);
+    }
+  }, [carouselApi, selectedMonth]);
   
 
   useEffect(() => {
@@ -691,4 +697,3 @@ export default function OrdersPage() {
     </>
   );
 }
-
