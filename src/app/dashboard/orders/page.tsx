@@ -148,7 +148,8 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
             let fileContent = "REC|1\n";
             studentChunk.forEach(student => {
                 const formattedValue = (valuePerStudent * 100).toFixed(0);
-                fileContent += `${student.cpf}|2|${formattedValue}|${student.name}|\n`;
+                const unformattedCpf = student.cpf.replace(/[^\d]/g, '');
+                fileContent += `${unformattedCpf}|2|${formattedValue}|${student.name}|\n`;
             });
 
             const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
@@ -178,7 +179,8 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
             // Storing the content of the first file as a reference
             fileContent: "REC|1\n" + studentsForFile.slice(0, studentsPerFile).map(student => {
                 const formattedValue = (valuePerStudent * 100).toFixed(0);
-                return `${student.cpf}|2|${formattedValue}|${student.name}|\n`;
+                const unformattedCpf = student.cpf.replace(/[^\d]/g, '');
+                return `${unformattedCpf}|2|${formattedValue}|${student.name}|\n`;
             }).join(''),
         };
 
@@ -408,3 +410,4 @@ export default function OrdersPage() {
 }
 
     
+
