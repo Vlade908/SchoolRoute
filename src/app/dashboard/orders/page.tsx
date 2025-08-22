@@ -145,12 +145,13 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
             const end = start + studentsPerFile;
             const studentChunk = studentsForFile.slice(start, end);
             
-            let fileContent = "REC|1\n";
-            studentChunk.forEach(student => {
+            const studentLines = studentChunk.map(student => {
                 const formattedValue = (valuePerStudent * 100).toFixed(0);
                 const unformattedCpf = student.cpf.replace(/[^\d]/g, '');
-                fileContent += `${unformattedCpf}|2|${formattedValue}|${student.name}|\n`;
+                return `${unformattedCpf}|2|${formattedValue}|${student.name}|`;
             });
+            
+            const fileContent = "REC|1\n" + studentLines.join('\n');
 
             const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
             const link = document.createElement("a");
@@ -170,6 +171,12 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         const newOrderId = `PED${orderDate.getFullYear()}${(orderDate.getMonth() + 1).toString().padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
         const totalValue = studentsForFile.length * valuePerStudent;
 
+        const firstChunkLines = studentsForFile.slice(0, studentsPerFile).map(student => {
+            const formattedValue = (valuePerStudent * 100).toFixed(0);
+            const unformattedCpf = student.cpf.replace(/[^\d]/g, '');
+            return `${unformattedCpf}|2|${formattedValue}|${student.name}|`;
+        });
+
         const newOrder: Omit<Order, 'id'> = {
             orderId: newOrderId,
             date: orderDate.toISOString().split('T')[0],
@@ -177,11 +184,7 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
             user: user.name,
             studentCount: studentsForFile.length,
             // Storing the content of the first file as a reference
-            fileContent: "REC|1\n" + studentsForFile.slice(0, studentsPerFile).map(student => {
-                const formattedValue = (valuePerStudent * 100).toFixed(0);
-                const unformattedCpf = student.cpf.replace(/[^\d]/g, '');
-                return `${unformattedCpf}|2|${formattedValue}|${student.name}|\n`;
-            }).join(''),
+            fileContent: "REC|1\n" + firstChunkLines.join('\n'),
         };
 
         onSave(newOrder);
@@ -410,4 +413,5 @@ export default function OrdersPage() {
 }
 
     
+
 
