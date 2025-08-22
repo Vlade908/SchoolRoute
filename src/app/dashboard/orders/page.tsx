@@ -53,6 +53,7 @@ type Order = {
     user: string;
     studentCount: number;
     fileContent: string;
+    savedAt: Timestamp;
 };
 
 type Student = {
@@ -69,7 +70,7 @@ type School = {
 };
 
 
-function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order: Omit<Order, 'id'>) => void; isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order: Omit<Order, 'id' | 'savedAt'>) => void; isOpen: boolean, onOpenChange: (open: boolean) => void }) {
     const { user } = useUser();
     const { toast } = useToast();
     const [allStudents, setAllStudents] = useState<Student[]>([]);
@@ -80,7 +81,7 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
     
     // New state for multi-step modal
     const [step, setStep] = useState<'selection' | 'confirmation'>('selection');
-    const [generatedOrder, setGeneratedOrder] = useState<Omit<Order, 'id' | 'orderId'> | null>(null);
+    const [generatedOrder, setGeneratedOrder] = useState<Omit<Order, 'id' | 'orderId' | 'savedAt'> | null>(null);
     const [manualOrderId, setManualOrderId] = useState('');
 
     useEffect(() => {
@@ -201,7 +202,7 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
         const fileContentToSave = "REC|1\n" + firstChunkLines.join('\n');
 
 
-        const newOrderData: Omit<Order, 'id' | 'orderId'> = {
+        const newOrderData: Omit<Order, 'id' | 'orderId' | 'savedAt'> = {
             date: orderDate.toISOString().split('T')[0],
             totalValue: totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
             user: user.name,
@@ -219,7 +220,7 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
             return;
         }
         
-        const finalOrder: Omit<Order, 'id'> = {
+        const finalOrder: Omit<Order, 'id' | 'savedAt'> = {
             ...generatedOrder,
             orderId: manualOrderId
         };
@@ -388,10 +389,18 @@ export default function OrdersPage() {
         snapshot.forEach(doc => {
             const data = decryptObjectValues(doc.data()) as any;
             if(data) {
+                // Ensure Timestamp is correctly hydrated
+                if (data.savedAt && typeof data.savedAt.seconds === 'number') {
+                    data.savedAt = new Timestamp(data.savedAt.seconds, data.savedAt.nanoseconds);
+                }
                 fetchedOrders.push({ id: doc.id, ...data });
             }
         });
-        fetchedOrders.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        fetchedOrders.sort((a,b) => {
+             const timeA = a.savedAt?.toMillis() || 0;
+             const timeB = b.savedAt?.toMillis() || 0;
+             return timeB - timeA;
+        });
         setOrders(fetchedOrders);
         setLoading(false);
     });
@@ -400,7 +409,7 @@ export default function OrdersPage() {
 
   }, [user, router]);
   
-  const handleSaveOrder = async (newOrderData: Omit<Order, 'id'>) => {
+  const handleSaveOrder = async (newOrderData: Omit<Order, 'id' | 'savedAt'>) => {
     try {
         const dataToSave = { ...newOrderData, savedAt: Timestamp.now() };
         const encryptedOrder = encryptObjectValues(dataToSave);
@@ -438,7 +447,10 @@ export default function OrdersPage() {
                 Crie e baixe os arquivos de pedido de passe para os alunos.
                 </CardDescription>
             </div>
-             <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+             <Dialog open={isAddModalOpen} onOpenChange={(isOpen) => {
+                setIsAddModalOpen(isOpen);
+                // The dialog state is now reset inside its own component when closed
+             }}>
                 <DialogTrigger asChild>
                     <Button size="sm" className="gap-1">
                         <PlusCircle className="h-3.5 w-3.5" />
@@ -496,10 +508,3 @@ export default function OrdersPage() {
     </Card>
   );
 }
-
-    
-
-
-
-
-
