@@ -275,7 +275,6 @@ export default function PassRequestsPage() {
                                 <TableHead>Nome</TableHead>
                                 <TableHead>RA</TableHead>
                                 <TableHead>CPF</TableHead>
-                                <TableHead>Status Atual</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -290,11 +289,10 @@ export default function PassRequestsPage() {
                                     <TableCell className="font-medium">{student.name}</TableCell>
                                     <TableCell>{student.ra}</TableCell>
                                     <TableCell>{student.cpf}</TableCell>
-                                    <TableCell>{student.status}</TableCell>
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center">Nenhum aluno homologado encontrado.</TableCell>
+                                    <TableCell colSpan={4} className="text-center">Nenhum aluno encontrado.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
@@ -303,7 +301,7 @@ export default function PassRequestsPage() {
             </CardContent>
              <CardFooter>
                 <div className="text-xs text-muted-foreground">
-                    Mostrando <strong>{filteredStudents.length}</strong> de <strong>{allStudents.length}</strong> alunos homologados.
+                    Mostrando <strong>{filteredStudents.length}</strong> de <strong>{allStudents.length}</strong> alunos.
                 </div>
             </CardFooter>
         </Card>
