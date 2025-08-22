@@ -1,4 +1,6 @@
+
 'use client';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -10,63 +12,53 @@ import { useUser } from '@/contexts/user-context';
 import { Activity, Users, School, UserCheck, Bus, FileText, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { decryptObjectValues } from '@/lib/crypto';
 
 
-const data = [
-  {
-    name: "Jan",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Fev",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Mar",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Abr",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Mai",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Jun",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Jul",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Ago",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Set",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Out",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Nov",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-  {
-    name: "Dez",
-    total: Math.floor(Math.random() * 5000) + 1000,
-  },
-]
-
+type ChartData = {
+    name: string;
+    total: number;
+};
 
 export default function DashboardPage() {
   const { user } = useUser();
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "orders"), (snapshot) => {
+        const monthlyTotals: { [key: number]: number } = {};
+
+        snapshot.forEach((doc) => {
+            const data = decryptObjectValues(doc.data());
+            if (data && data.date && data.totalValue && data.status !== 'Excluído') {
+                const month = new Date(data.date).getMonth(); // 0-11
+                const valueString = data.totalValue.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+                const value = parseFloat(valueString);
+                
+                if (!isNaN(value)) {
+                    if (monthlyTotals[month]) {
+                        monthlyTotals[month] += value;
+                    } else {
+                        monthlyTotals[month] = value;
+                    }
+                }
+            }
+        });
+        
+        const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+        const formattedData = monthNames.map((name, index) => ({
+            name: name,
+            total: monthlyTotals[index] || 0
+        }));
+
+        setChartData(formattedData);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   if (!user) {
     return null;
@@ -138,11 +130,12 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4">
             <CardHeader>
-              <CardTitle>Visão Geral de Matrículas</CardTitle>
+              <CardTitle>Visão Geral de Despesas com Passes</CardTitle>
+              <CardDescription>Total gasto por mês em passes estudantis.</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
             <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={data}>
+              <BarChart data={chartData}>
                 <XAxis
                   dataKey="name"
                   stroke="#888888"
@@ -155,7 +148,13 @@ export default function DashboardPage() {
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(value) => `${value}`}
+                  tickFormatter={(value) => `R$ ${value.toLocaleString('pt-BR')}`}
+                />
+                 <Tooltip
+                    cursor={{fill: 'hsl(var(--muted))'}}
+                    contentStyle={{backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))'}}
+                    labelStyle={{color: 'hsl(var(--foreground))'}}
+                    formatter={(value: number) => [new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value), 'Total']}
                 />
                 <Bar
                   dataKey="total"
