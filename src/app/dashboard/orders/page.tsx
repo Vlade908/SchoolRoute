@@ -162,7 +162,7 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
 
         const ticketValue = 4.90;
         const remainingDays = 15;
-        const valuePerStudent = ticketValue * remainingDays * 10;
+        const valuePerStudent = ticketValue * remainingDays;
         const studentsPerFile = 150;
         const numFiles = Math.ceil(studentsForFile.length / studentsPerFile);
         
