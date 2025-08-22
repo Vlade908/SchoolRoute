@@ -98,6 +98,7 @@ type StudentOrder = {
     orderId: string;
     date: string;
     value: string;
+    savedAt?: Timestamp;
 };
 
 type SchoolClass = {
@@ -233,19 +234,25 @@ function StudentProfileDialog({
                         const valueInCents = parseInt(parts[2], 10);
                         const valueInReais = (valueInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
                         
+                        let savedAtTimestamp = undefined;
+                        if (orderData.savedAt && typeof orderData.savedAt.seconds === 'number') {
+                            savedAtTimestamp = new Timestamp(orderData.savedAt.seconds, orderData.savedAt.nanoseconds);
+                        }
+                        
                         foundOrders.push({
                             orderId: orderData.orderId,
                             date: new Date(orderData.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}),
-                            value: valueInReais
+                            value: valueInReais,
+                            savedAt: savedAtTimestamp,
                         });
                     }
                 }
             });
 
             foundOrders.sort((a, b) => {
-                const dateA = new Date(a.date.split('/').reverse().join('-')).getTime();
-                const dateB = new Date(b.date.split('/').reverse().join('-')).getTime();
-                return dateB - dateA;
+              const timeA = a.savedAt?.toMillis() || 0;
+              const timeB = b.savedAt?.toMillis() || 0;
+              return timeB - timeA;
             });
             
             setStudentOrders(foundOrders);
@@ -1464,6 +1471,7 @@ export default function StudentsPage() {
     
 
     
+
 
 
 
