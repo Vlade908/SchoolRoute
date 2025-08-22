@@ -386,7 +386,7 @@ export default function OrdersPage() {
   
   const [carouselApi, setCarouselApi] = useState<CarouselApi>()
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(new Date().getMonth());
 
   const months = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -404,6 +404,17 @@ export default function OrdersPage() {
     }
     return Array.from(years).sort((a,b) => parseInt(b) - parseInt(a));
   }, [allOrders]);
+  
+  const isAddOrderAllowed = useMemo(() => {
+    if (selectedMonth === null) return false;
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    if (parseInt(selectedYear) !== currentYear) return false;
+
+    return selectedMonth >= currentMonth -1 && selectedMonth <= currentMonth + 1;
+  }, [selectedMonth, selectedYear]);
   
 
   useEffect(() => {
@@ -589,19 +600,21 @@ export default function OrdersPage() {
                                 <SelectItem value="all">Todos</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                            <DialogTrigger asChild>
-                                <Button size="sm" className="gap-1">
-                                    <PlusCircle className="h-3.5 w-3.5" />
-                                    Novo Pedido
-                                </Button>
-                            </DialogTrigger>
-                            <GenerateOrderDialog 
-                                onSave={handleSaveOrder} 
-                                isOpen={isAddModalOpen} 
-                                onOpenChange={setIsAddModalOpen} 
-                            />
-                        </Dialog>
+                        {isAddOrderAllowed && (
+                            <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                                <DialogTrigger asChild>
+                                    <Button size="sm" className="gap-1">
+                                        <PlusCircle className="h-3.5 w-3.5" />
+                                        Novo Pedido
+                                    </Button>
+                                </DialogTrigger>
+                                <GenerateOrderDialog 
+                                    onSave={handleSaveOrder} 
+                                    isOpen={isAddModalOpen} 
+                                    onOpenChange={setIsAddModalOpen} 
+                                />
+                            </Dialog>
+                        )}
                     </div>
                 </div>
             </CardHeader>
@@ -615,7 +628,9 @@ export default function OrdersPage() {
                       <TableHead>Valor Total</TableHead>
                       <TableHead>Nº de Alunos</TableHead>
                       <TableHead>Realizado Por</TableHead>
-                      <TableHead><span className="sr-only">Ações</span></TableHead>
+                      <TableHead>
+                        <span className="sr-only">Ações</span>
+                      </TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -655,7 +670,7 @@ export default function OrdersPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
-                        <TableCell>
+                         <TableCell>
                           {order.status === 'Excluído' && (
                             <Badge variant='destructive' className='bg-red-600'>
                                 Excluído
@@ -676,3 +691,4 @@ export default function OrdersPage() {
     </>
   );
 }
+
