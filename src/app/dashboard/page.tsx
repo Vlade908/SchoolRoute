@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
 import { decryptObjectValues } from '@/lib/crypto';
 
 
@@ -23,41 +23,135 @@ type ChartData = {
     total: number;
 };
 
+type DashboardData = {
+    totalStudents: number;
+    totalSchools: number;
+    pendingRequests: number;
+    monthlyOrders: {
+        count: number;
+        totalValue: number;
+    }
+};
+
+type RecentActivity = {
+    id: string;
+    type: 'user' | 'transport';
+    description: string;
+    date: Timestamp;
+    link: string;
+};
+
 export default function DashboardPage() {
   const { user } = useUser();
   const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+      totalStudents: 0,
+      totalSchools: 0,
+      pendingRequests: 0,
+      monthlyOrders: { count: 0, totalValue: 0 }
+  });
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "orders"), (snapshot) => {
+    // Listener for orders (for chart and monthly orders card)
+    const ordersUnsubscribe = onSnapshot(collection(db, "orders"), (snapshot) => {
         const monthlyTotals: { [key: number]: number } = {};
+        let currentMonthOrdersCount = 0;
+        let currentMonthTotalValue = 0;
+        const currentMonth = new Date().getMonth();
 
         snapshot.forEach((doc) => {
             const data = decryptObjectValues(doc.data());
             if (data && data.date && data.totalValue && data.status !== 'Excluído') {
-                const month = new Date(data.date).getMonth(); // 0-11
+                const orderDate = new Date(data.date);
+                const month = orderDate.getMonth();
                 const valueString = data.totalValue.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
                 const value = parseFloat(valueString);
                 
                 if (!isNaN(value)) {
+                    // For chart
                     if (monthlyTotals[month]) {
                         monthlyTotals[month] += value;
                     } else {
                         monthlyTotals[month] = value;
+                    }
+                    // For card
+                    if (month === currentMonth) {
+                        currentMonthOrdersCount++;
+                        currentMonthTotalValue += value;
                     }
                 }
             }
         });
         
         const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-        const formattedData = monthNames.map((name, index) => ({
+        const formattedChartData = monthNames.map((name, index) => ({
             name: name,
             total: monthlyTotals[index] || 0
         }));
-
-        setChartData(formattedData);
+        setChartData(formattedChartData);
+        setDashboardData(prev => ({ ...prev, monthlyOrders: { count: currentMonthOrdersCount, totalValue: currentMonthTotalValue }}));
+    });
+    
+    // Listener for total students
+    const studentsUnsubscribe = onSnapshot(collection(db, "students"), (snapshot) => {
+        setDashboardData(prev => ({...prev, totalStudents: snapshot.size}));
+    });
+    
+    // Listener for total schools
+    const schoolsUnsubscribe = onSnapshot(collection(db, "schools"), (snapshot) => {
+        setDashboardData(prev => ({...prev, totalSchools: snapshot.size}));
+    });
+    
+    // Listener for pending transport requests
+    const transportUnsubscribe = onSnapshot(query(collection(db, "transport-requests"), where("status", "==", "Pendente")), (snapshot) => {
+        setDashboardData(prev => ({...prev, pendingRequests: snapshot.size}));
+    });
+    
+    // Listener for recent activities
+    const usersUnsubscribe = onSnapshot(query(collection(db, "users"), where("status", "==", "Pendente")), (snapshot) => {
+        const userActivities: RecentActivity[] = [];
+        snapshot.forEach(doc => {
+            const data = decryptObjectValues(doc.data());
+            if (data) {
+                userActivities.push({
+                    id: doc.id,
+                    type: 'user',
+                    description: `Novo funcionário '${data.name}' aguarda aprovação.`,
+                    date: data.creationDate,
+                    link: '/dashboard/employees'
+                });
+            }
+        });
+        setRecentActivities(prev => [...userActivities, ...prev.filter(a => a.type !== 'user')].sort((a,b) => b.date.toMillis() - a.date.toMillis()).slice(0,5));
+    });
+    
+     const transportActivitiesUnsubscribe = onSnapshot(query(collection(db, "transport-requests"), where("status", "==", "Pendente")), (snapshot) => {
+        const transportActivities: RecentActivity[] = [];
+        snapshot.forEach(doc => {
+            const data = decryptObjectValues(doc.data());
+            if (data) {
+                transportActivities.push({
+                    id: doc.id,
+                    type: 'transport',
+                    description: `Aluno '${data.studentName}' solicitou transporte.`,
+                    date: data.createdAt,
+                    link: '/dashboard/transport'
+                });
+            }
+        });
+       setRecentActivities(prev => [...transportActivities, ...prev.filter(a => a.type !== 'transport')].sort((a,b) => b.date.toMillis() - a.date.toMillis()).slice(0,5));
     });
 
-    return () => unsubscribe();
+
+    return () => {
+        ordersUnsubscribe();
+        studentsUnsubscribe();
+        schoolsUnsubscribe();
+        transportUnsubscribe();
+        usersUnsubscribe();
+        transportActivitiesUnsubscribe();
+    };
   }, []);
 
   if (!user) {
@@ -65,6 +159,14 @@ export default function DashboardPage() {
   }
   
   const welcomeMessage = `Bem-vindo(a) de volta, ${user.name.split(' ')[0]}!`;
+  
+  const renderActivityIcon = (type: 'user' | 'transport') => {
+      switch(type) {
+          case 'user': return <UserCheck className="h-6 w-6"/>;
+          case 'transport': return <Bus className="h-6 w-6"/>;
+          default: return <Activity className="h-6 w-6"/>;
+      }
+  }
 
   return (
     <div className="flex-1 space-y-4">
@@ -80,10 +182,7 @@ export default function DashboardPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">10,234</div>
-              <p className="text-xs text-muted-foreground">
-                +180.1% do mês passado
-              </p>
+              <div className="text-2xl font-bold">{dashboardData.totalStudents.toLocaleString('pt-BR')}</div>
             </CardContent>
           </Card>
           <Card>
@@ -94,10 +193,7 @@ export default function DashboardPage() {
               <School className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">89</div>
-              <p className="text-xs text-muted-foreground">
-                +19% do mês passado
-              </p>
+              <div className="text-2xl font-bold">{dashboardData.totalSchools}</div>
             </CardContent>
           </Card>
           <Card>
@@ -106,10 +202,7 @@ export default function DashboardPage() {
               <Bus className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">124</div>
-              <p className="text-xs text-muted-foreground">
-                +32 novas solicitações hoje
-              </p>
+              <div className="text-2xl font-bold">{dashboardData.pendingRequests}</div>
             </CardContent>
           </Card>
           <Card>
@@ -120,9 +213,9 @@ export default function DashboardPage() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
+              <div className="text-2xl font-bold">{dashboardData.monthlyOrders.count}</div>
               <p className="text-xs text-muted-foreground">
-                Totalizando R$ 45.231,89
+                Totalizando {dashboardData.monthlyOrders.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </p>
             </CardContent>
           </Card>
@@ -148,7 +241,7 @@ export default function DashboardPage() {
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(value) => `R$ ${value.toLocaleString('pt-BR')}`}
+                  tickFormatter={(value) => `R$${(value as number / 1000).toFixed(0)}k`}
                 />
                  <Tooltip
                     cursor={{fill: 'hsl(var(--muted))'}}
@@ -169,55 +262,34 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>Atividades Recentes</CardTitle>
                 <CardDescription>
-                  Você tem 5 novas solicitações e 2 cadastros para aprovar.
+                  Últimas solicitações e cadastros pendentes de aprovação.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4">
-                <div className="flex items-center space-x-4">
-                  <UserCheck className="h-6 w-6"/>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      Aprovação de Cadastro
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Novo funcionário 'Maria Silva' aguarda aprovação.
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href="/dashboard/employees">Ver</Link>
-                  </Button>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <Bus className="h-6 w-6"/>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      Solicitação de Transporte
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Aluno 'João Pereira' solicitou transporte.
-                    </p>
-                  </div>
-                   <Button variant="outline" size="sm" asChild>
-                    <Link href="/dashboard/transport">Ver</Link>
-                  </Button>
-                </div>
-                 <div className="flex items-center space-x-4">
-                  <UserCheck className="h-6 w-6"/>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      Aprovação de Cadastro
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Novo funcionário 'Carlos Souza' aguarda aprovação.
-                    </p>
-                  </div>
-                   <Button variant="outline" size="sm" asChild>
-                    <Link href="/dashboard/employees">Ver</Link>
-                  </Button>
-                </div>
+                {recentActivities.length > 0 ? (
+                    recentActivities.map(activity => (
+                         <div key={activity.id} className="flex items-center space-x-4">
+                            {renderActivityIcon(activity.type)}
+                            <div className="flex-1 space-y-1">
+                                <p className="text-sm font-medium leading-none">
+                                    {activity.type === 'user' ? 'Aprovação de Cadastro' : 'Solicitação de Transporte'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    {activity.description}
+                                </p>
+                            </div>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={activity.link}>Ver</Link>
+                            </Button>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center">Nenhuma atividade pendente.</p>
+                )}
               </CardContent>
             </Card>
         </div>
     </div>
   );
 }
+
