@@ -780,13 +780,11 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
 
   const handleSave = () => {
     const dataToValidate: Partial<typeof studentData> = { ...studentData };
+    delete dataToValidate.uid; // uid is auto-generated
+    
     if (dataToValidate.hasPass === 'Não') {
       delete dataToValidate.souCardNumber;
     }
-     if (dataToValidate.uid) { // uid is not part of the form, it's auto-generated.
-      delete dataToValidate.uid;
-    }
-
 
     for (const key in dataToValidate) {
         if (dataToValidate[key as keyof typeof dataToValidate] === '') {
@@ -798,7 +796,7 @@ function AddStudentDialog({ onSave, onOpenChange }: { onSave: (student: Omit<Stu
             return;
         }
     }
-    const { ...studentToSave } = studentData;
+    const { uid, ...studentToSave } = studentData;
     onSave(studentToSave);
   }
 
@@ -1082,7 +1080,7 @@ export default function StudentsPage() {
     }
   };
   
-  const handleAddStudent = async (newStudentData: Omit<Student, 'id' | 'enrollmentDate' | 'status'>) => {
+  const handleAddStudent = async (newStudentData: Omit<Student, 'id' | 'enrollmentDate' | 'status' | 'uid'>) => {
     try {
         const schoolDoc = await getDoc(doc(db, 'schools', newStudentData.schoolId));
         const schoolData = decryptObjectValues(schoolDoc.data() || {});
@@ -1340,4 +1338,5 @@ export default function StudentsPage() {
     
 
     
+
 
