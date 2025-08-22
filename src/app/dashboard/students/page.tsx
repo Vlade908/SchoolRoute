@@ -142,6 +142,7 @@ function StudentProfileDialog({
   const [yearFilter, setYearFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('data');
+  const [monthFilter, setMonthFilter] = useState('all');
 
   
   useEffect(() => {
@@ -167,6 +168,10 @@ function StudentProfileDialog({
                  setSelectedSchool(null);
             }
         });
+    } else {
+        setMonthFilter('all');
+        setYearFilter('all');
+        setTypeFilter('all');
     }
   }, [isOpen, student]);
   
@@ -268,6 +273,26 @@ function StudentProfileDialog({
           return yearMatch && typeMatch;
       });
   }, [requests, yearFilter, typeFilter]);
+
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    studentOrders.forEach(order => {
+        const [day, month, year] = order.date.split('/');
+        months.add(`${month}/${year}`);
+    });
+    // Convert to array and sort if needed
+    return Array.from(months);
+  }, [studentOrders]);
+
+  const filteredOrders = useMemo(() => {
+    if (monthFilter === 'all') {
+        return studentOrders;
+    }
+    return studentOrders.filter(order => {
+        const [day, month, year] = order.date.split('/');
+        return `${month}/${year}` === monthFilter;
+    });
+  }, [studentOrders, monthFilter]);
 
 
   const selectedGradeObj = useMemo(() => {
@@ -628,8 +653,23 @@ function StudentProfileDialog({
                 <TabsContent value="order-history" className="pt-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Histórico de Pedidos</CardTitle>
-                      <CardDescription>Lista de pedidos de passe escolar que incluíram este aluno.</CardDescription>
+                      <div className="flex justify-between items-center">
+                          <div>
+                            <CardTitle>Histórico de Pedidos</CardTitle>
+                            <CardDescription>Lista de pedidos de passe escolar que incluíram este aluno.</CardDescription>
+                          </div>
+                           <Select value={monthFilter} onValueChange={setMonthFilter}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Filtrar por mês" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos os Meses</SelectItem>
+                                    {availableMonths.map(month => (
+                                        <SelectItem key={month} value={month}>{month}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <div className="overflow-x-auto">
@@ -644,8 +684,8 @@ function StudentProfileDialog({
                             <TableBody>
                                 {loadingOrders ? (
                                     <TableRow><TableCell colSpan={3} className="text-center">Carregando...</TableCell></TableRow>
-                                ) : studentOrders.length > 0 ? (
-                                    studentOrders.map(order => (
+                                ) : filteredOrders.length > 0 ? (
+                                    filteredOrders.map(order => (
                                         <TableRow key={order.orderId}>
                                             <TableCell>{order.orderId}</TableCell>
                                             <TableCell>{order.date}</TableCell>
@@ -1417,6 +1457,7 @@ export default function StudentsPage() {
     
 
     
+
 
 
 
