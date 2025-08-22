@@ -73,7 +73,7 @@ export default function PassRequestsPage() {
                 const studentData: Student[] = [];
                 querySnapshot.forEach(doc => {
                     const decryptedData = decryptObjectValues(doc.data()) as any;
-                    if (decryptedData) {
+                    if (decryptedData && decryptedData.status === 'Homologado') {
                         studentData.push({
                             id: doc.id,
                             uid: decryptedData.uid, 
@@ -294,7 +294,7 @@ export default function PassRequestsPage() {
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center">Nenhum aluno encontrado.</TableCell>
+                                    <TableCell colSpan={5} className="text-center">Nenhum aluno homologado encontrado.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
@@ -303,7 +303,7 @@ export default function PassRequestsPage() {
             </CardContent>
              <CardFooter>
                 <div className="text-xs text-muted-foreground">
-                    Mostrando <strong>{filteredStudents.length}</strong> de <strong>{allStudents.length}</strong> alunos.
+                    Mostrando <strong>{filteredStudents.length}</strong> de <strong>{allStudents.length}</strong> alunos homologados.
                 </div>
             </CardFooter>
         </Card>
