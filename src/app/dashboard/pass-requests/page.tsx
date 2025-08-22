@@ -15,21 +15,35 @@ import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
 import { Input } from '@/components/ui/input';
 import { Search, Send, ListFilter } from 'lucide-react';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Student = {
     id: string;
-    uid: string; // Ensure UID is part of the student type
+    uid: string;
     name: string;
     ra: string;
     cpf: string;
     status: string;
     schoolId: string;
+    grade: string;
+    className: string;
+    classPeriod: string;
+};
+
+type SchoolClass = {
+  name: string;
+  period: 'Manhã' | 'Tarde' | 'Noite' | 'Integral';
+};
+
+type SchoolGrade = {
+  name: string;
+  classes: SchoolClass[];
 };
 
 type School = {
     id: string;
     name: string;
+    grades?: SchoolGrade[];
 }
 
 export default function PassRequestsPage() {
@@ -42,6 +56,39 @@ export default function PassRequestsPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [schoolFilter, setSchoolFilter] = useState('all');
+    
+    // New filters
+    const [gradeFilter, setGradeFilter] = useState('all');
+    const [periodFilter, setPeriodFilter] = useState('all');
+    const [classFilter, setClassFilter] = useState('all');
+
+    const activeSchoolId = useMemo(() => {
+        if (user?.role === 2) return user.schoolId;
+        if (user?.role >= 3) return schoolFilter;
+        return null;
+    }, [user, schoolFilter]);
+
+    const activeSchool = useMemo(() => {
+        return schools.find(s => s.id === activeSchoolId);
+    }, [schools, activeSchoolId]);
+    
+    const availableGrades = useMemo(() => activeSchool?.grades || [], [activeSchool]);
+    
+    const availablePeriods = useMemo(() => {
+        if (!gradeFilter || gradeFilter === 'all' || !availableGrades) return [];
+        const grade = availableGrades.find(g => g.name === gradeFilter);
+        if (!grade) return [];
+        const periods = grade.classes.map(c => c.period);
+        return [...new Set(periods)];
+    }, [availableGrades, gradeFilter]);
+    
+    const availableClasses = useMemo(() => {
+        if (!periodFilter || periodFilter === 'all' || !availableGrades || !gradeFilter || gradeFilter === 'all') return [];
+        const grade = availableGrades.find(g => g.name === gradeFilter);
+        if (!grade) return [];
+        return grade.classes.filter(c => c.period === periodFilter);
+    }, [availableGrades, gradeFilter, periodFilter]);
+
 
     useEffect(() => {
         if (userLoading) return;
@@ -59,7 +106,7 @@ export default function PassRequestsPage() {
                 schoolsSnapshot.forEach(doc => {
                     const data = decryptObjectValues(doc.data()) as any;
                     if (data) {
-                       schoolsData.push({ id: doc.id, name: data.name });
+                       schoolsData.push({ id: doc.id, name: data.name, grades: data.grades || [] });
                     }
                 });
                 setSchools(schoolsData);
@@ -82,6 +129,9 @@ export default function PassRequestsPage() {
                             cpf: decryptedData.cpf,
                             status: decryptedData.status,
                             schoolId: decryptedData.schoolId,
+                            grade: decryptedData.grade,
+                            className: decryptedData.className,
+                            classPeriod: decryptedData.classPeriod,
                         });
                     }
                 });
@@ -108,6 +158,17 @@ export default function PassRequestsPage() {
             students = students.filter(student => student.schoolId === schoolFilter);
         }
 
+        // Advanced filters
+        if (gradeFilter !== 'all') {
+            students = students.filter(s => s.grade === gradeFilter);
+        }
+        if (periodFilter !== 'all') {
+            students = students.filter(s => s.classPeriod === periodFilter);
+        }
+        if (classFilter !== 'all') {
+            students = students.filter(s => s.className === classFilter);
+        }
+
         // Filter by search term
         if (searchTerm) {
             const lowerCaseSearch = searchTerm.toLowerCase();
@@ -119,7 +180,7 @@ export default function PassRequestsPage() {
         }
 
         return students;
-    }, [allStudents, searchTerm, schoolFilter, user]);
+    }, [allStudents, searchTerm, schoolFilter, user, gradeFilter, periodFilter, classFilter]);
     
     const selectedSchoolName = useMemo(() => {
         if (user?.role === 2) return user.schoolName;
@@ -227,38 +288,63 @@ export default function PassRequestsPage() {
                         Criar Solicitação ({selectedStudents.length})
                     </Button>
                 </div>
-                 <div className="flex flex-col sm:flex-row items-center gap-2 mt-4">
-                    <div className="relative flex-1 w-full">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Buscar por nome, RA ou CPF..."
-                            className="pl-8"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    {user.role >= 3 && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="w-full sm:w-auto gap-1">
-                                    <ListFilter className="h-3.5 w-3.5" />
-                                    Filtrar por Escola
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Selecione uma escola</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuCheckboxItem checked={schoolFilter === 'all'} onCheckedChange={() => setSchoolFilter('all')}>
-                                    Todas as Escolas
-                                </DropdownMenuCheckboxItem>
-                                {schools.map(school => (
-                                    <DropdownMenuCheckboxItem key={school.id} checked={schoolFilter === school.id} onCheckedChange={() => setSchoolFilter(school.id)}>
-                                        {school.name}
+                 <div className="flex flex-col gap-2 mt-4">
+                    <div className="flex flex-col sm:flex-row items-center gap-2">
+                        <div className="relative flex-1 w-full">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Buscar por nome, RA ou CPF..."
+                                className="pl-8"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        {user.role >= 3 && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="w-full sm:w-auto gap-1">
+                                        <ListFilter className="h-3.5 w-3.5" />
+                                        Filtrar por Escola
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Selecione uma escola</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuCheckboxItem checked={schoolFilter === 'all'} onCheckedChange={() => setSchoolFilter('all')}>
+                                        Todas as Escolas
                                     </DropdownMenuCheckboxItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
+                                    {schools.map(school => (
+                                        <DropdownMenuCheckboxItem key={school.id} checked={schoolFilter === school.id} onCheckedChange={() => setSchoolFilter(school.id)}>
+                                            {school.name}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-2">
+                        <Select value={gradeFilter} onValueChange={setGradeFilter} disabled={!activeSchool}>
+                            <SelectTrigger className="w-full md:flex-1"><SelectValue placeholder="Filtrar por Série/Ano" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas as Séries</SelectItem>
+                                {availableGrades.map(grade => <SelectItem key={grade.name} value={grade.name}>{grade.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                         <Select value={periodFilter} onValueChange={setPeriodFilter} disabled={!gradeFilter || gradeFilter === 'all'}>
+                            <SelectTrigger className="w-full md:flex-1"><SelectValue placeholder="Filtrar por Período" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos os Períodos</SelectItem>
+                                {availablePeriods.map(period => <SelectItem key={period} value={period}>{period}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                         <Select value={classFilter} onValueChange={setClassFilter} disabled={!periodFilter || periodFilter === 'all'}>
+                            <SelectTrigger className="w-full md:flex-1"><SelectValue placeholder="Filtrar por Turma" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas as Turmas</SelectItem>
+                                {availableClasses.map(cls => <SelectItem key={cls.name} value={cls.name}>{cls.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent>
@@ -274,6 +360,8 @@ export default function PassRequestsPage() {
                                 </TableHead>
                                 <TableHead>Nome</TableHead>
                                 <TableHead>RA</TableHead>
+                                <TableHead>Série/Ano</TableHead>
+                                <TableHead>Turma</TableHead>
                                 <TableHead>CPF</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -288,11 +376,13 @@ export default function PassRequestsPage() {
                                     </TableCell>
                                     <TableCell className="font-medium">{student.name}</TableCell>
                                     <TableCell>{student.ra}</TableCell>
+                                    <TableCell>{student.grade}</TableCell>
+                                    <TableCell>{student.className}</TableCell>
                                     <TableCell>{student.cpf}</TableCell>
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center">Nenhum aluno encontrado.</TableCell>
+                                    <TableCell colSpan={6} className="text-center">Nenhum aluno encontrado.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
