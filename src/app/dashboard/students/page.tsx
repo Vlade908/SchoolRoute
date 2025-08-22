@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Check,
   ChevronsUpDown,
+  Upload,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -58,6 +59,7 @@ import { AddressMap } from '@/components/address-map';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { StudentImportDialog } from '@/components/student-import-dialog';
 
 
 type Student = {
@@ -241,7 +243,7 @@ function StudentProfileDialog({
                         
                         foundOrders.push({
                             orderId: orderData.orderId,
-                            date: new Date(orderData.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}),
+                            date: orderData.date,
                             value: valueInReais,
                             savedAt: savedAtTimestamp,
                         });
@@ -291,7 +293,9 @@ function StudentProfileDialog({
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
     studentOrders.forEach(order => {
-        const [day, month, year] = order.date.split('/');
+        const orderDate = new Date(order.date);
+        const month = (orderDate.getUTCMonth() + 1).toString().padStart(2, '0');
+        const year = orderDate.getUTCFullYear();
         months.add(`${month}/${year}`);
     });
     // Convert to array and sort if needed
@@ -303,7 +307,9 @@ function StudentProfileDialog({
         return studentOrders;
     }
     return studentOrders.filter(order => {
-        const [day, month, year] = order.date.split('/');
+        const orderDate = new Date(order.date);
+        const month = (orderDate.getUTCMonth() + 1).toString().padStart(2, '0');
+        const year = orderDate.getUTCFullYear();
         return `${month}/${year}` === monthFilter;
     });
   }, [studentOrders, monthFilter]);
@@ -702,7 +708,7 @@ function StudentProfileDialog({
                                     filteredOrders.map((order, index) => (
                                         <TableRow key={`${order.orderId}-${index}`}>
                                             <TableCell>{order.orderId}</TableCell>
-                                            <TableCell>{order.date}</TableCell>
+                                            <TableCell>{new Date(order.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</TableCell>
                                             <TableCell>{order.value}</TableCell>
                                         </TableRow>
                                     ))
@@ -1066,6 +1072,7 @@ export default function StudentsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isProfileDialogOpen, setProfileDialogOpen] = useState(false);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [isImportDialogOpen, setImportDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [schools, setSchools] = useState<School[]>([]);
 
@@ -1274,6 +1281,11 @@ export default function StudentsPage() {
         setPage(prev => prev - 1);
     }
   }
+  
+  const handleImportSuccess = () => {
+    fetchStudents('new');
+    setImportDialogOpen(false);
+  }
 
   return (
     <Tabs defaultValue="all" value={activeTab} onValueChange={handleTabChange}>
@@ -1325,6 +1337,17 @@ export default function StudentsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          <Dialog open={isImportDialogOpen} onOpenChange={setImportDialogOpen}>
+              <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-10 gap-1">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                          Importar Alunos
+                      </span>
+                  </Button>
+              </DialogTrigger>
+              <StudentImportDialog onOpenChange={setImportDialogOpen} onSuccess={handleImportSuccess} />
+          </Dialog>
           <Button size="sm" variant="outline" className="h-10 gap-1">
             <File className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-rap">
@@ -1467,15 +1490,3 @@ export default function StudentsPage() {
     </Tabs>
   );
 }
-
-    
-
-    
-
-
-
-
-
-
-
-

@@ -1,0 +1,281 @@
+
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import * as XLSX from 'xlsx';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { ScrollArea } from './ui/scroll-area';
+import { Badge } from './ui/badge';
+import { ArrowLeft, ArrowRight, Loader2, UploadCloud } from 'lucide-react';
+
+
+type School = {
+    id: string;
+    name: string;
+    schoolType?: string;
+};
+
+const studentSystemFields = [
+    { value: 'name', label: 'Nome do Aluno' },
+    { value: 'cpf', label: 'CPF' },
+    { value: 'ra', label: 'RA' },
+    { value: 'rg', label: 'RG' },
+    { value: 'rgIssueDate', label: 'Data de Emissão do RG' },
+    { value: 'schoolName', label: 'Nome da Escola' },
+    { value: 'grade', label: 'Série/Ano' },
+    { value: 'className', label: 'Turma' },
+    { value: 'classPeriod', label: 'Período da Turma' },
+    { value: 'responsibleName', label: 'Nome do Responsável' },
+    { value: 'contactPhone', label: 'Telefone de Contato' },
+    { value: 'contactEmail', label: 'Email de Contato' },
+    { value: 'address', label: 'Endereço' },
+    { value: 'hasPass', label: 'Possui Passe (Sim/Não)' },
+    { value: 'souCardNumber', label: 'Nº Cartão SOU' },
+];
+
+export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange: (isOpen: boolean) => void; onSuccess: () => void }) {
+    const { toast } = useToast();
+    const [step, setStep] = useState(1);
+    const [file, setFile] = useState<File | null>(null);
+    const [sheetData, setSheetData] = useState<any[]>([]);
+    const [headers, setHeaders] = useState<string[]>([]);
+    const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [importSummary, setImportSummary] = useState<{ successCount: number; errorCount: number; newSchools: Record<string, number> } | null>(null);
+    const [schools, setSchools] = useState<School[]>([]);
+
+    useEffect(() => {
+        const fetchSchools = async () => {
+            const schoolsCollection = collection(db, 'schools');
+            const snapshot = await getDocs(query(schoolsCollection));
+            const schoolsData: School[] = snapshot.docs.map(doc => {
+                const decryptedData = decryptObjectValues(doc.data()) as any;
+                return { id: doc.id, name: decryptedData.name, schoolType: decryptedData.schoolType };
+            });
+            setSchools(schoolsData);
+        };
+        fetchSchools();
+    }, []);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const selectedFile = e.target.files[0];
+            if (selectedFile.type === 'text/csv' || selectedFile.name.endsWith('.xlsx')) {
+                setFile(selectedFile);
+            } else {
+                toast({ variant: 'destructive', title: 'Tipo de arquivo inválido', description: 'Por favor, selecione um arquivo .xlsx ou .csv.' });
+            }
+        }
+    };
+
+    const handleParseFile = () => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'binary' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet);
+            setSheetData(json);
+            if (json.length > 0) {
+                setHeaders(Object.keys(json[0]));
+                setStep(2);
+            } else {
+                toast({ variant: 'destructive', title: 'Planilha Vazia', description: 'A planilha selecionada não contém dados.' });
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    const handleMappingChange = (header: string, systemField: string) => {
+        setColumnMapping(prev => ({ ...prev, [header]: systemField }));
+    };
+
+    const handleImport = async () => {
+        setIsProcessing(true);
+        let successCount = 0;
+        let errorCount = 0;
+        const newSchoolsToCreate: Record<string, any[]> = {};
+
+        for (const row of sheetData) {
+            const studentData: Record<string, any> = {};
+            for (const header in columnMapping) {
+                if (columnMapping[header]) {
+                    studentData[columnMapping[header]] = row[header];
+                }
+            }
+
+            if (!studentData.name || !studentData.schoolName) {
+                errorCount++;
+                continue;
+            }
+
+            const schoolName = studentData.schoolName.trim();
+            const existingSchool = schools.find(s => s.name.toLowerCase() === schoolName.toLowerCase());
+
+            if (!existingSchool) {
+                if (!newSchoolsToCreate[schoolName]) {
+                    newSchoolsToCreate[schoolName] = [];
+                }
+                newSchoolsToCreate[schoolName].push(studentData);
+                continue;
+            }
+
+            try {
+                const studentToAdd = {
+                    ...studentData,
+                    schoolId: existingSchool.id,
+                    schoolType: existingSchool.schoolType || 'N/A',
+                    status: 'Não Homologado',
+                    enrollmentDate: Timestamp.now(),
+                    uid: `student_${Date.now()}_${Math.random()}`
+                };
+                const encryptedStudent = encryptObjectValues(studentToAdd);
+                await addDoc(collection(db, "students"), encryptedStudent);
+                successCount++;
+            } catch (error) {
+                console.error("Error adding student:", error);
+                errorCount++;
+            }
+        }
+        
+        const newSchoolsSummary = Object.entries(newSchoolsToCreate).reduce((acc, [name, students]) => {
+            acc[name] = students.length;
+            return acc;
+        }, {} as Record<string, number>);
+
+        setImportSummary({ successCount, errorCount, newSchools: newSchoolsSummary });
+        setIsProcessing(false);
+        setStep(3);
+    };
+    
+    const handleCloseAndRefresh = () => {
+        onSuccess();
+    }
+
+    return (
+        <DialogContent className="sm:max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Importar Alunos de Planilha</DialogTitle>
+                <DialogDescription>
+                    Siga os passos para importar múltiplos alunos de uma vez.
+                </DialogDescription>
+            </DialogHeader>
+
+            {step === 1 && (
+                <div className="py-4">
+                    <Label htmlFor="spreadsheet-file" className="block text-sm font-medium text-gray-700 mb-2">
+                        Passo 1: Selecionar Arquivo (.xlsx ou .csv)
+                    </Label>
+                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                        <div className="space-y-1 text-center">
+                            <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
+                            <div className="flex text-sm text-gray-600">
+                                <Label htmlFor="spreadsheet-file" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-focus focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
+                                    <span>Carregar um arquivo</span>
+                                    <Input id="spreadsheet-file" name="spreadsheet-file" type="file" className="sr-only" onChange={handleFileChange} accept=".xlsx, .csv" />
+                                </Label>
+                                <p className="pl-1">ou arraste e solte</p>
+                            </div>
+                            {file ? <p className="text-xs text-gray-500">{file.name}</p> : <p className="text-xs text-gray-500">XLSX, CSV até 10MB</p>}
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {step === 2 && (
+                <div className="py-4">
+                    <Label className="block text-sm font-medium text-gray-700 mb-2">
+                        Passo 2: Mapear Colunas da Planilha
+                    </Label>
+                    <p className="text-sm text-muted-foreground mb-4">Associe cada coluna da sua planilha ao campo correspondente no sistema.</p>
+                    <ScrollArea className="h-72 w-full pr-4">
+                        <div className="space-y-4">
+                            {headers.map(header => (
+                                <div key={header} className="grid grid-cols-2 gap-4 items-center">
+                                    <Label className="text-right truncate" title={header}>{header}</Label>
+                                    <Select onValueChange={(value) => handleMappingChange(header, value)}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Ignorar esta coluna" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">Ignorar esta coluna</SelectItem>
+                                            {studentSystemFields.map(field => (
+                                                <SelectItem key={field.value} value={field.value}>
+                                                    {field.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </div>
+            )}
+            
+            {step === 3 && importSummary && (
+                <div className="py-4">
+                    <Label className="block text-sm font-medium text-gray-700 mb-2">
+                        Passo 3: Resumo da Importação
+                    </Label>
+                     <Alert>
+                        <AlertTitle>Importação Concluída!</AlertTitle>
+                        <AlertDescription>
+                            <p><Badge variant="default" className="bg-green-600">{importSummary.successCount}</Badge> alunos importados com sucesso.</p>
+                            <p><Badge variant="destructive">{importSummary.errorCount}</Badge> alunos não foram importados por falta de dados.</p>
+                        </AlertDescription>
+                    </Alert>
+                    
+                    {Object.keys(importSummary.newSchools).length > 0 && (
+                        <Alert variant="destructive" className="mt-4">
+                            <AlertTitle>Ação Necessária: Novas Escolas Encontradas!</AlertTitle>
+                            <AlertDescription>
+                                <p>Os seguintes alunos não foram importados porque as escolas deles não estão cadastradas. Por favor, cadastre estas escolas na aba 'Escolas' e importe a planilha novamente para estes alunos.</p>
+                                <ul className="mt-2 list-disc list-inside">
+                                {Object.entries(importSummary.newSchools).map(([schoolName, count]) => (
+                                    <li key={schoolName}><strong>{schoolName}</strong> ({count} alunos)</li>
+                                ))}
+                                </ul>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </div>
+            )}
+
+            <DialogFooter>
+                {step === 1 && (
+                    <Button onClick={handleParseFile} disabled={!file}>
+                        Próximo <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                )}
+                {step === 2 && (
+                    <div className="flex w-full justify-between">
+                         <Button variant="outline" onClick={() => setStep(1)}>
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+                        </Button>
+                        <Button onClick={handleImport} disabled={isProcessing}>
+                            {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : <>Importar Alunos</>}
+                        </Button>
+                    </div>
+                )}
+                 {step === 3 && (
+                    <Button onClick={handleCloseAndRefresh}>
+                        Fechar
+                    </Button>
+                )}
+            </DialogFooter>
+        </DialogContent>
+    );
+}
+
