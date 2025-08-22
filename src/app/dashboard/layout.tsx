@@ -13,6 +13,7 @@ import {
   FileText,
   PanelLeft,
   Building,
+  History,
 } from 'lucide-react';
 import { useUser, UserProvider } from '@/contexts/user-context';
 import { Button } from '@/components/ui/button';
@@ -35,34 +36,25 @@ type User = {
   schoolName: string | null;
 };
 
+const navLinksConfig = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, minRole: 1 },
+    { href: '/dashboard/students', label: 'Alunos', icon: Users, minRole: 1 },
+    { href: '/dashboard/pass-requests', label: 'Solicitar Passes', icon: Bus, minRole: 2 },
+    { href: '/dashboard/schools', label: 'Escolas', icon: SchoolIcon, minRole: 3 },
+    { href: '/dashboard/city-halls', label: 'Prefeituras', icon: Building, minRole: 3 },
+    { href: '/dashboard/employees', label: 'Funcionários', icon: UserPlus, minRole: 3 },
+    { href: '/dashboard/transport', label: 'Solicitações', icon: Bus, minRole: 3 },
+    { href: '/dashboard/orders', label: 'Pedidos', icon: FileText, minRole: 3 },
+];
+
 function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
   const { user } = useUser();
   const pathname = usePathname();
 
   if (!user) return null;
   
-  const commonLinks = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, minRole: 1 },
-    { href: '/dashboard/students', label: 'Alunos', icon: Users, minRole: 1 },
-  ];
-  
-  const schoolUserLinks = [
-      { href: '/dashboard/pass-requests', label: 'Solicitar Passes', icon: Bus, minRole: 2 },
-  ];
-
-  const adminLinks = [
-    { href: '/dashboard/schools', label: 'Escolas', icon: SchoolIcon, minRole: 3 },
-    { href: '/dashboard/city-halls', label: 'Prefeituras', icon: Building, minRole: 3 },
-    { href: '/dashboard/employees', label: 'Funcionários', icon: UserPlus, minRole: 3 },
-    { href: '/dashboard/transport', label: 'Solicitações', icon: Bus, minRole: 3 },
-    { href: '/dashboard/orders', label: 'Pedidos', icon: FileText, minRole: 3 },
-  ];
-
-  const navLinks = [
-    ...commonLinks,
-    ...(user.role >= 2 ? schoolUserLinks : []),
-    ...(user.role >=3 ? adminLinks : [])
-  ].filter(link => user.role >= link.minRole)
+  const navLinks = navLinksConfig
+   .filter(link => user.role >= link.minRole)
    .filter((link, index, self) => index === self.findIndex((l) => l.href === link.href)); // Remove duplicates
 
 
@@ -88,7 +80,30 @@ function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading } = useUser();
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      const linkConfig = navLinksConfig.find(link => link.href === pathname);
+      if (!linkConfig) return;
+
+      const newActivity = {
+        href: pathname,
+        label: linkConfig.label,
+        date: new Date().toISOString(),
+      };
+      
+      const storedActivities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+      
+      // Avoid adding duplicates
+      const filteredActivities = storedActivities.filter((activity: any) => activity.href !== newActivity.href);
+      
+      const updatedActivities = [newActivity, ...filteredActivities].slice(0, 5);
+
+      localStorage.setItem('recentActivities', JSON.stringify(updatedActivities));
+    }
+  }, [pathname, user]);
 
   if (loading) {
     return (
