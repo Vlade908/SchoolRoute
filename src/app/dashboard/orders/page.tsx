@@ -134,7 +134,7 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         const ticketValue = 4.90;
         const remainingDays = 15;
         const valuePerStudent = ticketValue * remainingDays * 10;
-        const studentsPerFile = 1000;
+        const studentsPerFile = 150;
         const numFiles = Math.ceil(studentsForFile.length / studentsPerFile);
         
         const selectedSchool = schools.find(s => s.id === schoolFilter);
