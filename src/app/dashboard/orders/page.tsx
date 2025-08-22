@@ -60,39 +60,67 @@ type Student = {
     name: string;
     cpf: string;
     schoolName: string;
+    schoolId: string;
+};
+
+type School = {
+    id: string;
+    name: string;
 };
 
 
 function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Order, 'id'>) => void; onOpenChange: (open: boolean) => void }) {
     const { user } = useUser();
     const { toast } = useToast();
-    const [studentsForOrder, setStudentsForOrder] = useState<Student[]>([]);
+    const [allStudents, setAllStudents] = useState<Student[]>([]);
+    const [schools, setSchools] = useState<School[]>([]);
     const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
+    const [schoolFilter, setSchoolFilter] = useState('all');
 
     useEffect(() => {
-        const fetchStudents = async () => {
+        const fetchData = async () => {
             try {
                 setLoading(true);
-                const q = query(collection(db, "students"));
+                // Fetch Schools
+                const schoolsSnapshot = await getDocs(collection(db, 'schools'));
+                const schoolsData: School[] = [];
+                schoolsSnapshot.forEach(doc => {
+                    const data = decryptObjectValues(doc.data()) as any;
+                    if (data) {
+                       schoolsData.push({ id: doc.id, name: data.name });
+                    }
+                });
+                setSchools(schoolsData);
+
+                // Fetch Students
+                const studentsRef = collection(db, "students");
+                const q = query(studentsRef);
                 const querySnapshot = await getDocs(q);
                 const studentsData: Student[] = [];
                 querySnapshot.forEach(doc => {
                     const data = decryptObjectValues(doc.data()) as any;
                     if(data && data.status === 'Homologado') {
-                        studentsData.push({ id: doc.id, name: data.name, cpf: data.cpf, schoolName: data.schoolName });
+                        studentsData.push({ id: doc.id, name: data.name, cpf: data.cpf, schoolName: data.schoolName, schoolId: data.schoolId });
                     }
                 });
-                setStudentsForOrder(studentsData);
+                setAllStudents(studentsData);
             } catch (err) {
-                console.error("Failed to fetch students:", err);
-                toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar os alunos.' });
+                console.error("Failed to fetch data:", err);
+                toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível carregar os dados.' });
             } finally {
                 setLoading(false);
             }
         };
-        fetchStudents();
+        fetchData();
     }, [toast]);
+    
+    const filteredStudents = useMemo(() => {
+        if (schoolFilter === 'all') {
+            return allStudents;
+        }
+        return allStudents.filter(student => student.schoolId === schoolFilter);
+    }, [allStudents, schoolFilter]);
 
     const handleGenerate = () => {
         if (!user || selectedStudents.length === 0) {
@@ -100,40 +128,58 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
             return;
         }
 
+        const studentsForFile = allStudents.filter(s => selectedStudents.includes(s.id));
+        if (studentsForFile.length === 0) return;
+
         const ticketValue = 4.90;
         const remainingDays = 15;
         const valuePerStudent = ticketValue * remainingDays * 10;
+        const studentsPerFile = 1000;
+        const numFiles = Math.ceil(studentsForFile.length / studentsPerFile);
         
-        const filteredStudents = studentsForOrder.filter(s => selectedStudents.includes(s.id));
-        
-        let fileContent = "REC|1\n";
-        filteredStudents.forEach(student => {
-            const formattedValue = (valuePerStudent * 100).toFixed(0);
-            fileContent += `${student.cpf}|2|${formattedValue}|${student.name}|\n`;
-        });
-        
-        const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        const orderDate = new Date();
-        const formattedDate = orderDate.toISOString().split('T')[0];
-        link.setAttribute("href", url);
-        link.setAttribute("download", `pedido_passes_${formattedDate}.txt`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const selectedSchool = schools.find(s => s.id === schoolFilter);
+        const baseFileName = selectedSchool ? selectedSchool.name.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase() : `pedido_passes_${new Date().toISOString().split('T')[0]}`;
 
+        for (let i = 0; i < numFiles; i++) {
+            const start = i * studentsPerFile;
+            const end = start + studentsPerFile;
+            const studentChunk = studentsForFile.slice(start, end);
+            
+            let fileContent = "REC|1\n";
+            studentChunk.forEach(student => {
+                const formattedValue = (valuePerStudent * 100).toFixed(0);
+                fileContent += `${student.cpf}|2|${formattedValue}|${student.name}|\n`;
+            });
+
+            const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            const fileName = numFiles > 1 ? `${baseFileName}_${i + 1}.txt` : `${baseFileName}.txt`;
+
+            link.setAttribute("href", url);
+            link.setAttribute("download", fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        const orderDate = new Date();
         const newOrderId = `PED${orderDate.getFullYear()}${(orderDate.getMonth() + 1).toString().padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
-        const totalValue = filteredStudents.length * valuePerStudent;
+        const totalValue = studentsForFile.length * valuePerStudent;
 
         const newOrder: Omit<Order, 'id'> = {
             orderId: newOrderId,
-            date: formattedDate,
+            date: orderDate.toISOString().split('T')[0],
             totalValue: totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
             user: user.name,
-            studentCount: filteredStudents.length,
-            fileContent: fileContent,
+            studentCount: studentsForFile.length,
+            // Storing the content of the first file as a reference
+            fileContent: "REC|1\n" + studentsForFile.slice(0, studentsPerFile).map(student => {
+                const formattedValue = (valuePerStudent * 100).toFixed(0);
+                return `${student.cpf}|2|${formattedValue}|${student.name}|\n`;
+            }).join(''),
         };
 
         onSave(newOrder);
@@ -142,7 +188,7 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
   
     const toggleSelectAll = (checked: boolean) => {
         if (checked) {
-            setSelectedStudents(studentsForOrder.map(s => s.id));
+            setSelectedStudents(filteredStudents.map(s => s.id));
         } else {
             setSelectedStudents([]);
         }
@@ -152,9 +198,9 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         <DialogContent className="sm:max-w-6xl">
             <DialogHeader>
                 <DialogTitle>Gerar Novo Pedido de Passe</DialogTitle>
-                <DialogDescription>Selecione o tipo de pedido e os alunos para gerar o arquivo .txt.</DialogDescription>
+                <DialogDescription>Selecione os alunos para gerar o arquivo .txt.</DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                 <div>
                     <Label htmlFor="order-type">Tipo de Pedido</Label>
                     <Select defaultValue="general">
@@ -163,6 +209,20 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="general">Passe Geral (Alunos Homologados)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div>
+                    <Label htmlFor="school-filter">Filtrar por Escola</Label>
+                    <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+                        <SelectTrigger id="school-filter">
+                            <SelectValue placeholder="Selecione uma escola" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todas as Escolas</SelectItem>
+                            {schools.map(school => (
+                                <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>
@@ -175,7 +235,7 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
                                 <TableHead className="w-[50px]">
                                     <Checkbox 
                                         onCheckedChange={(checked) => toggleSelectAll(!!checked)} 
-                                        checked={studentsForOrder.length > 0 && selectedStudents.length === studentsForOrder.length}
+                                        checked={filteredStudents.length > 0 && selectedStudents.length === filteredStudents.length}
                                         disabled={loading}
                                     />
                                 </TableHead>
@@ -186,9 +246,9 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
                         </TableHeader>
                         <TableBody>
                            {loading ? (
-                             <TableRow><TableCell colSpan={4} className="text-center">Carregando alunos...</TableCell></TableRow>
-                           ) : studentsForOrder.length > 0 ? (
-                                studentsForOrder.map(student => (
+                             <TableRow><TableCell colSpan={4} className="text-center">Carregando...</TableCell></TableRow>
+                           ) : filteredStudents.length > 0 ? (
+                                filteredStudents.map(student => (
                                    <TableRow key={student.id}>
                                        <TableCell>
                                            <Checkbox 
@@ -212,7 +272,7 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
             </Card>
             <DialogFooter>
                 <div className="text-sm text-muted-foreground">
-                    {selectedStudents.length} de {studentsForOrder.length} alunos selecionados.
+                    {selectedStudents.length} de {filteredStudents.length} alunos selecionados.
                 </div>
                 <Button onClick={handleGenerate} disabled={selectedStudents.length === 0 || loading}>
                     <Download className="mr-2 h-4 w-4"/> Gerar Pedido
@@ -346,3 +406,5 @@ export default function OrdersPage() {
     </Card>
   );
 }
+
+    
