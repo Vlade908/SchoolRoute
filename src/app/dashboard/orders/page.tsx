@@ -80,7 +80,7 @@ type School = {
 };
 
 
-function GenerateOrderDialog({ onSave, isOpen, onOpenChange, selectedMonth }: { onSave: (order: Omit<Order, 'id' | 'savedAt' | 'status'>) => void; isOpen: boolean, onOpenChange: (open: boolean) => void, selectedMonth: number | null; }) {
+function GenerateOrderDialog({ onSave, isOpen, onOpenChange, selectedMonth, selectedYear }: { onSave: (order: Omit<Order, 'id' | 'savedAt' | 'status'>) => void; isOpen: boolean, onOpenChange: (open: boolean) => void, selectedMonth: number | null; selectedYear: string; }) {
     const { user } = useUser();
     const { toast } = useToast();
     const [allStudents, setAllStudents] = useState<Student[]>([]);
@@ -93,6 +93,7 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange, selectedMonth }: { 
     const [step, setStep] = useState<'selection' | 'confirmation'>('selection');
     const [generatedOrder, setGeneratedOrder] = useState<Omit<Order, 'id' | 'orderId' | 'savedAt' | 'status'> | null>(null);
     const [manualOrderId, setManualOrderId] = useState('');
+    const [orderType, setOrderType] = useState('general');
     
     const resetState = useCallback(() => {
         setStep('selection');
@@ -100,6 +101,7 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange, selectedMonth }: { 
         setGeneratedOrder(null);
         setManualOrderId('');
         setSchoolFilter('all');
+        setOrderType('general');
     }, []);
 
     const isNextMonth = useMemo(() => {
@@ -157,18 +159,43 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange, selectedMonth }: { 
         }
         return allStudents.filter(student => student.schoolId === schoolFilter);
     }, [allStudents, schoolFilter]);
+    
+    const countWeekdays = (start: Date, end: Date): number => {
+        let count = 0;
+        const curDate = new Date(start.getTime());
+        while (curDate <= end) {
+            const dayOfWeek = curDate.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+            curDate.setDate(curDate.getDate() + 1);
+        }
+        return count;
+    }
 
     const handleGenerate = () => {
-        if (!user || selectedStudents.length === 0) {
-            toast({ variant: 'destructive', title: 'Seleção Inválida', description: 'Nenhum aluno selecionado.' });
+        if (!user || selectedStudents.length === 0 || selectedMonth === null) {
+            toast({ variant: 'destructive', title: 'Seleção Inválida', description: 'Nenhum aluno selecionado ou mês inválido.' });
             return;
         }
 
         const studentsForFile = allStudents.filter(s => selectedStudents.includes(s.id));
         if (studentsForFile.length === 0) return;
-
+        
+        let remainingDays = 0;
         const ticketValue = 4.90;
-        const remainingDays = 15;
+        const year = parseInt(selectedYear);
+
+        if (orderType === 'general') {
+            const firstDayOfMonth = new Date(year, selectedMonth, 1);
+            const lastDayOfMonth = new Date(year, selectedMonth + 1, 0);
+            remainingDays = countWeekdays(firstDayOfMonth, lastDayOfMonth);
+        } else { // 'complementary' for current month
+            const today = new Date();
+            const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            if (today.getMonth() === selectedMonth && today.getFullYear() === year) {
+                remainingDays = countWeekdays(today, lastDayOfMonth);
+            }
+        }
+        
         const valuePerStudent = ticketValue * remainingDays;
         const studentsPerFile = 150;
         const numFiles = Math.ceil(studentsForFile.length / studentsPerFile);
@@ -302,7 +329,7 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange, selectedMonth }: { 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                 <div>
                     <Label htmlFor="order-type">Tipo de Pedido</Label>
-                    <Select defaultValue="general">
+                    <Select value={orderType} onValueChange={setOrderType}>
                         <SelectTrigger id="order-type">
                             <SelectValue />
                         </SelectTrigger>
@@ -644,6 +671,7 @@ export default function OrdersPage() {
                                     isOpen={isAddModalOpen} 
                                     onOpenChange={setIsAddModalOpen}
                                     selectedMonth={selectedMonth}
+                                    selectedYear={selectedYear}
                                 />
                             </Dialog>
                         )}
@@ -723,3 +751,4 @@ export default function OrdersPage() {
     </>
   );
 }
+
