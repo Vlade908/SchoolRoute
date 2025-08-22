@@ -241,6 +241,13 @@ function StudentProfileDialog({
                     }
                 }
             });
+
+            foundOrders.sort((a, b) => {
+                const dateA = new Date(a.date.split('/').reverse().join('-')).getTime();
+                const dateB = new Date(b.date.split('/').reverse().join('-')).getTime();
+                return dateB - dateA;
+            });
+            
             setStudentOrders(foundOrders);
         }).catch(err => {
             console.error("Error fetching student orders:", err);
@@ -1457,6 +1464,7 @@ export default function StudentsPage() {
     
 
     
+
 
 
 
