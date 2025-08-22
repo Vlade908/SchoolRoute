@@ -520,7 +520,6 @@ export default function OrdersPage() {
               <TableHead>Valor Total</TableHead>
               <TableHead>Nº de Alunos</TableHead>
               <TableHead>Realizado Por</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead>
                 <span className="sr-only">Ações</span>
               </TableHead>
@@ -528,7 +527,7 @@ export default function OrdersPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={7} className="text-center">Carregando pedidos...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center">Carregando pedidos...</TableCell></TableRow>
             ) : filteredOrders.length > 0 ? (
               filteredOrders.map((order) => (
               <TableRow key={order.id}>
@@ -537,13 +536,6 @@ export default function OrdersPage() {
                 <TableCell>{order.totalValue}</TableCell>
                 <TableCell>{order.studentCount}</TableCell>
                 <TableCell>{order.user}</TableCell>
-                <TableCell>
-                  {order.status === 'Excluído' && (
-                    <Badge variant='destructive' className='bg-red-600'>
-                        {order.status}
-                    </Badge>
-                  )}
-                </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -569,10 +561,17 @@ export default function OrdersPage() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
+                <TableCell>
+                  {order.status === 'Excluído' && (
+                    <Badge variant='destructive' className='bg-red-600'>
+                        {order.status}
+                    </Badge>
+                  )}
+                </TableCell>
               </TableRow>
             ))
             ) : (
-                 <TableRow><TableCell colSpan={7} className="text-center">Nenhum pedido encontrado para o filtro selecionado.</TableCell></TableRow>
+                 <TableRow><TableCell colSpan={6} className="text-center">Nenhum pedido encontrado para o filtro selecionado.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -581,5 +580,7 @@ export default function OrdersPage() {
     </Card>
   );
 }
+
+    
 
     
