@@ -103,7 +103,10 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
 
 
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+           resetState();
+           return;
+        }
 
         const fetchData = async () => {
             try {
@@ -229,7 +232,6 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
         };
 
         onSave(finalOrder);
-        resetState();
         onOpenChange(false);
     }
   
@@ -396,7 +398,7 @@ export default function OrdersPage() {
                 if (data.savedAt && typeof data.savedAt.seconds === 'number') {
                     data.savedAt = new Timestamp(data.savedAt.seconds, data.savedAt.nanoseconds);
                 }
-                fetchedOrders.push({ id: doc.id, status: 'Ativo', ...data });
+                fetchedOrders.push({ id: doc.id, status: data.status || 'Ativo', ...data });
             }
         });
         fetchedOrders.sort((a,b) => {
@@ -536,9 +538,11 @@ export default function OrdersPage() {
                 <TableCell>{order.studentCount}</TableCell>
                 <TableCell>{order.user}</TableCell>
                 <TableCell>
-                    <Badge variant={order.status === 'Ativo' ? 'default' : 'destructive'} className={order.status === 'Ativo' ? 'bg-green-600' : 'bg-red-600'}>
+                  {order.status === 'Excluído' && (
+                    <Badge variant='destructive' className='bg-red-600'>
                         {order.status}
                     </Badge>
+                  )}
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>
