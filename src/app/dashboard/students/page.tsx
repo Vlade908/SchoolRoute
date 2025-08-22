@@ -94,6 +94,12 @@ type TransportRequest = {
     executor?: string;
 };
 
+type StudentOrder = {
+    orderId: string;
+    date: string;
+    value: string;
+};
+
 type SchoolClass = {
   name: string;
   period: 'Manhã' | 'Tarde' | 'Noite' | 'Integral';
@@ -131,8 +137,11 @@ function StudentProfileDialog({
   const [isSchoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
   const [requests, setRequests] = useState<TransportRequest[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [studentOrders, setStudentOrders] = useState<StudentOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [yearFilter, setYearFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('data');
 
   
   useEffect(() => {
@@ -162,7 +171,7 @@ function StudentProfileDialog({
   }, [isOpen, student]);
   
   useEffect(() => {
-    if (isOpen && student?.id) {
+    if (isOpen && student?.id && activeTab === 'requests') {
         setLoadingRequests(true);
         const requestsRef = collection(db, "transport-requests");
         const q = query(requestsRef, where("studentUid", "==", student.id));
@@ -201,7 +210,40 @@ function StudentProfileDialog({
             setLoadingRequests(false);
         });
     }
-}, [isOpen, student?.id]);
+    
+    if(isOpen && student?.cpf && activeTab === 'order-history') {
+        setLoadingOrders(true);
+        const ordersRef = collection(db, "orders");
+        const studentCpf = student.cpf.replace(/[^\d]/g, '');
+
+        getDocs(ordersRef).then((snapshot) => {
+            const foundOrders: StudentOrder[] = [];
+            snapshot.forEach(docSnap => {
+                const orderData = decryptObjectValues(docSnap.data()) as any;
+                if(orderData && orderData.fileContent && typeof orderData.fileContent === 'string') {
+                    const lines = orderData.fileContent.split('\n');
+                    const studentLine = lines.find(line => line.startsWith(studentCpf));
+                    if(studentLine) {
+                        const parts = studentLine.split('|');
+                        const valueInCents = parseInt(parts[2], 10);
+                        const valueInReais = (valueInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                        
+                        foundOrders.push({
+                            orderId: orderData.orderId,
+                            date: new Date(orderData.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}),
+                            value: valueInReais
+                        });
+                    }
+                }
+            });
+            setStudentOrders(foundOrders);
+        }).catch(err => {
+            console.error("Error fetching student orders:", err);
+        }).finally(() => {
+            setLoadingOrders(false);
+        });
+    }
+}, [isOpen, student?.id, student?.cpf, activeTab]);
 
   
   const availableYears = useMemo(() => {
@@ -323,12 +365,13 @@ function StudentProfileDialog({
               <DialogTitle>{isEditing ? 'Editar Perfil do Aluno' : 'Perfil do Aluno'}</DialogTitle>
               <DialogDescription>{student.name} - {student.ra}</DialogDescription>
             </DialogHeader>
-            <Tabs defaultValue="data">
-              <TabsList className="grid w-full grid-cols-5">
+            <Tabs defaultValue="data" value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="data">Dados</TabsTrigger>
                 <TabsTrigger value="documents">Documentos</TabsTrigger>
                 <TabsTrigger value="enrollments">Matrículas</TabsTrigger>
                 <TabsTrigger value="requests">Solicitações</TabsTrigger>
+                <TabsTrigger value="order-history">Pedidos</TabsTrigger>
                 <TabsTrigger value="history">Histórico</TabsTrigger>
               </TabsList>
               <TabsContent value="data" className="pt-4">
@@ -575,6 +618,42 @@ function StudentProfileDialog({
                                     ))
                                 ) : (
                                     <TableRow><TableCell colSpan={5} className="text-center">Nenhuma solicitação encontrada.</TableCell></TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+               </TabsContent>
+                <TabsContent value="order-history" className="pt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Histórico de Pedidos</CardTitle>
+                      <CardDescription>Lista de pedidos de passe escolar que incluíram este aluno.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Nº do Pedido</TableHead>
+                                    <TableHead>Data do Pedido</TableHead>
+                                    <TableHead>Valor do Passe</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loadingOrders ? (
+                                    <TableRow><TableCell colSpan={3} className="text-center">Carregando...</TableCell></TableRow>
+                                ) : studentOrders.length > 0 ? (
+                                    studentOrders.map(order => (
+                                        <TableRow key={order.orderId}>
+                                            <TableCell>{order.orderId}</TableCell>
+                                            <TableCell>{order.date}</TableCell>
+                                            <TableCell>{order.value}</TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow><TableCell colSpan={3} className="text-center">Nenhum pedido encontrado para este aluno.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
@@ -1338,5 +1417,6 @@ export default function StudentsPage() {
     
 
     
+
 
 
