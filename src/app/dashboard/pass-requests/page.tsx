@@ -114,7 +114,7 @@ export default function PassRequestsPage() {
 
                 // Fetch all students
                 const studentsRef = collection(db, "students");
-                const q = query(studentsRef);
+                const q = query(studentsRef, where("status", "==", "Homologado"));
                 const querySnapshot = await getDocs(q);
 
                 const studentData: Student[] = [];
@@ -360,9 +360,9 @@ export default function PassRequestsPage() {
                                 </TableHead>
                                 <TableHead>Nome</TableHead>
                                 <TableHead>RA</TableHead>
+                                <TableHead>CPF</TableHead>
                                 <TableHead>Série/Ano</TableHead>
                                 <TableHead>Turma</TableHead>
-                                <TableHead>CPF</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -376,9 +376,9 @@ export default function PassRequestsPage() {
                                     </TableCell>
                                     <TableCell className="font-medium">{student.name}</TableCell>
                                     <TableCell>{student.ra}</TableCell>
+                                    <TableCell>{student.cpf}</TableCell>
                                     <TableCell>{student.grade}</TableCell>
                                     <TableCell>{student.className}</TableCell>
-                                    <TableCell>{student.cpf}</TableCell>
                                 </TableRow>
                             )) : (
                                 <TableRow>
