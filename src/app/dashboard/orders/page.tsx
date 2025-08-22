@@ -1,7 +1,7 @@
 
 'use client';
-import { useState, useEffect, useMemo } from 'react';
-import { MoreHorizontal, PlusCircle, Download, ArrowLeft, Trash2, Undo, ListFilter } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { MoreHorizontal, PlusCircle, Download, Trash2, Undo, ListFilter, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -51,6 +51,7 @@ import { collection, onSnapshot, getDocs, query, where, addDoc, Timestamp, doc, 
 import { useToast } from '@/hooks/use-toast';
 import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
 import { Badge } from '@/components/ui/badge';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel';
 
 
 type Order = {
@@ -93,13 +94,13 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
     const [generatedOrder, setGeneratedOrder] = useState<Omit<Order, 'id' | 'orderId' | 'savedAt' | 'status'> | null>(null);
     const [manualOrderId, setManualOrderId] = useState('');
     
-    const resetState = () => {
+    const resetState = useCallback(() => {
         setStep('selection');
         setSelectedStudents([]);
         setGeneratedOrder(null);
         setManualOrderId('');
         setSchoolFilter('all');
-    };
+    }, []);
 
 
     useEffect(() => {
@@ -142,7 +143,7 @@ function GenerateOrderDialog({ onSave, isOpen, onOpenChange }: { onSave: (order:
             }
         };
         fetchData();
-    }, [isOpen, toast]);
+    }, [isOpen, toast, resetState]);
     
     const filteredStudents = useMemo(() => {
         if (schoolFilter === 'all') {
@@ -382,6 +383,28 @@ export default function OrdersPage() {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('Ativo');
+  
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+
+  const months = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  ];
+  
+  const currentMonthIndex = new Date().getFullYear().toString() === selectedYear ? new Date().getMonth() : 11;
+  const availableMonths = months.slice(0, currentMonthIndex + 1);
+
+  const availableYears = useMemo(() => {
+    const years = new Set(allOrders.map(order => new Date(order.date).getFullYear().toString()));
+    const currentYear = new Date().getFullYear().toString();
+    if (!years.has(currentYear)) {
+      years.add(currentYear);
+    }
+    return Array.from(years).sort((a,b) => parseInt(b) - parseInt(a));
+  }, [allOrders]);
+  
 
   useEffect(() => {
     if (!user || user.role < 3) {
@@ -401,11 +424,8 @@ export default function OrdersPage() {
                 fetchedOrders.push({ id: doc.id, status: data.status || 'Ativo', ...data });
             }
         });
-        fetchedOrders.sort((a,b) => {
-             const timeA = a.savedAt?.toMillis() || 0;
-             const timeB = b.savedAt?.toMillis() || 0;
-             return timeB - timeA;
-        });
+        
+        fetchedOrders.sort((a,b) => (b.savedAt?.toMillis() || 0) - (a.savedAt?.toMillis() || 0));
         setAllOrders(fetchedOrders);
         setLoading(false);
     });
@@ -415,11 +435,31 @@ export default function OrdersPage() {
   }, [user, router]);
   
   const filteredOrders = useMemo(() => {
-    if (statusFilter === 'all') {
-        return allOrders;
+    let orders = allOrders.filter(order => new Date(order.date).getFullYear().toString() === selectedYear);
+
+    if (selectedMonth !== null) {
+      orders = orders.filter(order => new Date(order.date).getMonth() === selectedMonth);
+    } else {
+        return []; // Do not show any order if no month is selected
     }
-    return allOrders.filter(order => order.status === statusFilter);
-  }, [allOrders, statusFilter]);
+    
+    if (statusFilter !== 'all') {
+        orders = orders.filter(order => order.status === statusFilter);
+    }
+    
+    return orders;
+  }, [allOrders, selectedYear, selectedMonth, statusFilter]);
+
+  const ordersByMonth = useMemo(() => {
+    const counts = new Array(12).fill(0);
+    allOrders.forEach(order => {
+        if (new Date(order.date).getFullYear().toString() === selectedYear) {
+            const month = new Date(order.date).getMonth();
+            counts[month]++;
+        }
+    });
+    return counts;
+  }, [allOrders, selectedYear]);
 
   
   const handleSaveOrder = async (newOrderData: Omit<Order, 'id' | 'savedAt' | 'status'>) => {
@@ -468,119 +508,171 @@ export default function OrdersPage() {
     link.click();
     document.body.removeChild(link);
   }
+  
+  const handleYearChange = (year: string) => {
+    setSelectedYear(year);
+    setSelectedMonth(null); // Reset month selection when year changes
+  }
 
   if (!user || user.role < 3) {
       return <p>Acesso negado.</p>;
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className='flex-1'>
-                <CardTitle>Geração de Pedidos</CardTitle>
-                <CardDescription>
-                Crie e baixe os arquivos de pedido de passe para os alunos.
-                </CardDescription>
-            </div>
-             <div className='flex items-center gap-2'>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className='w-full sm:w-[180px]'>
-                        <SelectValue placeholder="Filtrar por status"/>
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Ativo">Ativos</SelectItem>
-                        <SelectItem value="Excluído">Excluídos</SelectItem>
-                        <SelectItem value="all">Todos</SelectItem>
-                    </SelectContent>
-                </Select>
-                 <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                    <DialogTrigger asChild>
-                        <Button size="sm" className="gap-1">
-                            <PlusCircle className="h-3.5 w-3.5" />
-                            Novo Pedido
-                        </Button>
-                    </DialogTrigger>
-                    <GenerateOrderDialog 
-                        onSave={handleSaveOrder} 
-                        isOpen={isAddModalOpen} 
-                        onOpenChange={setIsAddModalOpen} 
-                    />
-                </Dialog>
-            </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-       <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nº do Pedido</TableHead>
-              <TableHead>Data</TableHead>
-              <TableHead>Valor Total</TableHead>
-              <TableHead>Nº de Alunos</TableHead>
-              <TableHead>Realizado Por</TableHead>
-              <TableHead>
-                <span className="sr-only">Ações</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={6} className="text-center">Carregando pedidos...</TableCell></TableRow>
-            ) : filteredOrders.length > 0 ? (
-              filteredOrders.map((order) => (
-              <TableRow key={order.id}>
-                <TableCell className="font-medium">{order.orderId}</TableCell>
-                <TableCell>{new Date(order.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</TableCell>
-                <TableCell>{order.totalValue}</TableCell>
-                <TableCell>{order.studentCount}</TableCell>
-                <TableCell>{order.user}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuItem onSelect={() => downloadFile(order.fileContent, order.date)}>
-                            <Download className="mr-2 h-4 w-4"/> Baixar Novamente
-                        </DropdownMenuItem>
-                        {order.status === 'Ativo' ? (
-                            <DropdownMenuItem className="text-red-500" onSelect={() => handleUpdateOrderStatus(order, 'Excluído')}>
-                                <Trash2 className="mr-2 h-4 w-4"/> Excluir
-                            </DropdownMenuItem>
-                        ) : (
-                            <DropdownMenuItem onSelect={() => handleUpdateOrderStatus(order, 'Ativo')}>
-                                <Undo className="mr-2 h-4 w-4"/> Restaurar
-                            </DropdownMenuItem>
-                        )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-                <TableCell>
-                  {order.status === 'Excluído' && (
-                    <Badge variant='destructive' className='bg-red-600'>
-                        {order.status}
-                    </Badge>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))
-            ) : (
-                 <TableRow><TableCell colSpan={6} className="text-center">Nenhum pedido encontrado para o filtro selecionado.</TableCell></TableRow>
-            )}
-          </TableBody>
-        </Table>
-       </div>
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Geração de Pedidos</CardTitle>
+          <CardDescription>
+            Crie e baixe os arquivos de pedido de passe para os alunos.
+          </CardDescription>
+          <div className="flex items-center gap-4 pt-4">
+              <Label>Ano:</Label>
+              <Select value={selectedYear} onValueChange={handleYearChange}>
+                  <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {availableYears.map(year => (
+                          <SelectItem key={year} value={year}>{year}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+            <Carousel setApi={setCarouselApi} className="w-full">
+                <CarouselContent>
+                    {availableMonths.map((month, index) => (
+                        <CarouselItem key={month} className="basis-1/2 md:basis-1/4 lg:basis-1/6">
+                             <div className="p-1">
+                                <Card 
+                                    className={`cursor-pointer transition-all ${selectedMonth === index ? 'border-primary ring-2 ring-primary' : 'hover:border-primary/50'}`}
+                                    onClick={() => setSelectedMonth(index)}
+                                >
+                                    <CardHeader className="p-4 flex flex-row items-center justify-between">
+                                        <CardTitle className="text-lg">{month}</CardTitle>
+                                        <Badge variant={selectedMonth === index ? 'default' : 'secondary'}>{ordersByMonth[index]}</Badge>
+                                    </CardHeader>
+                                    <CardContent className="p-4 pt-0">
+                                       <p className="text-xs text-muted-foreground">{ordersByMonth[index]} pedido(s) este mês.</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </CarouselItem>
+                    ))}
+                </CarouselContent>
+                <CarouselPrevious className="absolute left-0 top-1/2 -translate-y-1/2" />
+                <CarouselNext className="absolute right-0 top-1/2 -translate-y-1/2" />
+            </Carousel>
+        </CardContent>
+      </Card>
+
+      {selectedMonth !== null && (
+        <Card className="mt-6">
+            <CardHeader>
+                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className='flex-1'>
+                        <CardTitle>Pedidos de {months[selectedMonth]} de {selectedYear}</CardTitle>
+                        <CardDescription>
+                          Lista de pedidos realizados no mês selecionado.
+                        </CardDescription>
+                    </div>
+                    <div className='flex items-center gap-2'>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className='w-full sm:w-[180px]'>
+                                <SelectValue placeholder="Filtrar por status"/>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Ativo">Ativos</SelectItem>
+                                <SelectItem value="Excluído">Excluídos</SelectItem>
+                                <SelectItem value="all">Todos</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm" className="gap-1">
+                                    <PlusCircle className="h-3.5 w-3.5" />
+                                    Novo Pedido
+                                </Button>
+                            </DialogTrigger>
+                            <GenerateOrderDialog 
+                                onSave={handleSaveOrder} 
+                                isOpen={isAddModalOpen} 
+                                onOpenChange={setIsAddModalOpen} 
+                            />
+                        </Dialog>
+                    </div>
+                </div>
+            </CardHeader>
+             <CardContent>
+               <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nº do Pedido</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Valor Total</TableHead>
+                      <TableHead>Nº de Alunos</TableHead>
+                      <TableHead>Realizado Por</TableHead>
+                      <TableHead><span className="sr-only">Ações</span></TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow><TableCell colSpan={7} className="text-center">Carregando pedidos...</TableCell></TableRow>
+                    ) : filteredOrders.length > 0 ? (
+                      filteredOrders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">{order.orderId}</TableCell>
+                        <TableCell>{new Date(order.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</TableCell>
+                        <TableCell>{order.totalValue}</TableCell>
+                        <TableCell>{order.studentCount}</TableCell>
+                        <TableCell>{order.user}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button aria-haspopup="true" size="icon" variant="ghost">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Toggle menu</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                <DropdownMenuItem onSelect={() => downloadFile(order.fileContent, order.date)}>
+                                    <Download className="mr-2 h-4 w-4"/> Baixar Novamente
+                                </DropdownMenuItem>
+                                {order.status === 'Ativo' ? (
+                                    <DropdownMenuItem className="text-red-500" onSelect={() => handleUpdateOrderStatus(order, 'Excluído')}>
+                                        <Trash2 className="mr-2 h-4 w-4"/> Excluir
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem onSelect={() => handleUpdateOrderStatus(order, 'Ativo')}>
+                                        <Undo className="mr-2 h-4 w-4"/> Restaurar
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                        <TableCell>
+                          {order.status === 'Excluído' && (
+                            <Badge variant='destructive' className='bg-red-600'>
+                                Excluído
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                    ) : (
+                        <TableRow><TableCell colSpan={7} className="text-center">Nenhum pedido encontrado para o filtro selecionado.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+               </div>
+              </CardContent>
+        </Card>
+      )}
+    </>
   );
 }
-
-    
-
-    
