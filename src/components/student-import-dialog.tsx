@@ -115,7 +115,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         for (const row of sheetData) {
             const studentData: Record<string, any> = {};
             for (const header in columnMapping) {
-                if (columnMapping[header]) {
+                if (columnMapping[header] && columnMapping[header] !== 'ignore') {
                     studentData[columnMapping[header]] = row[header];
                 }
             }
@@ -215,7 +215,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                             <SelectValue placeholder="Ignorar esta coluna" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">Ignorar esta coluna</SelectItem>
+                                            <SelectItem value="ignore">Ignorar esta coluna</SelectItem>
                                             {studentSystemFields.map(field => (
                                                 <SelectItem key={field.value} value={field.value}>
                                                     {field.label}
