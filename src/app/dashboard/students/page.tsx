@@ -685,8 +685,8 @@ function StudentProfileDialog({
                                 {loadingOrders ? (
                                     <TableRow><TableCell colSpan={3} className="text-center">Carregando...</TableCell></TableRow>
                                 ) : filteredOrders.length > 0 ? (
-                                    filteredOrders.map(order => (
-                                        <TableRow key={order.orderId}>
+                                    filteredOrders.map((order, index) => (
+                                        <TableRow key={`${order.orderId}-${index}`}>
                                             <TableCell>{order.orderId}</TableCell>
                                             <TableCell>{order.date}</TableCell>
                                             <TableCell>{order.value}</TableCell>
@@ -1457,6 +1457,7 @@ export default function StudentsPage() {
     
 
     
+
 
 
 
