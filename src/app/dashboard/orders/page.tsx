@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import { MoreHorizontal, PlusCircle, Download } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Download, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -77,6 +77,11 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
     const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [schoolFilter, setSchoolFilter] = useState('all');
+    
+    // New state for multi-step modal
+    const [step, setStep] = useState<'selection' | 'confirmation'>('selection');
+    const [generatedOrder, setGeneratedOrder] = useState<Omit<Order, 'id' | 'orderId'> | null>(null);
+    const [manualOrderId, setManualOrderId] = useState('');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -122,7 +127,7 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         return allStudents.filter(student => student.schoolId === schoolFilter);
     }, [allStudents, schoolFilter]);
 
-    const handleGenerate = () => {
+    const handleDownloadFiles = () => {
         if (!user || selectedStudents.length === 0) {
             toast({ variant: 'destructive', title: 'Seleção Inválida', description: 'Nenhum aluno selecionado.' });
             return;
@@ -168,7 +173,6 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         }
 
         const orderDate = new Date();
-        const newOrderId = `PED${orderDate.getFullYear()}${(orderDate.getMonth() + 1).toString().padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
         const totalValue = studentsForFile.length * valuePerStudent;
 
         const firstChunkLines = studentsForFile.slice(0, studentsPerFile).map(student => {
@@ -177,17 +181,30 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
             return `${unformattedCpf}|2|${formattedValue}|${student.name}|`;
         });
 
-        const newOrder: Omit<Order, 'id'> = {
-            orderId: newOrderId,
+        const newOrderData: Omit<Order, 'id' | 'orderId'> = {
             date: orderDate.toISOString().split('T')[0],
             totalValue: totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
             user: user.name,
             studentCount: studentsForFile.length,
-            // Storing the content of the first file as a reference
             fileContent: "REC|1\n" + firstChunkLines.join('\n'),
         };
 
-        onSave(newOrder);
+        setGeneratedOrder(newOrderData);
+        setStep('confirmation');
+    }
+    
+    const handleSaveOrder = () => {
+        if (!generatedOrder || !manualOrderId) {
+            toast({ variant: 'destructive', title: 'ID do Pedido Obrigatório', description: 'Por favor, insira o número do pedido.' });
+            return;
+        }
+        
+        const finalOrder: Omit<Order, 'id'> = {
+            ...generatedOrder,
+            orderId: manualOrderId
+        };
+
+        onSave(finalOrder);
         onOpenChange(false);
     }
   
@@ -197,6 +214,55 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
         } else {
             setSelectedStudents([]);
         }
+    }
+
+    const resetState = () => {
+        setStep('selection');
+        setSelectedStudents([]);
+        setGeneratedOrder(null);
+        setManualOrderId('');
+    }
+
+    if (step === 'confirmation' && generatedOrder) {
+      return (
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Confirmar e Salvar Pedido</DialogTitle>
+                <DialogDescription>
+                    O(s) arquivo(s) foram baixados. Insira o número do pedido para salvá-lo no sistema.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Alunos incluídos:</span>
+                    <span className="font-medium">{generatedOrder.studentCount}</span>
+                </div>
+                 <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Valor total do pedido:</span>
+                    <span className="font-medium">{generatedOrder.totalValue}</span>
+                </div>
+                <div>
+                  <Label htmlFor="manualOrderId" className="text-right">
+                    Nº do Pedido
+                  </Label>
+                  <Input
+                    id="manualOrderId"
+                    value={manualOrderId}
+                    onChange={(e) => setManualOrderId(e.target.value)}
+                    placeholder="Insira o número do pedido"
+                  />
+                </div>
+            </div>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setStep('selection')} className="w-full sm:w-auto">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+                </Button>
+                <Button onClick={handleSaveOrder} className="w-full sm:w-auto">
+                    Salvar Pedido
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      )
     }
 
     return (
@@ -279,7 +345,7 @@ function GenerateOrderDialog({ onSave, onOpenChange }: { onSave: (order: Omit<Or
                 <div className="text-sm text-muted-foreground">
                     {selectedStudents.length} de {filteredStudents.length} alunos selecionados.
                 </div>
-                <Button onClick={handleGenerate} disabled={selectedStudents.length === 0 || loading}>
+                <Button onClick={handleDownloadFiles} disabled={selectedStudents.length === 0 || loading}>
                     <Download className="mr-2 h-4 w-4"/> Gerar Pedido
                 </Button>
             </DialogFooter>
@@ -413,5 +479,6 @@ export default function OrdersPage() {
 }
 
     
+
 
 
