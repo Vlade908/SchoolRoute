@@ -73,7 +73,7 @@ export default function PassRequestsPage() {
                 const studentData: Student[] = [];
                 querySnapshot.forEach(doc => {
                     const decryptedData = decryptObjectValues(doc.data()) as any;
-                    if (decryptedData && decryptedData.status === 'Homologado') {
+                    if (decryptedData) {
                         studentData.push({
                             id: doc.id,
                             uid: decryptedData.uid, 
