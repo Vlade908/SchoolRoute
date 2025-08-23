@@ -15,7 +15,7 @@ import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { ScrollArea, ScrollBar } from './ui/scroll-area';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Loader2, UploadCloud, Search, FileSpreadsheet, Star } from 'lucide-react';
+import { ArrowLeft, Loader2, UploadCloud, Search, FileSpreadsheet, Star, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
@@ -29,6 +29,11 @@ type School = {
     name: string;
     schoolType?: string;
 };
+
+const monthNames = [
+  'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN',
+  'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'
+];
 
 const studentSystemFields = [
     { value: 'name', label: 'Nome do Aluno' },
@@ -47,6 +52,10 @@ const studentSystemFields = [
     { value: 'hasPass', label: 'Possui Passe (Sim/Não)' },
     { value: 'souCardNumber', label: 'Nº Cartão SOU' },
     { value: 'status', label: 'Status de Homologação' },
+    ...monthNames.map((month, index) => ({
+      value: `receivedMonth:${index + 1}`,
+      label: `Mes Que Recebeu: ${month}`
+    }))
 ];
 
 function MappingTable({
