@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,10 @@ import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
-import { ArrowLeft, ArrowRight, Loader2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, UploadCloud, Star, Search, GripVertical, FileSpreadsheet } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Checkbox } from './ui/checkbox';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 
 
 type School = {
@@ -42,6 +45,77 @@ const studentSystemFields = [
     { value: 'souCardNumber', label: 'Nº Cartão SOU' },
 ];
 
+function MappingTable({ headers, onMappingChange, initialMapping }: { headers: string[], onMappingChange: (header: string, systemField: string) => void, initialMapping: Record<string, string>}) {
+    const [searchTerm, setSearchTerm] = useState('');
+    const filteredHeaders = useMemo(() => {
+        if (!searchTerm) return headers;
+        return headers.filter(h => h.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [headers, searchTerm]);
+
+    return (
+        <div>
+             <div className="flex justify-between items-center mb-4">
+                 <div className="flex items-center gap-2">
+                    <Label htmlFor="header-row">Linha do Cabeçalho</Label>
+                    <Input 
+                        id="header-row" 
+                        type="number" 
+                        defaultValue={1}
+                        onChange={(e) => {
+                            // This would be handled by a callback to re-process the sheet in a real implementation
+                        }}
+                        min="1"
+                        className="w-20"
+                    />
+                     <span className="text-xs text-muted-foreground">Especifique qual linha contém os nomes das colunas.</span>
+                 </div>
+                 <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Buscar colunas..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 w-full md:w-64"
+                    />
+                 </div>
+             </div>
+            <ScrollArea className="h-72 w-full pr-4 border rounded-md">
+                <Table>
+                    <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                        <TableRow>
+                            <TableHead className="w-1/2">Coluna</TableHead>
+                            <TableHead className="w-1/2">Mapear Para Campo do Sistema</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredHeaders.map(header => (
+                            <TableRow key={header}>
+                                <TableCell className="font-medium truncate" title={header}>{header}</TableCell>
+                                <TableCell>
+                                    <Select onValueChange={(value) => onMappingChange(header, value)} defaultValue={initialMapping[header] || 'ignore'}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Ignorar esta coluna" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="ignore">Ignorar esta coluna</SelectItem>
+                                            {studentSystemFields.map(field => (
+                                                <SelectItem key={field.value} value={field.value}>
+                                                    {field.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
+        </div>
+    );
+}
+
+
 export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange: (isOpen: boolean) => void; onSuccess: () => void }) {
     const { toast } = useToast();
     const [step, setStep] = useState(1);
@@ -49,6 +123,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
     const [sheetNames, setSheetNames] = useState<string[]>([]);
     const [selectedSheet, setSelectedSheet] = useState('');
+    const [primarySheet, setPrimarySheet] = useState('');
     const [sheetData, setSheetData] = useState<any[]>([]);
     const [headers, setHeaders] = useState<string[]>([]);
     const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
@@ -93,6 +168,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 setWorkbook(wb);
                 setSheetNames(wb.SheetNames);
                 setSelectedSheet(wb.SheetNames[0]);
+                setPrimarySheet(wb.SheetNames[0]);
              } catch (error) {
                 console.error("Error parsing file:", error);
                 toast({ variant: 'destructive', title: 'Erro ao Ler Planilha', description: 'Não foi possível processar o arquivo. Verifique se o formato é válido.' });
@@ -208,20 +284,19 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     }
 
     return (
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="sm:max-w-6xl">
             <DialogHeader>
                 <DialogTitle>Importar Alunos de Planilha</DialogTitle>
                 <DialogDescription>
-                    Siga os passos para importar múltiplos alunos de uma vez.
+                  {step === 1 && "Selecione o arquivo de planilha que deseja importar."}
+                  {step === 2 && "Selecione a aba, defina a linha do cabeçalho e valide as colunas para importar."}
+                  {step === 3 && "A importação foi concluída. Veja o resumo abaixo."}
                 </DialogDescription>
             </DialogHeader>
 
             {step === 1 && (
                 <div className="py-4 space-y-4">
                     <div>
-                        <Label htmlFor="spreadsheet-file" className="block text-sm font-medium text-muted-foreground mb-2">
-                            Passo 1: Selecionar Arquivo (.xlsx, .csv, .ods)
-                        </Label>
                         <Label
                             htmlFor="spreadsheet-file"
                             className="relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50 transition-colors"
@@ -240,62 +315,42 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 </div>
             )}
             
-            {step === 2 && (
-                <div className="py-4">
-                    <Label className="block text-sm font-medium text-muted-foreground mb-2">
-                        Passo 2: Configurar e Mapear Colunas
-                    </Label>
-                    <p className="text-sm text-muted-foreground mb-4">Selecione a planilha e associe as colunas aos campos do sistema.</p>
-                     
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <Label htmlFor="sheet-select">Selecionar Planilha</Label>
-                             <Select value={selectedSheet} onValueChange={setSelectedSheet} disabled={sheetNames.length <= 1}>
-                                <SelectTrigger id="sheet-select">
-                                    <SelectValue placeholder="Selecione a planilha" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {sheetNames.map(name => (
-                                        <SelectItem key={name} value={name}>{name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="header-row">Linha do Cabeçalho</Label>
-                            <Input 
-                                id="header-row" 
-                                type="number" 
-                                value={headerRow} 
-                                onChange={(e) => setHeaderRow(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                                min="1"
-                                className="w-32 mt-1"
-                            />
-                        </div>
-                     </div>
-                    
-                    <ScrollArea className="h-72 w-full pr-4">
-                        <div className="space-y-4">
-                            {headers.map(header => (
-                                <div key={header} className="grid grid-cols-2 gap-4 items-center">
-                                    <Label className="text-right truncate" title={header}>{header}</Label>
-                                    <Select onValueChange={(value) => handleMappingChange(header, value)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Ignorar esta coluna" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="ignore">Ignorar esta coluna</SelectItem>
-                                            {studentSystemFields.map(field => (
-                                                <SelectItem key={field.value} value={field.value}>
-                                                    {field.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+            {step === 2 && workbook && (
+                <div className="py-4 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm">
+                        <FileSpreadsheet className="mr-2 h-4 w-4"/>
+                        {file?.name}
+                      </Button>
+                       <Button variant="ghost" size="icon" className="h-8 w-8">
+                         <PlusCircle className="h-4 w-4" />
+                       </Button>
+                    </div>
+
+                    <ScrollArea className="w-full whitespace-nowrap">
+                        <div className="flex items-center gap-2 border-b">
+                            {sheetNames.map(name => (
+                                <button
+                                    key={name}
+                                    onClick={() => setSelectedSheet(name)}
+                                    className={cn(
+                                        "flex items-center gap-2 p-2 text-sm transition-colors border-b-2",
+                                        selectedSheet === name 
+                                            ? "border-primary text-primary font-semibold" 
+                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <GripVertical className="h-4 w-4" />
+                                    <span>{name}</span>
+                                    <button onClick={(e) => {e.stopPropagation(); setPrimarySheet(name);}}>
+                                      <Star className={cn("h-4 w-4 transition-colors", primarySheet === name ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground hover:text-yellow-400')}/>
+                                    </button>
+                                </button>
                             ))}
                         </div>
                     </ScrollArea>
+                    
+                    <MappingTable headers={headers} onMappingChange={handleMappingChange} initialMapping={columnMapping} />
                 </div>
             )}
             
