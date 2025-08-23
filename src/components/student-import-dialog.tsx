@@ -18,6 +18,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { saveImportConfig, type SheetConfig } from '@/app/actions/save-import-config';
+import { db } from '@/lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { decryptObjectValues } from '@/lib/crypto';
 
 
 const monthNames = [
@@ -47,6 +50,12 @@ const studentSystemFields = [
       label: `Mes Que Recebeu: ${month}`
     }))
 ];
+
+type School = {
+    id: string;
+    name: string;
+    address: string;
+}
 
 function MappingTable({
   headers,
@@ -196,6 +205,23 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const [importSummary, setImportSummary] = useState<{ successCount: number; errorCount: number; newSchools: Record<string, number> } | null>(null);
     const [headerRow, setHeaderRow] = useState(1);
     const [selectedHeaders, setSelectedHeaders] = useState(new Set<string>());
+    const [schools, setSchools] = useState<School[]>([]);
+
+    useEffect(() => {
+        const fetchSchools = async () => {
+            const schoolsCollection = collection(db, 'schools');
+            const snapshot = await getDocs(schoolsCollection);
+            const schoolsData: School[] = [];
+            snapshot.forEach(doc => {
+                 const decryptedData = decryptObjectValues(doc.data()) as any;
+                 if(decryptedData) {
+                     schoolsData.push({ id: doc.id, name: decryptedData.name, address: decryptedData.address || '' });
+                 }
+            });
+            setSchools(schoolsData);
+        };
+        fetchSchools();
+    }, []);
 
     const resetState = () => {
         setStep(1);
@@ -324,13 +350,11 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
 
         setIsProcessing(true);
         try {
-            // NOTE: This saves the config for ALL sheets, not just the selected one.
-            // A more advanced implementation might let you build a config across multiple sheets.
             const configToSave: SheetConfig[] = sheetNames.map(name => ({
                 sheetName: name,
                 isPrimary: primarySheet === name,
-                headerRow: headerRow, // Assuming same header row for all for now
-                columnMapping: columnMapping, // Assuming same mapping for all for now
+                headerRow: headerRow,
+                columnMapping: columnMapping,
             }));
 
             const result = await saveImportConfig({
@@ -363,30 +387,35 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 }
             }
 
-            // Logic to automatically set hasPass
             if (student.souCardNumber) {
                 student.hasPass = 'Sim';
             }
 
-            // Default values for missing optional fields
             if (!student.responsibleName) student.responsibleName = "Jon Due";
             if (!student.contactPhone) student.contactPhone = "00000000000";
             if (!student.contactEmail) student.contactEmail = "johndue0000@gmail.com";
             if (!student.rg) student.rg = "000000000";
             if (!student.rgIssueDate) student.rgIssueDate = "00/00/0000";
+            if (!student.address) {
+                const school = schools.find(s => s.name === student.schoolName || s.id === student.schoolId);
+                if (school) {
+                    student.address = school.address;
+                }
+            }
             
             return student;
-        }).filter(student => Object.keys(student).length > 0 && student.name); // Ensure student has at least a name
+        }).filter(student => Object.keys(student).length > 0 && student.name);
 
-        // Placeholder for more complex validation and summary
         const newSchools: Record<string, number> = {};
         studentsToImport.forEach(student => {
-            if (student.schoolName) { // Assuming schoolName is a mapped field
-                newSchools[student.schoolName] = (newSchools[student.schoolName] || 0) + 1;
+            if (student.schoolName) {
+                const schoolExists = schools.some(s => s.name === student.schoolName);
+                if (!schoolExists) {
+                    newSchools[student.schoolName] = (newSchools[student.schoolName] || 0) + 1;
+                }
             }
         });
         
-        // This is a mock summary
         setImportSummary({ 
             successCount: studentsToImport.length, 
             errorCount: 0, 
