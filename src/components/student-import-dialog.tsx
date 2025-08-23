@@ -15,12 +15,13 @@ import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { ScrollArea, ScrollBar } from './ui/scroll-area';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Loader2, UploadCloud, Search, FileSpreadsheet } from 'lucide-react';
+import { ArrowLeft, Loader2, UploadCloud, Search, FileSpreadsheet, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
+import { Checkbox } from './ui/checkbox';
 
 
 type School = {
@@ -47,83 +48,131 @@ const studentSystemFields = [
     { value: 'souCardNumber', label: 'Nº Cartão SOU' },
 ];
 
-function MappingTable({ headers, columnMapping, onMappingChange }: { headers: string[], columnMapping: Record<string, string>, onMappingChange: (header: string, field: string) => void }) {
-    const [searchTerm, setSearchTerm] = useState('');
+function MappingTable({
+  headers,
+  columnMapping,
+  onMappingChange,
+  selectedHeaders,
+  onSelectedHeadersChange,
+}: {
+  headers: string[];
+  columnMapping: Record<string, string>;
+  onMappingChange: (header: string, field: string) => void;
+  selectedHeaders: Set<string>;
+  onSelectedHeadersChange: (newSelected: Set<string>) => void;
+}) {
+  const [searchTerm, setSearchTerm] = useState('');
 
-    const filteredHeaders = useMemo(() => {
-        if (!searchTerm) return headers;
-        return headers.filter(h => h.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [headers, searchTerm]);
+  const filteredHeaders = useMemo(() => {
+    if (!searchTerm) return headers;
+    return headers.filter(h => h.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [headers, searchTerm]);
 
-    const getSystemFieldLabel = (value: string) => {
-        return studentSystemFields.find(f => f.value === value)?.label || 'Selecione um papel...';
+  const getSystemFieldLabel = (value: string) => {
+    return studentSystemFields.find(f => f.value === value)?.label || 'Selecione um papel...';
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      onSelectedHeadersChange(new Set(headers));
+    } else {
+      onSelectedHeadersChange(new Set());
     }
+  };
 
-    return (
-        <div className="flex-grow flex flex-col overflow-hidden">
-            <div className="flex justify-between items-center mb-4 px-1">
-                <h3 className="text-lg font-semibold">Mapear Colunas</h3>
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Buscar colunas..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-8 w-full md:w-64"
-                    />
-                </div>
-            </div>
-            <div className="flex-grow overflow-hidden border rounded-md">
-              <ScrollArea className="h-full">
-                  <Table className="relative">
-                      <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
-                          <TableRow>
-                              <TableHead className="w-1/2">Coluna da Planilha</TableHead>
-                              <TableHead className="w-1/2">Campo no Sistema</TableHead>
-                          </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                          {filteredHeaders.map((header, index) => (
-                              <TableRow key={`${header}-${index}`}>
-                                  <TableCell className="font-medium truncate" title={header}>{header || <span className="text-muted-foreground italic">Coluna Vazia</span>}</TableCell>
-                                  <TableCell>
-                                      <Popover>
-                                          <PopoverTrigger asChild>
-                                              <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                                                  <span className="truncate">{getSystemFieldLabel(columnMapping[header] || 'ignore')}</span>
-                                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                              </Button>
-                                          </PopoverTrigger>
-                                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                              <Command>
-                                                  <CommandInput placeholder="Buscar campo..." />
-                                                  <CommandList>
-                                                      <CommandEmpty>Nenhum campo encontrado.</CommandEmpty>
-                                                      <CommandGroup>
-                                                            <CommandItem value="ignore" onSelect={() => onMappingChange(header, 'ignore')}>
-                                                                <Check className={cn("mr-2 h-4 w-4", (columnMapping[header] || 'ignore') === 'ignore' ? "opacity-100" : "opacity-0")} />
-                                                                Ignorar esta coluna
-                                                            </CommandItem>
-                                                          {studentSystemFields.map(field => (
-                                                              <CommandItem key={field.value} value={field.label} onSelect={() => onMappingChange(header, field.value)}>
-                                                                  <Check className={cn("mr-2 h-4 w-4", columnMapping[header] === field.value ? "opacity-100" : "opacity-0")} />
-                                                                  {field.label}
-                                                              </CommandItem>
-                                                          ))}
-                                                      </CommandGroup>
-                                                  </CommandList>
-                                              </Command>
-                                          </PopoverContent>
-                                      </Popover>
-                                  </TableCell>
-                              </TableRow>
-                          ))}
-                      </TableBody>
-                  </Table>
-              </ScrollArea>
-            </div>
+  const handleSelectHeader = (header: string, checked: boolean) => {
+    const newSet = new Set(selectedHeaders);
+    if (checked) {
+      newSet.add(header);
+    } else {
+      newSet.delete(header);
+    }
+    onSelectedHeadersChange(newSet);
+  };
+
+  const isAllSelected = headers.length > 0 && selectedHeaders.size === headers.length;
+
+  return (
+    <div className="flex-grow flex flex-col overflow-hidden">
+      <div className="flex justify-between items-center mb-4 px-1">
+        <h3 className="text-lg font-semibold">Mapear Colunas</h3>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar colunas..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 w-full md:w-64"
+          />
         </div>
-    );
+      </div>
+      <div className="flex-grow overflow-hidden border rounded-md">
+        <ScrollArea className="h-full">
+          <Table className="relative">
+            <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
+              <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Selecionar todas as colunas"
+                  />
+                </TableHead>
+                <TableHead className="w-1/2">Coluna da Planilha</TableHead>
+                <TableHead className="w-1/2">Campo no Sistema</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredHeaders.map((header, index) => (
+                <TableRow key={`${header}-${index}`}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedHeaders.has(header)}
+                      onCheckedChange={(checked) => handleSelectHeader(header, !!checked)}
+                      aria-label={`Selecionar coluna ${header}`}
+                    />
+                  </TableCell>
+                  <TableCell className="font-medium truncate" title={header}>
+                    {header || <span className="text-muted-foreground italic">Coluna Vazia</span>}
+                  </TableCell>
+                  <TableCell>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                          <span className="truncate">{getSystemFieldLabel(columnMapping[header] || 'ignore')}</span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command>
+                          <CommandInput placeholder="Buscar campo..." />
+                          <CommandList>
+                            <CommandEmpty>Nenhum campo encontrado.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem value="ignore" onSelect={() => onMappingChange(header, 'ignore')}>
+                                <Check className={cn("mr-2 h-4 w-4", (columnMapping[header] || 'ignore') === 'ignore' ? "opacity-100" : "opacity-0")} />
+                                Ignorar esta coluna
+                              </CommandItem>
+                              {studentSystemFields.map(field => (
+                                <CommandItem key={field.value} value={field.label} onSelect={() => onMappingChange(header, field.value)}>
+                                  <Check className={cn("mr-2 h-4 w-4", columnMapping[header] === field.value ? "opacity-100" : "opacity-0")} />
+                                  {field.label}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      </div>
+    </div>
+  );
 }
 
 export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange: (isOpen: boolean) => void; onSuccess: () => void }) {
@@ -139,6 +188,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const [isProcessing, setIsProcessing] = useState(false);
     const [importSummary, setImportSummary] = useState<{ successCount: number; errorCount: number; newSchools: Record<string, number> } | null>(null);
     const [headerRow, setHeaderRow] = useState(1);
+    const [selectedHeaders, setSelectedHeaders] = useState(new Set<string>());
 
     const resetState = () => {
         setStep(1);
@@ -152,6 +202,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         setIsProcessing(false);
         setImportSummary(null);
         setHeaderRow(1);
+        setSelectedHeaders(new Set());
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,6 +255,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             if (data.length < headerRow) {
                  setHeaders([]);
                  setSheetData([]);
+                 setSelectedHeaders(new Set());
                  return;
             }
 
@@ -233,6 +285,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 }
             });
             setColumnMapping(newMapping);
+            setSelectedHeaders(new Set(extractedHeaders.filter(h => !!h))); // Auto-select all non-empty headers initially
         } catch (error) {
             console.error("Error processing sheet:", error);
             toast({ variant: 'destructive', title: 'Erro ao processar a planilha' });
@@ -296,7 +349,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 );
             case 2:
                 return (
-                    <DialogContent className="sm:max-w-6xl flex flex-col h-[90vh]">
+                     <DialogContent className="sm:max-w-6xl flex flex-col h-[90vh]">
                         <DialogHeader>
                             <DialogTitle>Mapear Colunas</DialogTitle>
                             <DialogDescription>Passo 2 de 3: Configure como a planilha será importada.</DialogDescription>
@@ -337,7 +390,13 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                 />
                                 <span className="text-xs text-muted-foreground">Especifique qual linha contém os nomes das colunas.</span>
                             </div>
-                            <MappingTable headers={headers} columnMapping={columnMapping} onMappingChange={handleMappingChange} />
+                            <MappingTable 
+                                headers={headers} 
+                                columnMapping={columnMapping} 
+                                onMappingChange={handleMappingChange}
+                                selectedHeaders={selectedHeaders}
+                                onSelectedHeadersChange={setSelectedHeaders}
+                            />
                         </div>
                         <DialogFooter>
                             <Button variant="outline" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4" /> Voltar</Button>
