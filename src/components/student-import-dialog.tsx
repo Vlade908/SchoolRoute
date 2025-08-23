@@ -17,6 +17,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
+import { saveImportConfigFlow, type SheetConfig } from '@/ai/flows/save-import-config-flow';
 
 
 const monthNames = [
@@ -240,8 +241,9 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 setWorkbook(wb);
                 setSheetNames(wb.SheetNames);
                 if (wb.SheetNames.length > 0) {
-                    setSelectedSheet(wb.SheetNames[0]);
-                    setPrimarySheet(wb.SheetNames[0]);
+                    const firstSheet = wb.SheetNames[0];
+                    setSelectedSheet(firstSheet);
+                    setPrimarySheet(firstSheet);
                 }
                 setStep(2);
              } catch (error) {
@@ -293,6 +295,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 }
             });
             setColumnMapping(newMapping);
+            // Reset selected headers when sheet data changes
             setSelectedHeaders(new Set());
         } catch (error) {
             console.error("Error processing sheet:", error);
@@ -312,6 +315,41 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     
     const handleTogglePrimarySheet = (sheetName: string) => {
         setPrimarySheet(prev => prev === sheetName ? null : sheetName);
+    };
+
+    const handleSaveConfig = async () => {
+        if (!file) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Nenhum arquivo para salvar a configuração.' });
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            // NOTE: This saves the config for ALL sheets, not just the selected one.
+            // A more advanced implementation might let you build a config across multiple sheets.
+            const configToSave: SheetConfig[] = sheetNames.map(name => ({
+                sheetName: name,
+                isPrimary: primarySheet === name,
+                headerRow: headerRow, // Assuming same header row for all for now
+                columnMapping: columnMapping, // Assuming same mapping for all for now
+            }));
+
+            const result = await saveImportConfigFlow({
+                fileName: file.name,
+                configurations: configToSave,
+            });
+
+            if (result.success) {
+                toast({ title: 'Sucesso!', description: 'Configuração de importação salva no servidor.' });
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error) {
+            console.error('Failed to save configuration:', error);
+            toast({ variant: 'destructive', title: 'Erro ao Salvar', description: 'Não foi possível salvar a configuração.' });
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handleValidate = async () => {
@@ -416,7 +454,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                         <DialogFooter>
                             <Button variant="outline" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4" /> Voltar</Button>
                             <div className="flex-grow" />
-                            <Button variant="ghost">Salvar Configuração</Button>
+                            <Button variant="ghost" onClick={handleSaveConfig} disabled={isProcessing}>Salvar Configuração</Button>
                             <Button onClick={handleValidate} disabled={isProcessing}>
                                 {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Validando...</> : "Validar e Prosseguir"}
                             </Button>
