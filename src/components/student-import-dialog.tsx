@@ -15,11 +15,9 @@ import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { ScrollArea, ScrollBar } from './ui/scroll-area';
 import { Badge } from './ui/badge';
-import { ArrowLeft, ArrowRight, Loader2, UploadCloud, Star, Search, GripVertical, FileSpreadsheet, PlusCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, UploadCloud, Star, Search, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Checkbox } from './ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-
 
 type School = {
     id: string;
@@ -102,7 +100,6 @@ function MappingTable({ headers, onMappingChange, initialMapping }: { headers: s
     );
 }
 
-
 export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange: (isOpen: boolean) => void; onSuccess: () => void }) {
     const { toast } = useToast();
     const [step, setStep] = useState(1);
@@ -177,35 +174,40 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         if (!workbook || !selectedSheet) return;
         try {
             const worksheet = workbook.Sheets[selectedSheet];
-            // header: A - 1 tells sheet_to_json to use row A as the header.
-            // Since our headerRow state is 1-based, we subtract 1.
-            const json = XLSX.utils.sheet_to_json(worksheet, { header: headerRow - 1, defval: "" });
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: headerRow > 0 ? headerRow - 1 : 0, defval: "" });
 
-            if (json.length > 0) {
-                // The first element is the actual data, starting from the row after the header
-                const dataRows = json.slice(1);
-                setSheetData(dataRows);
-                
-                // The keys of the first data object are our headers.
-                const firstRow = dataRows[0] as any;
-                if (firstRow) {
-                    setHeaders(Object.keys(firstRow));
-                } else {
-                     // If there's only a header row but no data, get headers from the original json result
-                    const headerData = json[0] as any;
-                    setHeaders(Object.keys(headerData));
-                    setSheetData([]); // No data rows to process
-                }
-            } else {
-                toast({ variant: 'destructive', title: 'Planilha Vazia', description: 'A planilha selecionada não contém dados a partir da linha de cabeçalho especificada.' });
+            if (json.length === 0) {
+                toast({ variant: 'destructive', title: 'Planilha Vazia', description: 'A planilha selecionada não contém dados ou cabeçalhos.' });
                 setHeaders([]);
                 setSheetData([]);
+                return;
             }
+            
+            const firstRowData = json[0] as any;
+            const extractedHeaders = Object.keys(firstRowData);
+            setHeaders(extractedHeaders);
+            
+            const dataRows = headerRow > 0 ? json.slice(1) : json;
+            setSheetData(dataRows);
+            
+            // Auto-mapping suggestion
+            const newMapping: Record<string, string> = {};
+            extractedHeaders.forEach(header => {
+                const headerLower = header.toLowerCase();
+                const matchedField = studentSystemFields.find(field => headerLower.includes(field.value.toLowerCase()) || field.label.toLowerCase().includes(headerLower));
+                if (matchedField) {
+                    newMapping[header] = matchedField.value;
+                }
+            });
+            setColumnMapping(newMapping);
+
+
         } catch (error) {
             console.error("Error processing sheet:", error);
             toast({ variant: 'destructive', title: 'Erro ao processar a planilha', description: 'Ocorreu um erro ao extrair os dados. Tente novamente.' });
         }
     }, [workbook, selectedSheet, headerRow, toast]);
+
 
     useEffect(() => {
         if (workbook && selectedSheet) {
@@ -315,7 +317,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 <div className="py-4 space-y-6">
                     <div className="space-y-2">
                         <Label>Planilha</Label>
-                        <ScrollArea className="w-full whitespace-nowrap">
+                         <ScrollArea className="w-full whitespace-nowrap">
                             <div className="flex w-max space-x-1 border-b">
                                 {sheetNames.map((name) => (
                                     <button
@@ -405,5 +407,3 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         </DialogContent>
     );
 }
-
-    
