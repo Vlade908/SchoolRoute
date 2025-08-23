@@ -6,16 +6,11 @@ import { DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFoot
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
-import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { ScrollArea, ScrollBar } from './ui/scroll-area';
-import { Badge } from './ui/badge';
-import { ArrowLeft, Loader2, UploadCloud, Search, FileSpreadsheet, Star, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, UploadCloud, Search, FileSpreadsheet, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
@@ -23,12 +18,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 
-
-type School = {
-    id: string;
-    name: string;
-    schoolType?: string;
-};
 
 const monthNames = [
   'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN',
@@ -198,6 +187,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
     const [sheetNames, setSheetNames] = useState<string[]>([]);
     const [selectedSheet, setSelectedSheet] = useState('');
+    const [primarySheet, setPrimarySheet] = useState<string | null>(null);
     const [sheetData, setSheetData] = useState<any[]>([]);
     const [headers, setHeaders] = useState<string[]>([]);
     const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
@@ -212,6 +202,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         setWorkbook(null);
         setSheetNames([]);
         setSelectedSheet('');
+        setPrimarySheet(null);
         setSheetData([]);
         setHeaders([]);
         setColumnMapping({});
@@ -250,6 +241,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 setSheetNames(wb.SheetNames);
                 if (wb.SheetNames.length > 0) {
                     setSelectedSheet(wb.SheetNames[0]);
+                    setPrimarySheet(wb.SheetNames[0]);
                 }
                 setStep(2);
              } catch (error) {
@@ -316,6 +308,10 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
 
     const handleMappingChange = (header: string, systemField: string) => {
         setColumnMapping(prev => ({ ...prev, [header]: systemField }));
+    };
+    
+    const handleTogglePrimarySheet = (sheetName: string) => {
+        setPrimarySheet(prev => prev === sheetName ? null : sheetName);
     };
 
     const handleValidate = async () => {
@@ -388,6 +384,9 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                             >
                                                 <FileSpreadsheet className="h-4 w-4" />
                                                 <span className="whitespace-nowrap">{name}</span>
+                                                <button onClick={(e) => { e.stopPropagation(); handleTogglePrimarySheet(name); }} className="ml-2 p-1 rounded-full hover:bg-muted">
+                                                    <Star className={cn("h-4 w-4 text-muted-foreground", primarySheet === name && "fill-current text-yellow-500")} />
+                                                </button>
                                             </button>
                                         ))}
                                     </div>
