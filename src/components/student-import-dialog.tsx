@@ -19,6 +19,7 @@ import { ArrowLeft, ArrowRight, Loader2, UploadCloud, Star, Search, GripVertical
 import { cn } from '@/lib/utils';
 import { Checkbox } from './ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 
 
 type School = {
@@ -56,18 +57,6 @@ function MappingTable({ headers, onMappingChange, initialMapping }: { headers: s
         <div>
              <div className="flex justify-between items-center mb-4">
                  <div className="flex items-center gap-2">
-                    <Label htmlFor="header-row">Linha do Cabeçalho</Label>
-                    <Input 
-                        id="header-row" 
-                        type="number" 
-                        defaultValue={1}
-                        onChange={(e) => {
-                            // This would be handled by a callback to re-process the sheet in a real implementation
-                        }}
-                        min="1"
-                        className="w-20"
-                    />
-                     <span className="text-xs text-muted-foreground">Especifique qual linha contém os nomes das colunas.</span>
                  </div>
                  <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -159,7 +148,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         }
     };
     
-    const parseFile = (fileToParse: File) => {
+    const parseAndSetWorkbook = (fileToParse: File) => {
         const reader = new FileReader();
         reader.onload = (e) => {
              try {
@@ -183,7 +172,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             return;
         }
         setStep(2);
-        parseFile(file);
+        parseAndSetWorkbook(file);
     }
     
     const processSheetData = useCallback(() => {
@@ -327,38 +316,59 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                        </Button>
                     </div>
 
-                    <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="flex items-center gap-2 border-b">
-                            {sheetNames.map(name => (
-                                <button
-                                    key={name}
-                                    onClick={() => setSelectedSheet(name)}
-                                    className={cn(
-                                        "flex items-center gap-2 p-2 text-sm transition-colors border-b-2",
-                                        selectedSheet === name 
-                                            ? "border-primary text-primary font-semibold" 
-                                            : "border-transparent text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <GripVertical className="h-4 w-4" />
-                                    <span>{name}</span>
-                                    <button onClick={(e) => {e.stopPropagation(); setPrimarySheet(name);}}>
-                                      <Star className={cn("h-4 w-4 transition-colors", primarySheet === name ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground hover:text-yellow-400')}/>
+                    <Carousel
+                        opts={{
+                            align: "start",
+                            dragFree: true,
+                        }}
+                        className="w-full"
+                    >
+                        <CarouselContent className="-ml-1">
+                            {sheetNames.map((name) => (
+                                <CarouselItem key={name} className="pl-1 basis-auto">
+                                    <button
+                                        onClick={() => setSelectedSheet(name)}
+                                        className={cn(
+                                            "flex items-center gap-2 p-2 text-sm transition-colors border-b-2",
+                                            selectedSheet === name 
+                                                ? "border-primary text-primary font-semibold" 
+                                                : "border-transparent text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <GripVertical className="h-4 w-4" />
+                                        <span className="whitespace-nowrap">{name}</span>
+                                        <button onClick={(e) => {e.stopPropagation(); setPrimarySheet(name);}}>
+                                          <Star className={cn("h-4 w-4 transition-colors", primarySheet === name ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground hover:text-yellow-400')}/>
+                                        </button>
                                     </button>
-                                </button>
+                                </CarouselItem>
                             ))}
+                        </CarouselContent>
+                         <div className="mt-2">
+                            <CarouselPrevious className="absolute left-0 top-1/2 -translate-y-1/2" />
+                            <CarouselNext className="absolute right-0 top-1/2 -translate-y-1/2" />
                         </div>
-                    </ScrollArea>
+                    </Carousel>
                     
+                     <div className="flex items-center gap-2 pt-4">
+                        <Label htmlFor="header-row">Linha do Cabeçalho</Label>
+                        <Input 
+                            id="header-row" 
+                            type="number"
+                            value={headerRow}
+                            onChange={(e) => setHeaderRow(Math.max(1, parseInt(e.target.value) || 1))}
+                            min="1"
+                            className="w-20"
+                        />
+                         <span className="text-xs text-muted-foreground">Especifique qual linha contém os nomes das colunas.</span>
+                     </div>
+
                     <MappingTable headers={headers} onMappingChange={handleMappingChange} initialMapping={columnMapping} />
                 </div>
             )}
             
             {step === 3 && importSummary && (
                 <div className="py-4">
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">
-                        Passo 3: Resumo da Importação
-                    </Label>
                      <Alert>
                         <AlertTitle>Importação Concluída!</AlertTitle>
                         <AlertDescription>
