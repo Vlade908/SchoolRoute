@@ -1203,12 +1203,7 @@ export default function StudentsPage() {
     try {
         const { id, ...studentData } = updatedStudent;
         const studentDocRef = doc(db, "students", id);
-        const currentDoc = await getDoc(studentDocRef);
-        const decryptedCurrent = decryptObjectValues(currentDoc.data() || {});
-        
-        const dataToUpdate = { ...decryptedCurrent, ...studentData };
-        
-        const encryptedStudent = encryptObjectValues(dataToUpdate);
+        const encryptedStudent = encryptObjectValues(studentData);
         await updateDoc(studentDocRef, encryptedStudent);
         toast({ title: "Sucesso!", description: "Aluno atualizado." });
         fetchStudents('new');

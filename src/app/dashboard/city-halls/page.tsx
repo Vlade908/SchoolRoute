@@ -36,7 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { encryptObjectValues } from '@/lib/crypto';
+import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
 
 
 type CityHall = {
@@ -222,7 +222,7 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
             const cityHallEmployees: Employee[] = [];
             querySnapshot.forEach((doc) => {
                 const encryptedData = doc.data() as any;
-                const data = encryptedData as any;
+                const data = decryptObjectValues(encryptedData) as any;
                 
                 if (data && data.hash === cityHall.hash) {
                     cityHallEmployees.push({
@@ -273,7 +273,7 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
         const employeeDoc = await getDoc(employeeDocRef);
         if (!employeeDoc.exists()) throw new Error("Funcionário não encontrado.");
         
-        const currentData = employeeDoc.data();
+        const currentData = decryptObjectValues(employeeDoc.data());
         if(!currentData) throw new Error("Falha ao descriptografar dados do funcionário.");
           
         const roleString = updatedEmployee.role;
@@ -448,7 +448,7 @@ export default function CityHallsPage() {
             const halls: CityHall[] = [];
             snapshot.forEach((doc) => {
                 const encryptedData = doc.data();
-                const data = encryptedData as any;
+                const data = decryptObjectValues(encryptedData) as any;
                 if(data) {
                     halls.push({ id: doc.id, ...data } as CityHall);
                 }

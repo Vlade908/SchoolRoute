@@ -7,10 +7,10 @@
 'use server';
 
 import { z } from 'zod';
-import { dbAdmin } from '@/lib/firebase-admin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { db } from '@/lib/firebase';
+import { Timestamp } from 'firebase/firestore';
 import type { ImportConfig } from '@/models/import-config';
-import { encryptObjectValues } from '@/lib/crypto';
+import { setDoc, doc } from 'firebase/firestore';
 
 
 // Define the Zod schema for the flow's input payload.
@@ -34,16 +34,14 @@ export async function saveImportConfig(config: ImportConfig): Promise<{ success:
     // Validate input with Zod
     const validatedConfig = ImportConfigSchema.parse(config);
     
-    const docRef = dbAdmin.collection('import-configurations').doc(validatedConfig.fileName);
+    const docRef = doc(db, 'import-configurations', validatedConfig.fileName);
     
     const dataToSave = {
       ...validatedConfig,
       updatedAt: Timestamp.now(),
     }
     
-    const encryptedData = encryptObjectValues(dataToSave);
-
-    await docRef.set(encryptedData, { merge: true });
+    await setDoc(docRef, dataToSave, { merge: true });
 
     console.log(`Configuration for ${validatedConfig.fileName} saved successfully.`);
     return { success: true, message: 'Configuração salva com sucesso.' };

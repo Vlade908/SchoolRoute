@@ -1,6 +1,8 @@
 import CryptoJS from 'crypto-js';
 
 const secretKey = process.env.ENCRYPTION_SECRET_KEY;
+const publicKey = process.env.NEXT_PUBLIC_CRYPTO_SECRET_KEY;
+
 
 // Função para criptografar um objeto
 export const encryptData = <T extends object>(data: T): string => {
@@ -13,11 +15,12 @@ export const encryptData = <T extends object>(data: T): string => {
 
 // Função para descriptografar uma string para um objeto
 export const decryptData = <T extends object>(encryptedData: string): T | null => {
-  if (!secretKey) {
-    throw new Error("Nenhuma chave de criptografia foi definida. Defina ENCRYPTION_SECRET_KEY.");
+  const key = secretKey || publicKey;
+  if (!key) {
+    throw new Error("Nenhuma chave de criptografia foi definida. Defina ENCRYPTION_SECRET_KEY ou NEXT_PUBLIC_CRYPTO_SECRET_KEY.");
   }
   try {
-    const bytes = CryptoJS.AES.decrypt(encryptedData, secretKey);
+    const bytes = CryptoJS.AES.decrypt(encryptedData, key);
     const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
     if (!decryptedString) {
         return null; // Retorna nulo se a descriptografia falhar

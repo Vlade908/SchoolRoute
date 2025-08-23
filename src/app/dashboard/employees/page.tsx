@@ -61,7 +61,7 @@ import {
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, updateDoc, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { encryptObjectValues } from '@/lib/crypto';
+import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
 
 type Employee = {
     id: string; // Firestore document ID
@@ -150,7 +150,7 @@ export default function EmployeesPage() {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
             const usersData: Employee[] = [];
             snapshot.forEach(doc => {
-                const data = doc.data() as any;
+                const data = decryptObjectValues(doc.data()) as any;
 
                 if (data) {
                     usersData.push({
@@ -182,7 +182,7 @@ export default function EmployeesPage() {
             const currentDoc = await getDoc(employeeDocRef);
             if (!currentDoc.exists()) throw new Error("Funcionário não encontrado.");
             
-            const currentData = currentDoc.data();
+            const currentData = decryptObjectValues(currentDoc.data());
             if(!currentData) throw new Error("Falha ao descriptografar dados do funcionário.");
             
             const dataToUpdate = {
@@ -213,7 +213,7 @@ export default function EmployeesPage() {
             const currentDoc = await getDoc(employeeDocRef);
             if (!currentDoc.exists()) throw new Error("Funcionário não encontrado.");
 
-            const currentData = currentDoc.data();
+            const currentData = decryptObjectValues(currentDoc.data());
             if(!currentData) throw new Error("Falha ao descriptografar dados do funcionário.");
             
             const dataToUpdate = { ...currentData, status: 'Inativo' };

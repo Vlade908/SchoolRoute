@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { decryptObjectValues } from '@/lib/crypto';
 
 
 type User = {
@@ -182,32 +183,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const userDocRef = doc(db, 'users', firebaseUser.uid);
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
-              const encryptedData = userDoc.data();
-              // A descriptografia agora deve ser feita em uma server action se necessário,
-              // mas para o perfil do usuário, podemos assumir que os dados já estão em um formato utilizável
-              // ou faremos uma chamada de servidor para obtê-los descriptografados.
-              // Por enquanto, vamos supor que a descriptografia acontece no backend e o layout recebe dados prontos.
-              const userData = encryptedData as any; // Simulação, idealmente viria de uma server action
-              
-              if (userData.encryptedData) {
-                  // Se os dados ainda estiverem criptografados, o ideal seria uma server action para buscar.
-                  // Como paliativo, podemos tentar descriptografar aqui, mas não é o ideal.
-                   console.error("User data is encrypted on the client. This should be handled by a server action.");
+                const userData = decryptObjectValues(userDoc.data()) as any;
+                if(!userData) {
+                   console.error("Failed to decrypt user data. Signing out.");
                    await auth.signOut();
                    setUser(null);
                    router.push('/');
                    setLoading(false);
                    return;
-              }
-
+                }
 
                 let schoolName = null;
                 if(userData.schoolId) {
                     const schoolDocRef = doc(db, 'schools', userData.schoolId);
                     const schoolDoc = await getDoc(schoolDocRef);
                     if(schoolDoc.exists()){
-                        // Da mesma forma, a descriptografia deve ocorrer no servidor.
-                        const schoolData = schoolDoc.data();
+                        const schoolData = decryptObjectValues(schoolDoc.data());
                         schoolName = schoolData?.name || null;
                     }
                 }

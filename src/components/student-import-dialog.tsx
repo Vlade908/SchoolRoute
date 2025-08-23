@@ -22,6 +22,7 @@ import { getImportConfig } from '@/app/actions/get-import-config';
 import { db } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import type { ImportConfig } from '@/models/import-config';
+import { decryptObjectValues } from '@/lib/crypto';
 
 
 const monthNames = [
@@ -214,7 +215,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             const snapshot = await getDocs(schoolsCollection);
             const schoolsData: School[] = [];
             snapshot.forEach(doc => {
-                 const data = doc.data();
+                 const data = decryptObjectValues(doc.data());
                  if(data) {
                      schoolsData.push({ id: doc.id, name: data.name, address: data.address || '' });
                  }

@@ -5,9 +5,10 @@
  */
 'use server';
 
-import { dbAdmin } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase';
 import type { ImportConfig } from '@/models/import-config';
-import { decryptObjectValues } from '@/lib/crypto';
+import { doc, getDoc } from 'firebase/firestore';
+
 
 /**
  * Retrieves a spreadsheet import configuration from Firestore.
@@ -17,17 +18,12 @@ import { decryptObjectValues } from '@/lib/crypto';
  */
 export async function getImportConfig(fileName: string): Promise<ImportConfig | null> {
   try {
-    const docRef = dbAdmin.collection('import-configurations').doc(fileName);
+    const docRef = doc(db, 'import-configurations', fileName);
     const docSnap = await docRef.get();
 
-    if (docSnap.exists) {
+    if (docSnap.exists()) {
       console.log(`Configuration for ${fileName} found.`);
-      const data = docSnap.data();
-      if (data) {
-        const decryptedData = decryptObjectValues(data);
-        return decryptedData as ImportConfig | null;
-      }
-      return null;
+      return docSnap.data() as ImportConfig | null;
     } else {
       console.log(`No configuration found for ${fileName}.`);
       return null;
