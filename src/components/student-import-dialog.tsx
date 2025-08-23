@@ -74,9 +74,15 @@ function MappingTable({
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredHeaders = useMemo(() => {
-    if (!searchTerm) return headers;
-    return headers.filter(h => h.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [headers, searchTerm]);
+    const searchFiltered = headers.filter(h => 
+        !searchTerm || h.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const selected = searchFiltered.filter(h => selectedHeaders.has(h));
+    const unselected = searchFiltered.filter(h => !selectedHeaders.has(h));
+
+    return [...selected, ...unselected];
+  }, [headers, searchTerm, selectedHeaders]);
 
   const getSystemFieldLabel = (value: string) => {
     return studentSystemFields.find(f => f.value === value)?.label || 'Ignorar esta coluna';
