@@ -285,7 +285,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 }
             });
             setColumnMapping(newMapping);
-            setSelectedHeaders(new Set(extractedHeaders.filter(h => !!h))); // Auto-select all non-empty headers initially
+            setSelectedHeaders(new Set());
         } catch (error) {
             console.error("Error processing sheet:", error);
             toast({ variant: 'destructive', title: 'Erro ao processar a planilha' });
