@@ -15,7 +15,7 @@ import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
-import { ArrowLeft, ArrowRight, Loader2, UploadCloud, Star, Search, GripVertical, FileSpreadsheet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, UploadCloud, Star, Search, GripVertical, FileSpreadsheet, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from './ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
