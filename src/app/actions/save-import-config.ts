@@ -9,18 +9,17 @@
 import { z } from 'zod';
 import { dbAdmin } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
+import type { ImportConfig } from '@/models/import-config';
 
 
 // Define the Zod schema for the flow's input payload.
 const ImportConfigSchema = z.object({
   fileName: z.string().describe('The name of the original spreadsheet file.'),
-  primarySheet: z.string().nullable().describe('The name of the primary worksheet (tab).'),
+  primarySheet: z.string().describe('The name of the primary worksheet (tab).'),
   headerRow: z.number().describe('The row number containing the headers.'),
   mapping: z.record(z.string()).describe('The mapping object from sheet columns to system fields.'),
 });
 
-// Export the inferred type for frontend use.
-export type ImportConfig = z.infer<typeof ImportConfigSchema>;
 
 /**
  * Saves a spreadsheet import configuration to Firestore using the Admin SDK.
