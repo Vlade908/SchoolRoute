@@ -46,6 +46,7 @@ const studentSystemFields = [
     { value: 'address', label: 'Endereço' },
     { value: 'hasPass', label: 'Possui Passe (Sim/Não)' },
     { value: 'souCardNumber', label: 'Nº Cartão SOU' },
+    { value: 'status', label: 'Status de Homologação' },
 ];
 
 function MappingTable({
@@ -69,7 +70,7 @@ function MappingTable({
   }, [headers, searchTerm]);
 
   const getSystemFieldLabel = (value: string) => {
-    return studentSystemFields.find(f => f.value === value)?.label || 'Selecione um papel...';
+    return studentSystemFields.find(f => f.value === value)?.label || 'Ignorar esta coluna';
   };
 
   const handleSelectAll = (checked: boolean) => {
