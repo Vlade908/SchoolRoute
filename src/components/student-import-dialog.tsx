@@ -353,12 +353,41 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
 
     const handleValidate = async () => {
         setIsProcessing(true);
-        // Placeholder for validation logic
-        setTimeout(() => {
-            setImportSummary({ successCount: sheetData.length - 1, errorCount: 1, newSchools: { "Escola Fantasma": 1 } });
-            setIsProcessing(false);
-            setStep(3);
-        }, 1500);
+
+        const studentsToImport = sheetData.map(row => {
+            const student: Record<string, any> = {};
+            for (const header of selectedHeaders) {
+                const systemField = columnMapping[header];
+                if (systemField && systemField !== 'ignore') {
+                    student[systemField] = row[header];
+                }
+            }
+
+            // Logic to automatically set hasPass
+            if (student.souCardNumber) {
+                student.hasPass = 'Sim';
+            }
+            
+            return student;
+        }).filter(student => Object.keys(student).length > 0);
+
+        // Placeholder for more complex validation and summary
+        const newSchools: Record<string, number> = {};
+        studentsToImport.forEach(student => {
+            if (student.schoolName) { // Assuming schoolName is a mapped field
+                newSchools[student.schoolName] = (newSchools[student.schoolName] || 0) + 1;
+            }
+        });
+        
+        // This is a mock summary
+        setImportSummary({ 
+            successCount: studentsToImport.length, 
+            errorCount: 0, 
+            newSchools: newSchools
+        });
+        
+        setIsProcessing(false);
+        setStep(3);
     };
     
     const handleClose = () => {
