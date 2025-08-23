@@ -15,10 +15,13 @@ import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { ScrollArea, ScrollBar } from './ui/scroll-area';
 import { Badge } from './ui/badge';
-import { ArrowLeft, ArrowRight, Loader2, UploadCloud, Star, Search, FileSpreadsheet, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, UploadCloud, Search, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Checkbox } from './ui/checkbox';
+import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
+
 
 type School = {
     id: string;
@@ -44,6 +47,84 @@ const studentSystemFields = [
     { value: 'souCardNumber', label: 'Nº Cartão SOU' },
 ];
 
+function MappingTable({ headers, columnMapping, onMappingChange }: { headers: string[], columnMapping: Record<string, string>, onMappingChange: (header: string, field: string) => void }) {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredHeaders = useMemo(() => {
+        if (!searchTerm) return headers;
+        return headers.filter(h => h.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [headers, searchTerm]);
+
+    const getSystemFieldLabel = (value: string) => {
+        return studentSystemFields.find(f => f.value === value)?.label || 'Selecione um papel...';
+    }
+
+    return (
+        <div className="flex-grow flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center mb-4 px-1">
+                <h3 className="text-lg font-semibold">Mapear Colunas</h3>
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Buscar colunas..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 w-full md:w-64"
+                    />
+                </div>
+            </div>
+            <div className="flex-grow overflow-hidden border rounded-md">
+              <ScrollArea className="h-full">
+                  <Table className="relative">
+                      <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
+                          <TableRow>
+                              <TableHead className="w-1/2">Coluna da Planilha</TableHead>
+                              <TableHead className="w-1/2">Campo no Sistema</TableHead>
+                          </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                          {filteredHeaders.map((header, index) => (
+                              <TableRow key={`${header}-${index}`}>
+                                  <TableCell className="font-medium truncate" title={header}>{header || <span className="text-muted-foreground italic">Coluna Vazia</span>}</TableCell>
+                                  <TableCell>
+                                      <Popover>
+                                          <PopoverTrigger asChild>
+                                              <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                                                  <span className="truncate">{getSystemFieldLabel(columnMapping[header] || 'ignore')}</span>
+                                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                              </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                              <Command>
+                                                  <CommandInput placeholder="Buscar campo..." />
+                                                  <CommandList>
+                                                      <CommandEmpty>Nenhum campo encontrado.</CommandEmpty>
+                                                      <CommandGroup>
+                                                            <CommandItem value="ignore" onSelect={() => onMappingChange(header, 'ignore')}>
+                                                                <Check className={cn("mr-2 h-4 w-4", (columnMapping[header] || 'ignore') === 'ignore' ? "opacity-100" : "opacity-0")} />
+                                                                Ignorar esta coluna
+                                                            </CommandItem>
+                                                          {studentSystemFields.map(field => (
+                                                              <CommandItem key={field.value} value={field.label} onSelect={() => onMappingChange(header, field.value)}>
+                                                                  <Check className={cn("mr-2 h-4 w-4", columnMapping[header] === field.value ? "opacity-100" : "opacity-0")} />
+                                                                  {field.label}
+                                                              </CommandItem>
+                                                          ))}
+                                                      </CommandGroup>
+                                                  </CommandList>
+                                              </Command>
+                                          </PopoverContent>
+                                      </Popover>
+                                  </TableCell>
+                              </TableRow>
+                          ))}
+                      </TableBody>
+                  </Table>
+              </ScrollArea>
+            </div>
+        </div>
+    );
+}
 
 export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange: (isOpen: boolean) => void; onSuccess: () => void }) {
     const { toast } = useToast();
@@ -52,47 +133,25 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
     const [sheetNames, setSheetNames] = useState<string[]>([]);
     const [selectedSheet, setSelectedSheet] = useState('');
-    const [primarySheet, setPrimarySheet] = useState('');
     const [sheetData, setSheetData] = useState<any[]>([]);
     const [headers, setHeaders] = useState<string[]>([]);
     const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
     const [isProcessing, setIsProcessing] = useState(false);
     const [importSummary, setImportSummary] = useState<{ successCount: number; errorCount: number; newSchools: Record<string, number> } | null>(null);
-    const [schools, setSchools] = useState<School[]>([]);
     const [headerRow, setHeaderRow] = useState(1);
-    const [searchTerm, setSearchTerm] = useState('');
-
-    const filteredHeaders = useMemo(() => {
-        if (!searchTerm) return headers;
-        return headers.filter(h => h.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [headers, searchTerm]);
-    
-    useEffect(() => {
-        const fetchSchools = async () => {
-            const schoolsCollection = collection(db, 'schools');
-            const snapshot = await getDocs(query(schoolsCollection));
-            const schoolsData: School[] = snapshot.docs.map(doc => {
-                const decryptedData = decryptObjectValues(doc.data()) as any;
-                return { id: doc.id, name: decryptedData.name, schoolType: decryptedData.schoolType };
-            });
-            setSchools(schoolsData);
-        };
-        fetchSchools();
-    }, []);
 
     const resetState = () => {
-      setFile(null);
-      setWorkbook(null);
-      setSheetNames([]);
-      setSelectedSheet('');
-      setPrimarySheet('');
-      setSheetData([]);
-      setHeaders([]);
-      setColumnMapping({});
-      setIsProcessing(false);
-      setImportSummary(null);
-      setHeaderRow(1);
-      setSearchTerm('');
+        setStep(1);
+        setFile(null);
+        setWorkbook(null);
+        setSheetNames([]);
+        setSelectedSheet('');
+        setSheetData([]);
+        setHeaders([]);
+        setColumnMapping({});
+        setIsProcessing(false);
+        setImportSummary(null);
+        setHeaderRow(1);
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,8 +167,12 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             }
         }
     };
-    
-    const processFile = (fileToParse: File) => {
+
+    const handleProceedToMapping = () => {
+        if (!file) {
+            toast({ variant: 'destructive', title: 'Nenhum arquivo selecionado' });
+            return;
+        }
         setIsProcessing(true);
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -119,28 +182,18 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 setWorkbook(wb);
                 setSheetNames(wb.SheetNames);
                 if (wb.SheetNames.length > 0) {
-                    const firstSheet = wb.SheetNames[0];
-                    setSelectedSheet(firstSheet);
-                    setPrimarySheet(firstSheet);
+                    setSelectedSheet(wb.SheetNames[0]);
                 }
                 setStep(2);
              } catch (error) {
                 console.error("Error parsing file:", error);
-                toast({ variant: 'destructive', title: 'Erro ao Ler Planilha', description: 'Não foi possível processar o arquivo. Verifique se o formato é válido.' });
+                toast({ variant: 'destructive', title: 'Erro ao Ler Planilha' });
              } finally {
                 setIsProcessing(false);
              }
         };
-        reader.readAsBinaryString(fileToParse);
-    }
-    
-    const handleProceedToMapping = () => {
-        if (!file) {
-            toast({ variant: 'destructive', title: 'Nenhum arquivo selecionado', description: 'Por favor, carregue uma planilha para continuar.' });
-            return;
-        }
-        processFile(file);
-    }
+        reader.readAsBinaryString(file);
+    };
 
     const processSheetData = useCallback(() => {
         if (!workbook || !selectedSheet) return;
@@ -149,15 +202,14 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
             if (data.length < headerRow) {
-                 toast({ variant: 'destructive', title: 'Linha do Cabeçalho Inválida', description: 'A linha do cabeçalho especificada não existe na planilha.' });
                  setHeaders([]);
                  setSheetData([]);
                  return;
             }
-            
+
             const extractedHeaders = data[headerRow - 1].map(String);
             setHeaders(extractedHeaders);
-            
+
             const dataRows = data.slice(headerRow);
             const jsonData = dataRows.map(row => {
                 const rowData: Record<string, any> = {};
@@ -167,14 +219,13 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 return rowData;
             });
             setSheetData(jsonData);
-            
-            // Auto-mapping suggestion
+
             const newMapping: Record<string, string> = {};
             extractedHeaders.forEach(header => {
                 if(!header) return;
                 const headerLower = header.toLowerCase().trim();
-                const matchedField = studentSystemFields.find(field => 
-                    headerLower.includes(field.label.toLowerCase()) || 
+                const matchedField = studentSystemFields.find(field =>
+                    headerLower.includes(field.label.toLowerCase()) ||
                     headerLower.includes(field.value.toLowerCase())
                 );
                 if (matchedField) {
@@ -182,254 +233,165 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 }
             });
             setColumnMapping(newMapping);
-
-
         } catch (error) {
             console.error("Error processing sheet:", error);
-            toast({ variant: 'destructive', title: 'Erro ao processar a planilha', description: 'Ocorreu um erro ao extrair os dados. Tente novamente.' });
+            toast({ variant: 'destructive', title: 'Erro ao processar a planilha' });
         }
     }, [workbook, selectedSheet, headerRow, toast]);
 
-
     useEffect(() => {
-        if (workbook && selectedSheet) {
+        if (step === 2 && workbook) {
             processSheetData();
         }
-    }, [workbook, selectedSheet, headerRow, processSheetData]);
+    }, [step, workbook, selectedSheet, headerRow, processSheetData]);
 
     const handleMappingChange = (header: string, systemField: string) => {
         setColumnMapping(prev => ({ ...prev, [header]: systemField }));
     };
 
-    const handleImport = async () => {
+    const handleValidate = async () => {
         setIsProcessing(true);
-        // This is a placeholder for the final import logic
-        // In a real scenario, this would process `sheetData` with `columnMapping`
-        // and show the summary.
+        // Placeholder for validation logic
         setTimeout(() => {
-            setImportSummary({ successCount: 120, errorCount: 5, newSchools: { "Escola Nova Exemplo": 5 } });
+            setImportSummary({ successCount: sheetData.length - 1, errorCount: 1, newSchools: { "Escola Fantasma": 1 } });
             setIsProcessing(false);
             setStep(3);
-        }, 2000);
+        }, 1500);
     };
     
     const handleClose = () => {
         resetState();
         onOpenChange(false);
-    }
-    
-     const handleBackToUpload = () => {
-        resetState();
-        setStep(1);
-    }
+    };
 
-    if (step === 3 && importSummary) {
-      return (
-        <DialogContent className="sm:max-w-xl">
-             <DialogHeader>
-                <DialogTitle>Resumo da Importação</DialogTitle>
-                <DialogDescription>
-                  A validação foi concluída. Veja o resumo abaixo.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-                 <Alert>
-                    <AlertTitle className="font-bold">Validação Concluída!</AlertTitle>
-                    <AlertDescription>
-                        <p className="flex items-center"><Badge variant="default" className="bg-green-600 mr-2">{importSummary.successCount}</Badge> alunos validados com sucesso.</p>
-                        <p className="flex items-center mt-2"><Badge variant="destructive" className="mr-2">{importSummary.errorCount}</Badge> alunos com erros de validação (ex: nome ou escola em branco).</p>
-                    </AlertDescription>
-                </Alert>
-                
-                {Object.keys(importSummary.newSchools).length > 0 && (
-                    <Alert variant="destructive">
-                        <Star className="h-4 w-4" />
-                        <AlertTitle className="font-bold">Ação Necessária: Novas Escolas Encontradas!</AlertTitle>
-                        <AlertDescription>
-                            <p>Os seguintes alunos não foram importados porque as escolas deles não estão cadastradas. Por favor, cadastre estas escolas na aba 'Escolas' e importe a planilha novamente para estes alunos.</p>
-                            <ul className="mt-2 list-disc list-inside">
-                            {Object.entries(importSummary.newSchools).map(([schoolName, count]) => (
-                                <li key={schoolName}><strong>{schoolName}</strong> ({count} alunos)</li>
-                            ))}
-                            </ul>
-                        </AlertDescription>
-                    </Alert>
-                )}
-            </div>
-             <DialogFooter>
-                <Button variant="outline" onClick={handleClose}>
-                    Fechar
-                </Button>
-                <Button onClick={() => { /* Placeholder for final import */ toast({title: "Importação Iniciada", description: "Os alunos estão sendo cadastrados em segundo plano."}); handleClose(); }}>
-                    Importar Alunos
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-      )
-    }
-
-    return (
-        <DialogContent className={cn("sm:max-w-6xl", step === 2 && "sm:max-w-[90vw] h-[90vh]")}>
-             <DialogHeader>
-                <DialogTitle>
-                    {step === 1 && "Importar Alunos de Planilha"}
-                    {step === 2 && "Selecione as Colunas e Valide"}
-                </DialogTitle>
-                <DialogDescription>
-                  {step === 1 && "Selecione o arquivo de planilha que deseja importar."}
-                  {step === 2 && "Selecione um arquivo, escolha a aba, defina a linha do cabeçalho e selecione as colunas para validar."}
-                </DialogDescription>
-            </DialogHeader>
-
-            {step === 1 && (
-                <div className="py-4 space-y-4">
-                    <div>
-                        <Label
-                            htmlFor="spreadsheet-file"
-                            className="relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50 transition-colors"
-                        >
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <UploadCloud className="w-10 h-10 mb-4 text-muted-foreground" />
-                                <p className="mb-2 text-sm text-muted-foreground">
-                                    <span className="font-semibold text-primary">Clique para carregar</span> ou arraste e solte
-                                </p>
-                                <p className="text-xs text-muted-foreground">XLSX, CSV ou ODS (MAX. 10MB)</p>
+    const renderStepContent = () => {
+        switch (step) {
+            case 1:
+                return (
+                    <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>Importar Alunos</DialogTitle>
+                            <DialogDescription>Passo 1 de 3: Selecione o arquivo de planilha que deseja importar.</DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 space-y-4">
+                            <Label htmlFor="spreadsheet-file" className="relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50 transition-colors">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <UploadCloud className="w-10 h-10 mb-4 text-muted-foreground" />
+                                    <p className="mb-2 text-sm text-muted-foreground">
+                                        <span className="font-semibold text-primary">Clique para carregar</span> ou arraste e solte
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">XLSX, CSV ou ODS (MAX. 10MB)</p>
+                                </div>
+                                <Input id="spreadsheet-file" type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.csv,.ods" />
+                            </Label>
+                            {file && <p className="text-sm text-muted-foreground mt-2">Arquivo selecionado: <span className="font-medium text-foreground">{file.name}</span></p>}
+                        </div>
+                        <DialogFooter>
+                             <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+                            <Button onClick={handleProceedToMapping} disabled={!file || isProcessing}>
+                                {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : "Próximo"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                );
+            case 2:
+                return (
+                    <DialogContent className="sm:max-w-6xl flex flex-col h-[90vh]">
+                        <DialogHeader>
+                            <DialogTitle>Mapear Colunas</DialogTitle>
+                            <DialogDescription>Passo 2 de 3: Configure como a planilha será importada.</DialogDescription>
+                        </DialogHeader>
+                        <div className="flex-grow flex flex-col space-y-4 overflow-hidden py-4">
+                            <div className="space-y-2">
+                                <Label>Planilha</Label>
+                                <ScrollArea className="w-full whitespace-nowrap">
+                                    <div className="flex w-max space-x-1 border-b">
+                                        {sheetNames.map((name) => (
+                                            <button
+                                                key={name}
+                                                onClick={() => setSelectedSheet(name)}
+                                                className={cn(
+                                                    "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
+                                                    selectedSheet === name
+                                                        ? "border-primary text-primary font-semibold"
+                                                        : "border-transparent text-muted-foreground hover:text-foreground"
+                                                )}
+                                            >
+                                                <FileSpreadsheet className="h-4 w-4" />
+                                                <span className="whitespace-nowrap">{name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <ScrollBar orientation="horizontal" />
+                                </ScrollArea>
                             </div>
-                            <Input id="spreadsheet-file" type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.csv,.ods" />
-                        </Label>
-                         {file && <p className="text-sm text-muted-foreground mt-2">Arquivo selecionado: <span className="font-medium text-foreground">{file.name}</span></p>}
-                    </div>
-                     <DialogFooter>
-                        <Button onClick={handleProceedToMapping} disabled={!file || isProcessing}>
-                            {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : <>Próximo <ArrowRight className="ml-2 h-4 w-4" /></>}
-                        </Button>
-                    </DialogFooter>
-                </div>
-            )}
-            
-            {step === 2 && workbook && (
-                <div className="flex flex-col h-full py-4 space-y-4">
-                    <div className="flex items-center gap-2 p-1 rounded-md bg-muted/60 w-fit">
-                        <div className="flex items-center gap-2 p-2 text-sm font-semibold text-primary-foreground bg-primary rounded-md">
-                           <FileSpreadsheet className="h-4 w-4" />
-                           <span className="truncate max-w-xs">{file?.name}</span>
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="header-row" className="whitespace-nowrap">Linha do Cabeçalho</Label>
+                                <Input
+                                    id="header-row"
+                                    type="number"
+                                    value={headerRow}
+                                    onChange={(e) => setHeaderRow(Math.max(1, parseInt(e.target.value) || 1))}
+                                    min="1"
+                                    className="w-20"
+                                />
+                                <span className="text-xs text-muted-foreground">Especifique qual linha contém os nomes das colunas.</span>
+                            </div>
+                            <MappingTable headers={headers} columnMapping={columnMapping} onMappingChange={handleMappingChange} />
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary">
-                          <PlusCircle className="h-4 w-4" />
-                       </Button>
-                    </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4" /> Voltar</Button>
+                            <div className="flex-grow" />
+                            <Button variant="ghost">Salvar Configuração</Button>
+                            <Button onClick={handleValidate} disabled={isProcessing}>
+                                {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Validando...</> : "Validar e Prosseguir"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                );
+            case 3:
+                return (
+                    <DialogContent className="sm:max-w-xl">
+                        <DialogHeader>
+                            <DialogTitle>Resumo da Importação</DialogTitle>
+                            <DialogDescription>Passo 3 de 3: Revise a validação antes de importar.</DialogDescription>
+                        </DialogHeader>
+                        {importSummary && (
+                            <div className="py-4 space-y-4">
+                                <Alert>
+                                    <AlertTitle className="font-bold">Validação Concluída!</AlertTitle>
+                                    <AlertDescription>
+                                        <p className="flex items-center"><Badge variant="default" className="bg-green-600 mr-2">{importSummary.successCount}</Badge> alunos prontos para importação.</p>
+                                        <p className="flex items-center mt-2"><Badge variant="destructive" className="mr-2">{importSummary.errorCount}</Badge> alunos com erros de validação (ex: campos obrigatórios em branco).</p>
+                                    </AlertDescription>
+                                </Alert>
+                                {Object.keys(importSummary.newSchools).length > 0 && (
+                                    <Alert variant="destructive">
+                                        <AlertTitle className="font-bold">Ação Necessária: Novas Escolas Encontradas!</AlertTitle>
+                                        <AlertDescription>
+                                            <p>As seguintes escolas não estão cadastradas e serão criadas. Verifique os dados após a importação.</p>
+                                            <ul className="mt-2 list-disc list-inside">
+                                                {Object.entries(importSummary.newSchools).map(([schoolName, count]) => (
+                                                    <li key={schoolName}><strong>{schoolName}</strong> ({count} alunos)</li>
+                                                ))}
+                                            </ul>
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setStep(2)}>Voltar</Button>
+                            <Button onClick={() => { onSuccess(); handleClose(); }} disabled={isProcessing}>
+                                 {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importando...</> : "Concluir Importação"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                );
+            default:
+                return null;
+        }
+    };
 
-                    <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="flex w-max space-x-1 border-b">
-                            {sheetNames.map((name) => (
-                                <button
-                                    key={name}
-                                    onClick={() => setSelectedSheet(name)}
-                                    className={cn(
-                                        "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
-                                        selectedSheet === name 
-                                            ? "border-primary text-primary font-semibold" 
-                                            : "border-transparent text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <FileSpreadsheet className="h-4 w-4" />
-                                    <span className="whitespace-nowrap">{name}</span>
-                                    <Star 
-                                      className={cn("h-4 w-4 cursor-pointer", primarySheet === name ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground hover:text-yellow-400')}
-                                      onClick={(e) => { e.stopPropagation(); setPrimarySheet(name); }}
-                                    />
-                                </button>
-                            ))}
-                        </div>
-                        <ScrollBar orientation="horizontal" />
-                    </ScrollArea>
-                    
-                    <div className="flex justify-between items-center gap-4">
-                        <div className="flex items-center gap-2">
-                           <Label htmlFor="header-row" className="whitespace-nowrap">Linha do Cabeçalho</Label>
-                           <Input 
-                               id="header-row" 
-                               type="number"
-                               value={headerRow}
-                               onChange={(e) => setHeaderRow(Math.max(1, parseInt(e.target.value) || 1))}
-                               min="1"
-                               className="w-20"
-                           />
-                           <span className="text-xs text-muted-foreground">Especifique qual linha contém os nomes das colunas.</span>
-                        </div>
-                        <div className="relative">
-                           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                           <Input
-                               placeholder="Buscar colunas..."
-                               value={searchTerm}
-                               onChange={(e) => setSearchTerm(e.target.value)}
-                               className="pl-8 w-full md:w-64"
-                           />
-                        </div>
-                    </div>
-                    
-                    <div className="flex-grow overflow-hidden">
-                       <ScrollArea className="h-full">
-                           <Table>
-                               <TableHeader className="sticky top-0 z-10 bg-card">
-                                   <TableRow>
-                                        <TableHead className="w-[50px]"><Checkbox /></TableHead>
-                                        <TableHead>Coluna</TableHead>
-                                        <TableHead>Tipo de Dado</TableHead>
-                                        <TableHead>Papel</TableHead>
-                                        <TableHead>Status de Validação</TableHead>
-                                   </TableRow>
-                               </TableHeader>
-                               <TableBody>
-                                   {filteredHeaders.map(header => (
-                                       <TableRow key={header}>
-                                            <TableCell><Checkbox /></TableCell>
-                                            <TableCell className="font-medium truncate max-w-xs" title={header}>{header || <span className="text-muted-foreground italic">Coluna Vazia</span>}</TableCell>
-                                            <TableCell>
-                                                <Select>
-                                                   <SelectTrigger><SelectValue placeholder="Selecione o tipo..." /></SelectTrigger>
-                                                   <SelectContent>
-                                                      <SelectItem value="text">Texto</SelectItem>
-                                                      <SelectItem value="number">Número</SelectItem>
-                                                      <SelectItem value="date">Data</SelectItem>
-                                                   </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Select onValueChange={(value) => handleMappingChange(header, value)} defaultValue={columnMapping[header] || 'ignore'}>
-                                                   <SelectTrigger><SelectValue placeholder="Selecione o papel..." /></SelectTrigger>
-                                                   <SelectContent>
-                                                       <SelectItem value="ignore">Ignorar</SelectItem>
-                                                       {studentSystemFields.map(field => (
-                                                           <SelectItem key={field.value} value={field.value}>
-                                                               {field.label}
-                                                           </SelectItem>
-                                                       ))}
-                                                   </SelectContent>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                               <Badge variant="outline">Não Validado</Badge>
-                                            </TableCell>
-                                       </TableRow>
-                                   ))}
-                               </TableBody>
-                           </Table>
-                       </ScrollArea>
-                    </div>
-
-                    <DialogFooter className="pt-4 border-t">
-                        <Button variant="outline" onClick={handleBackToUpload}>
-                           <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
-                        </Button>
-                        <div className="flex-grow" />
-                        <Button variant="ghost">Salvar Configuração</Button>
-                        <Button onClick={handleImport} disabled={isProcessing}>
-                            {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Validando...</> : "Validar e Prosseguir"}
-                        </Button>
-                    </DialogFooter>
-                </div>
-            )}
-        </DialogContent>
-    );
+    return <>{renderStepContent()}</>;
 }
