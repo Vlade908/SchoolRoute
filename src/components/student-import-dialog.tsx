@@ -46,6 +46,9 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const { toast } = useToast();
     const [step, setStep] = useState(1);
     const [file, setFile] = useState<File | null>(null);
+    const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+    const [sheetNames, setSheetNames] = useState<string[]>([]);
+    const [selectedSheet, setSelectedSheet] = useState('');
     const [sheetData, setSheetData] = useState<any[]>([]);
     const [headers, setHeaders] = useState<string[]>([]);
     const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
@@ -81,47 +84,62 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         }
     };
     
-    const handleParseFile = useCallback(() => {
-        if (!file) return;
+    const parseFile = (fileToParse: File) => {
         const reader = new FileReader();
         reader.onload = (e) => {
-            try {
+             try {
                 const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'binary' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet, { header: headerRow - 1, defval: "" });
-                
-                if (json.length > 0) {
-                    setSheetData(json);
-                    setHeaders(Object.keys(json[0]));
-                } else {
-                    toast({ variant: 'destructive', title: 'Planilha Vazia', description: 'A planilha selecionada não contém dados a partir da linha de cabeçalho especificada.' });
-                    setHeaders([]);
-                    setSheetData([]);
-                }
-            } catch (error) {
+                const wb = XLSX.read(data, { type: 'binary' });
+                setWorkbook(wb);
+                setSheetNames(wb.SheetNames);
+                setSelectedSheet(wb.SheetNames[0]);
+             } catch (error) {
                 console.error("Error parsing file:", error);
-                toast({ variant: 'destructive', title: 'Erro ao Ler Planilha', description: 'Não foi possível processar o arquivo. Verifique o formato e a linha do cabeçalho.' });
-            }
+                toast({ variant: 'destructive', title: 'Erro ao Ler Planilha', description: 'Não foi possível processar o arquivo. Verifique se o formato é válido.' });
+             }
         };
-        reader.readAsBinaryString(file);
-    }, [file, headerRow, toast]);
-
+        reader.readAsBinaryString(fileToParse);
+    }
+    
     const handleProceedToMapping = () => {
         if (!file) {
             toast({ variant: 'destructive', title: 'Nenhum arquivo selecionado', description: 'Por favor, carregue uma planilha para continuar.' });
             return;
         }
         setStep(2);
-        handleParseFile();
+        parseFile(file);
     }
     
-    useEffect(() => {
-        if (step === 2) {
-            handleParseFile();
+    const processSheetData = useCallback(() => {
+        if (!workbook || !selectedSheet) return;
+        try {
+            const worksheet = workbook.Sheets[selectedSheet];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: headerRow - 1, defval: "" });
+
+            if (json.length > 0) {
+                setSheetData(json);
+                const firstRow = json[0] as any;
+                if (firstRow) {
+                    setHeaders(Object.keys(firstRow));
+                } else {
+                    setHeaders([]);
+                }
+            } else {
+                toast({ variant: 'destructive', title: 'Planilha Vazia', description: 'A planilha selecionada não contém dados a partir da linha de cabeçalho especificada.' });
+                setHeaders([]);
+                setSheetData([]);
+            }
+        } catch (error) {
+            console.error("Error processing sheet:", error);
+            toast({ variant: 'destructive', title: 'Erro ao processar a planilha', description: 'Ocorreu um erro ao extrair os dados. Tente novamente.' });
         }
-    }, [headerRow, step, handleParseFile]);
+    }, [workbook, selectedSheet, headerRow, toast]);
+
+    useEffect(() => {
+        if (workbook && selectedSheet) {
+            processSheetData();
+        }
+    }, [workbook, selectedSheet, headerRow, processSheetData]);
 
     const handleMappingChange = (header: string, systemField: string) => {
         setColumnMapping(prev => ({ ...prev, [header]: systemField }));
@@ -225,21 +243,37 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             {step === 2 && (
                 <div className="py-4">
                     <Label className="block text-sm font-medium text-muted-foreground mb-2">
-                        Passo 2: Mapear Colunas da Planilha
+                        Passo 2: Configurar e Mapear Colunas
                     </Label>
-                    <p className="text-sm text-muted-foreground mb-4">Associe cada coluna da sua planilha ao campo correspondente no sistema.</p>
-                     <div className="mb-4">
-                         <Label htmlFor="header-row">Linha do Cabeçalho</Label>
-                        <Input 
-                            id="header-row" 
-                            type="number" 
-                            value={headerRow} 
-                            onChange={(e) => setHeaderRow(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                            min="1"
-                            className="w-32 mt-1"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">Informe o número da linha que contém os títulos das colunas.</p>
-                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">Selecione a planilha e associe as colunas aos campos do sistema.</p>
+                     
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <Label htmlFor="sheet-select">Selecionar Planilha</Label>
+                             <Select value={selectedSheet} onValueChange={setSelectedSheet} disabled={sheetNames.length <= 1}>
+                                <SelectTrigger id="sheet-select">
+                                    <SelectValue placeholder="Selecione a planilha" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {sheetNames.map(name => (
+                                        <SelectItem key={name} value={name}>{name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label htmlFor="header-row">Linha do Cabeçalho</Label>
+                            <Input 
+                                id="header-row" 
+                                type="number" 
+                                value={headerRow} 
+                                onChange={(e) => setHeaderRow(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                min="1"
+                                className="w-32 mt-1"
+                            />
+                        </div>
+                     </div>
+                    
                     <ScrollArea className="h-72 w-full pr-4">
                         <div className="space-y-4">
                             {headers.map(header => (
