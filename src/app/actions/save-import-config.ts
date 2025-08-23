@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { dbAdmin } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { ImportConfig } from '@/models/import-config';
+import { encryptObjectValues } from '@/lib/crypto';
 
 
 // Define the Zod schema for the flow's input payload.
@@ -35,10 +36,14 @@ export async function saveImportConfig(config: ImportConfig): Promise<{ success:
     
     const docRef = dbAdmin.collection('import-configurations').doc(validatedConfig.fileName);
     
-    await docRef.set({
+    const dataToSave = {
       ...validatedConfig,
       updatedAt: Timestamp.now(),
-    }, { merge: true });
+    }
+    
+    const encryptedData = encryptObjectValues(dataToSave);
+
+    await docRef.set(encryptedData);
 
     console.log(`Configuration for ${validatedConfig.fileName} saved successfully.`);
     return { success: true, message: 'Configuração salva com sucesso.' };

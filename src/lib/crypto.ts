@@ -1,9 +1,10 @@
 import CryptoJS from 'crypto-js';
 
-const secretKey = process.env.NEXT_PUBLIC_CRYPTO_SECRET_KEY;
+const secretKey = process.env.ENCRYPTION_SECRET_KEY ?? process.env.NEXT_PUBLIC_CRYPTO_SECRET_KEY;
+
 
 if (!secretKey) {
-  throw new Error("A variável de ambiente NEXT_PUBLIC_CRYPTO_SECRET_KEY não está definida.");
+  throw new Error("Nenhuma chave de criptografia foi definida. Defina ENCRYPTION_SECRET_KEY ou NEXT_PUBLIC_CRYPTO_SECRET_KEY.");
 }
 
 // Função para criptografar um objeto

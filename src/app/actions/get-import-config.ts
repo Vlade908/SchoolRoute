@@ -7,6 +7,7 @@
 
 import { dbAdmin } from '@/lib/firebase-admin';
 import type { ImportConfig } from '@/models/import-config';
+import { decryptObjectValues } from '@/lib/crypto';
 
 /**
  * Retrieves a spreadsheet import configuration from Firestore.
@@ -21,8 +22,8 @@ export async function getImportConfig(fileName: string): Promise<ImportConfig | 
 
     if (docSnap.exists) {
       console.log(`Configuration for ${fileName} found.`);
-      // We can cast directly as we trust the data structure saved by saveImportConfig
-      return docSnap.data() as ImportConfig;
+      const decryptedData = decryptObjectValues(docSnap.data() as any);
+      return decryptedData as ImportConfig | null;
     } else {
       console.log(`No configuration found for ${fileName}.`);
       return null;
