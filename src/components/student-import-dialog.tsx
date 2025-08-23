@@ -52,6 +52,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const [isProcessing, setIsProcessing] = useState(false);
     const [importSummary, setImportSummary] = useState<{ successCount: number; errorCount: number; newSchools: Record<string, number> } | null>(null);
     const [schools, setSchools] = useState<School[]>([]);
+    const [headerRow, setHeaderRow] = useState(1);
 
     useEffect(() => {
         const fetchSchools = async () => {
@@ -69,12 +70,10 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const selectedFile = e.target.files[0];
-            const fileType = selectedFile.type;
-            const fileName = selectedFile.name;
-            const acceptedTypes = ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.oasis.opendocument.spreadsheet'];
+            const fileName = selectedFile.name.toLowerCase();
             const acceptedExtensions = ['.csv', '.xlsx', '.ods'];
 
-            if (acceptedTypes.includes(fileType) || acceptedExtensions.some(ext => fileName.endsWith(ext))) {
+            if (acceptedExtensions.some(ext => fileName.endsWith(ext))) {
                 setFile(selectedFile);
             } else {
                 toast({ variant: 'destructive', title: 'Tipo de arquivo inválido', description: 'Por favor, selecione um arquivo .xlsx, .csv ou .ods.' });
@@ -86,17 +85,25 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
-            const data = e.target?.result;
-            const workbook = XLSX.read(data, { type: 'binary' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet);
-            setSheetData(json);
-            if (json.length > 0) {
-                setHeaders(Object.keys(json[0]));
-                setStep(2);
-            } else {
-                toast({ variant: 'destructive', title: 'Planilha Vazia', description: 'A planilha selecionada não contém dados.' });
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                // The 'header' option in sheet_to_json expects a 0-indexed row number.
+                const json = XLSX.utils.sheet_to_json(worksheet, { header: headerRow - 1, defval: "" });
+                
+                if (json.length > 0) {
+                    // Since header is a number, keys will be column names from that row.
+                    setSheetData(json);
+                    setHeaders(Object.keys(json[0]));
+                    setStep(2);
+                } else {
+                    toast({ variant: 'destructive', title: 'Planilha Vazia', description: 'A planilha selecionada não contém dados a partir da linha de cabeçalho especificada.' });
+                }
+            } catch (error) {
+                console.error("Error parsing file:", error);
+                toast({ variant: 'destructive', title: 'Erro ao Ler Planilha', description: 'Não foi possível processar o arquivo. Verifique o formato e a linha do cabeçalho.' });
             }
         };
         reader.readAsBinaryString(file);
@@ -178,24 +185,38 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             </DialogHeader>
 
             {step === 1 && (
-                <div className="py-4">
-                    <Label htmlFor="spreadsheet-file" className="block text-sm font-medium text-muted-foreground mb-2">
-                        Passo 1: Selecionar Arquivo (.xlsx, .csv, .ods)
-                    </Label>
-                    <Label
-                        htmlFor="spreadsheet-file"
-                        className="relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50 transition-colors"
-                    >
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <UploadCloud className="w-10 h-10 mb-4 text-muted-foreground" />
-                            <p className="mb-2 text-sm text-muted-foreground">
-                                <span className="font-semibold text-primary">Clique para carregar</span> ou arraste e solte
-                            </p>
-                            <p className="text-xs text-muted-foreground">XLSX, CSV ou ODS (MAX. 10MB)</p>
-                        </div>
-                        <Input id="spreadsheet-file" type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.csv,.ods" />
-                    </Label>
-                     {file && <p className="text-sm text-muted-foreground mt-2">Arquivo selecionado: <span className="font-medium text-foreground">{file.name}</span></p>}
+                <div className="py-4 space-y-4">
+                    <div>
+                        <Label htmlFor="spreadsheet-file" className="block text-sm font-medium text-muted-foreground mb-2">
+                            Passo 1: Selecionar Arquivo (.xlsx, .csv, .ods)
+                        </Label>
+                        <Label
+                            htmlFor="spreadsheet-file"
+                            className="relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50 transition-colors"
+                        >
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <UploadCloud className="w-10 h-10 mb-4 text-muted-foreground" />
+                                <p className="mb-2 text-sm text-muted-foreground">
+                                    <span className="font-semibold text-primary">Clique para carregar</span> ou arraste e solte
+                                </p>
+                                <p className="text-xs text-muted-foreground">XLSX, CSV ou ODS (MAX. 10MB)</p>
+                            </div>
+                            <Input id="spreadsheet-file" type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.csv,.ods" />
+                        </Label>
+                         {file && <p className="text-sm text-muted-foreground mt-2">Arquivo selecionado: <span className="font-medium text-foreground">{file.name}</span></p>}
+                    </div>
+                    <div>
+                         <Label htmlFor="header-row">Linha do Cabeçalho</Label>
+                        <Input 
+                            id="header-row" 
+                            type="number" 
+                            value={headerRow} 
+                            onChange={(e) => setHeaderRow(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                            min="1"
+                            className="w-32 mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Informe o número da linha que contém os títulos das colunas (ex: 1).</p>
+                    </div>
                 </div>
             )}
             
