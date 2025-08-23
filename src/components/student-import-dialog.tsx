@@ -409,22 +409,23 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                 <ScrollArea className="w-full whitespace-nowrap">
                                     <div className="flex w-max space-x-1 border-b">
                                         {sheetNames.map((name) => (
-                                            <button
-                                                key={name}
-                                                onClick={() => setSelectedSheet(name)}
-                                                className={cn(
-                                                    "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
-                                                    selectedSheet === name
-                                                        ? "border-primary text-primary font-semibold"
-                                                        : "border-transparent text-muted-foreground hover:text-foreground"
-                                                )}
-                                            >
-                                                <FileSpreadsheet className="h-4 w-4" />
-                                                <span className="whitespace-nowrap">{name}</span>
-                                                <button onClick={(e) => { e.stopPropagation(); handleTogglePrimarySheet(name); }} className="ml-2 p-1 rounded-full hover:bg-muted">
+                                            <div key={name} className="flex items-center">
+                                                <button
+                                                    onClick={() => setSelectedSheet(name)}
+                                                    className={cn(
+                                                        "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
+                                                        selectedSheet === name
+                                                            ? "border-primary text-primary font-semibold"
+                                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                                    )}
+                                                >
+                                                    <FileSpreadsheet className="h-4 w-4" />
+                                                    <span className="whitespace-nowrap">{name}</span>
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleTogglePrimarySheet(name); }} className="p-1 rounded-full hover:bg-muted">
                                                     <Star className={cn("h-4 w-4 text-muted-foreground", primarySheet === name && "fill-current text-yellow-500")} />
                                                 </button>
-                                            </button>
+                                            </div>
                                         ))}
                                     </div>
                                     <ScrollBar orientation="horizontal" />
