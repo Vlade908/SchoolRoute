@@ -2,7 +2,6 @@
  * @fileOverview Server action to save spreadsheet import configurations.
  *
  * - saveImportConfig - Saves a spreadsheet mapping configuration to Firestore.
- * - SheetConfig - The type definition for a single sheet's configuration.
  * - ImportConfig - The type definition for the complete configuration payload.
  */
 'use server';
@@ -11,22 +10,16 @@ import { z } from 'zod';
 import { dbAdmin } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 
-// Define the Zod schema for a single sheet configuration.
-const SheetConfigSchema = z.object({
-  sheetName: z.string().describe('The name of the worksheet (tab).'),
-  isPrimary: z.boolean().describe('Whether this is the primary worksheet.'),
-  headerRow: z.number().describe('The row number containing the headers.'),
-  columnMapping: z.record(z.string()).describe('The mapping object from sheet columns to system fields.'),
-});
 
 // Define the Zod schema for the flow's input payload.
 const ImportConfigSchema = z.object({
   fileName: z.string().describe('The name of the original spreadsheet file.'),
-  configurations: z.array(SheetConfigSchema).describe('A list of configurations for each sheet in the file.'),
+  primarySheet: z.string().nullable().describe('The name of the primary worksheet (tab).'),
+  headerRow: z.number().describe('The row number containing the headers.'),
+  mapping: z.record(z.string()).describe('The mapping object from sheet columns to system fields.'),
 });
 
-// Export the inferred types for frontend use.
-export type SheetConfig = z.infer<typeof SheetConfigSchema>;
+// Export the inferred type for frontend use.
 export type ImportConfig = z.infer<typeof ImportConfigSchema>;
 
 /**

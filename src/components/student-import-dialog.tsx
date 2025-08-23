@@ -17,7 +17,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
-import { saveImportConfig, type SheetConfig } from '@/app/actions/save-import-config';
+import { saveImportConfig } from '@/app/actions/save-import-config';
 import { db } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { decryptObjectValues } from '@/lib/crypto';
@@ -350,17 +350,14 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
 
         setIsProcessing(true);
         try {
-            const configToSave: SheetConfig[] = sheetNames.map(name => ({
-                sheetName: name,
-                isPrimary: primarySheet === name,
-                headerRow: headerRow,
-                columnMapping: columnMapping,
-            }));
-
-            const result = await saveImportConfig({
+            const configToSave = {
                 fileName: file.name,
-                configurations: configToSave,
-            });
+                primarySheet,
+                headerRow,
+                mapping: columnMapping,
+            };
+
+            const result = await saveImportConfig(configToSave);
 
             if (result.success) {
                 toast({ title: 'Sucesso!', description: 'Configuração de importação salva no servidor.' });
