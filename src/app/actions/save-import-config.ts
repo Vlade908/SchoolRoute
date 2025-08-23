@@ -43,7 +43,7 @@ export async function saveImportConfig(config: ImportConfig): Promise<{ success:
     
     const encryptedData = encryptObjectValues(dataToSave);
 
-    await docRef.set(encryptedData);
+    await docRef.set(encryptedData, { merge: true });
 
     console.log(`Configuration for ${validatedConfig.fileName} saved successfully.`);
     return { success: true, message: 'Configuração salva com sucesso.' };

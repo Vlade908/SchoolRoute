@@ -21,7 +21,6 @@ import { saveImportConfig } from '@/app/actions/save-import-config';
 import { getImportConfig } from '@/app/actions/get-import-config';
 import { db } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
-import { decryptObjectValues } from '@/lib/crypto';
 import type { ImportConfig } from '@/models/import-config';
 
 
@@ -215,9 +214,9 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             const snapshot = await getDocs(schoolsCollection);
             const schoolsData: School[] = [];
             snapshot.forEach(doc => {
-                 const decryptedData = decryptObjectValues(doc.data()) as any;
-                 if(decryptedData) {
-                     schoolsData.push({ id: doc.id, name: decryptedData.name, address: decryptedData.address || '' });
+                 const data = doc.data();
+                 if(data) {
+                     schoolsData.push({ id: doc.id, name: data.name, address: data.address || '' });
                  }
             });
             setSchools(schoolsData);
@@ -500,22 +499,22 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                     <div className="flex w-max space-x-1 border-b">
                                         {sheetNames.map((name) => (
                                           <div key={name} className="flex items-center">
-                                                <button
-                                                  onClick={() => setSelectedSheet(name)}
-                                                  className={cn(
-                                                      "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
-                                                      selectedSheet === name
-                                                          ? "border-primary text-primary font-semibold"
-                                                          : "border-transparent text-muted-foreground hover:text-foreground"
-                                                  )}
-                                                >
-                                                  <FileSpreadsheet className="h-4 w-4" />
-                                                  <span className="whitespace-nowrap">{name}</span>
-                                                </button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleTogglePrimarySheet(name); }} className="p-1 rounded-full hover:bg-muted">
-                                                    <Star className={cn("h-4 w-4 text-muted-foreground", primarySheet === name && "fill-current text-yellow-500")} />
-                                                </button>
-                                            </div>
+                                            <button
+                                              onClick={() => setSelectedSheet(name)}
+                                              className={cn(
+                                                "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
+                                                selectedSheet === name
+                                                  ? "border-primary text-primary font-semibold"
+                                                  : "border-transparent text-muted-foreground hover:text-foreground"
+                                              )}
+                                            >
+                                              <FileSpreadsheet className="h-4 w-4" />
+                                              <span className="whitespace-nowrap">{name}</span>
+                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleTogglePrimarySheet(name); }} className="p-1 rounded-full hover:bg-muted">
+                                              <Star className={cn("h-4 w-4 text-muted-foreground", primarySheet === name && "fill-current text-yellow-500")} />
+                                            </button>
+                                          </div>
                                         ))}
                                     </div>
                                     <ScrollBar orientation="horizontal" />

@@ -22,8 +22,12 @@ export async function getImportConfig(fileName: string): Promise<ImportConfig | 
 
     if (docSnap.exists) {
       console.log(`Configuration for ${fileName} found.`);
-      const decryptedData = decryptObjectValues(docSnap.data() as any);
-      return decryptedData as ImportConfig | null;
+      const data = docSnap.data();
+      if (data) {
+        const decryptedData = decryptObjectValues(data);
+        return decryptedData as ImportConfig | null;
+      }
+      return null;
     } else {
       console.log(`No configuration found for ${fileName}.`);
       return null;

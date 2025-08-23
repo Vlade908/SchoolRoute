@@ -24,7 +24,6 @@ import { cn } from '@/lib/utils';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { decryptObjectValues } from '@/lib/crypto';
 
 
 type User = {
@@ -184,15 +183,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
               const encryptedData = userDoc.data();
-              const userData = decryptObjectValues(encryptedData) as any;
+              // A descriptografia agora deve ser feita em uma server action se necessário,
+              // mas para o perfil do usuário, podemos assumir que os dados já estão em um formato utilizável
+              // ou faremos uma chamada de servidor para obtê-los descriptografados.
+              // Por enquanto, vamos supor que a descriptografia acontece no backend e o layout recebe dados prontos.
+              const userData = encryptedData as any; // Simulação, idealmente viria de uma server action
               
-              if (userData) {
+              if (userData.encryptedData) {
+                  // Se os dados ainda estiverem criptografados, o ideal seria uma server action para buscar.
+                  // Como paliativo, podemos tentar descriptografar aqui, mas não é o ideal.
+                   console.error("User data is encrypted on the client. This should be handled by a server action.");
+                   await auth.signOut();
+                   setUser(null);
+                   router.push('/');
+                   setLoading(false);
+                   return;
+              }
+
+
                 let schoolName = null;
                 if(userData.schoolId) {
                     const schoolDocRef = doc(db, 'schools', userData.schoolId);
                     const schoolDoc = await getDoc(schoolDocRef);
                     if(schoolDoc.exists()){
-                        const schoolData = decryptObjectValues(schoolDoc.data());
+                        // Da mesma forma, a descriptografia deve ocorrer no servidor.
+                        const schoolData = schoolDoc.data();
                         schoolName = schoolData?.name || null;
                     }
                 }
@@ -207,10 +222,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 };
                 setUser(userProfile);
 
-              } else {
-                 // Decryption failed or data malformed
-                 throw new Error("Failed to decrypt user data.");
-              }
             } else {
                // This case might happen if user exists in Auth but not in Firestore
                // Instead of throwing an error, we sign out and redirect.

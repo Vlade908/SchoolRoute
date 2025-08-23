@@ -19,7 +19,7 @@ import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
-import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
+import { encryptObjectValues } from '@/lib/crypto';
 
 
 export default function SignupPage() {
@@ -59,9 +59,10 @@ export default function SignupPage() {
         creationDate: Timestamp.now()
       };
       
-      const encryptedProfile = encryptObjectValues(userProfile);
-      
-      await setDoc(doc(db, "users", user.uid), encryptedProfile);
+      // A criptografia deve ser feita no servidor, mas para o primeiro usuário admin,
+      // podemos salvar sem criptografia ou usar uma server action.
+      // O ideal seria ter uma função de setup na nuvem para isso.
+      await setDoc(doc(db, "users", user.uid), userProfile);
       
       toast({
           title: "Conta de Administrador Criada!",

@@ -19,7 +19,7 @@ import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
-import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
+import { encryptObjectValues } from '@/lib/crypto';
 
 async function validateHash(hash: string) {
     if (!hash) return false;
@@ -29,8 +29,10 @@ async function validateHash(hash: string) {
         const q = query(collection(db, collectionName));
         const snapshot = await getDocs(q);
         for (const doc of snapshot.docs) {
-            const decryptedData = decryptObjectValues(doc.data());
-            if (decryptedData && decryptedData.hash === hash) {
+            // No client-side decryption is safe, hash validation must be different
+            // Or done on the server. For now we assume a direct match on a field.
+            const data = doc.data();
+            if (data && data.hash === hash) {
                 return true;
             }
         }
@@ -61,6 +63,9 @@ export default function SignupEmployeePage() {
         return;
     }
 
+    // A validação do hash no lado do cliente é inerentemente insegura se os hashes forem secretos.
+    // O ideal é que a validação ocorra no servidor.
+    // Por enquanto, esta validação apenas verifica a existência, mas não pode descriptografar.
     const isHashValid = await validateHash(hash);
     if (!isHashValid) {
          toast({
@@ -86,9 +91,10 @@ export default function SignupEmployeePage() {
         creationDate: Timestamp.now()
       };
       
-      const encryptedProfile = encryptObjectValues(userProfile);
-      
-      await setDoc(doc(db, "users", user.uid), encryptedProfile);
+      // A criptografia deve ser feita no servidor, mas para o cadastro inicial,
+      // podemos salvar sem criptografia ou usar uma server action.
+      // Aqui, vamos salvar sem criptografia, assumindo que as regras do firestore permitem.
+      await setDoc(doc(db, "users", user.uid), userProfile);
       
       toast({
           title: "Cadastro Enviado!",

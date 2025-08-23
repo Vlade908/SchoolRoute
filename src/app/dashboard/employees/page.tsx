@@ -61,7 +61,7 @@ import {
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, onSnapshot, query, updateDoc, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
+import { encryptObjectValues } from '@/lib/crypto';
 
 type Employee = {
     id: string; // Firestore document ID
@@ -150,8 +150,7 @@ export default function EmployeesPage() {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
             const usersData: Employee[] = [];
             snapshot.forEach(doc => {
-                const encryptedData = doc.data();
-                const data = decryptObjectValues(encryptedData) as any;
+                const data = doc.data() as any;
 
                 if (data) {
                     usersData.push({
@@ -183,12 +182,11 @@ export default function EmployeesPage() {
             const currentDoc = await getDoc(employeeDocRef);
             if (!currentDoc.exists()) throw new Error("Funcionário não encontrado.");
             
-            const encryptedData = currentDoc.data();
-            const decryptedData = decryptObjectValues(encryptedData);
-            if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
+            const currentData = currentDoc.data();
+            if(!currentData) throw new Error("Falha ao descriptografar dados do funcionário.");
             
             const dataToUpdate = {
-                ...decryptedData,
+                ...currentData,
                 status: updatedEmployee.status,
                 role: updatedEmployee.role,
             };
@@ -215,11 +213,10 @@ export default function EmployeesPage() {
             const currentDoc = await getDoc(employeeDocRef);
             if (!currentDoc.exists()) throw new Error("Funcionário não encontrado.");
 
-            const encryptedData = currentDoc.data();
-            const decryptedData = decryptObjectValues(encryptedData);
-            if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
+            const currentData = currentDoc.data();
+            if(!currentData) throw new Error("Falha ao descriptografar dados do funcionário.");
             
-            const dataToUpdate = { ...decryptedData, status: 'Inativo' };
+            const dataToUpdate = { ...currentData, status: 'Inativo' };
             const encryptedUpdate = encryptObjectValues(dataToUpdate);
 
             await updateDoc(employeeDocRef, encryptedUpdate);
