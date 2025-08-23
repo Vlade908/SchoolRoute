@@ -19,7 +19,6 @@ import { ArrowLeft, ArrowRight, Loader2, UploadCloud, Star, Search, GripVertical
 import { cn } from '@/lib/utils';
 import { Checkbox } from './ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 
 
 type School = {
@@ -316,39 +315,28 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                        </Button>
                     </div>
 
-                    <Carousel
-                        opts={{
-                            align: "start",
-                            dragFree: true,
-                        }}
-                        className="w-full"
-                    >
-                        <CarouselContent className="-ml-1">
+                    <ScrollArea className="w-full whitespace-nowrap">
+                        <div className="flex w-max space-x-1 border-b">
                             {sheetNames.map((name) => (
-                                <CarouselItem key={name} className="pl-1 basis-auto">
-                                    <button
-                                        onClick={() => setSelectedSheet(name)}
-                                        className={cn(
-                                            "flex items-center gap-2 p-2 text-sm transition-colors border-b-2",
-                                            selectedSheet === name 
-                                                ? "border-primary text-primary font-semibold" 
-                                                : "border-transparent text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        <GripVertical className="h-4 w-4" />
-                                        <span className="whitespace-nowrap">{name}</span>
-                                        <button onClick={(e) => {e.stopPropagation(); setPrimarySheet(name);}}>
-                                          <Star className={cn("h-4 w-4 transition-colors", primarySheet === name ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground hover:text-yellow-400')}/>
-                                        </button>
+                                <button
+                                    key={name}
+                                    onClick={() => setSelectedSheet(name)}
+                                    className={cn(
+                                        "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
+                                        selectedSheet === name 
+                                            ? "border-primary text-primary font-semibold" 
+                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <GripVertical className="h-4 w-4" />
+                                    <span className="whitespace-nowrap">{name}</span>
+                                    <button onClick={(e) => {e.stopPropagation(); setPrimarySheet(name);}}>
+                                      <Star className={cn("h-4 w-4 transition-colors", primarySheet === name ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground hover:text-yellow-400')}/>
                                     </button>
-                                </CarouselItem>
+                                </button>
                             ))}
-                        </CarouselContent>
-                         <div className="mt-2">
-                            <CarouselPrevious className="absolute left-0 top-1/2 -translate-y-1/2" />
-                            <CarouselNext className="absolute right-0 top-1/2 -translate-y-1/2" />
                         </div>
-                    </Carousel>
+                    </ScrollArea>
                     
                      <div className="flex items-center gap-2 pt-4">
                         <Label htmlFor="header-row">Linha do Cabeçalho</Label>
@@ -418,3 +406,5 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         </DialogContent>
     );
 }
+
+    
