@@ -8,8 +8,8 @@
 'use server';
 
 import { z } from 'zod';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { dbAdmin } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
 
 // Define the Zod schema for a single sheet configuration.
 const SheetConfigSchema = z.object({
@@ -30,7 +30,7 @@ export type SheetConfig = z.infer<typeof SheetConfigSchema>;
 export type ImportConfig = z.infer<typeof ImportConfigSchema>;
 
 /**
- * Saves a spreadsheet import configuration to Firestore.
+ * Saves a spreadsheet import configuration to Firestore using the Admin SDK.
  * Uses the file name as the document ID for easy retrieval.
  *
  * @param {ImportConfig} config - The import configuration object.
@@ -41,9 +41,9 @@ export async function saveImportConfig(config: ImportConfig): Promise<{ success:
     // Validate input with Zod
     const validatedConfig = ImportConfigSchema.parse(config);
     
-    const docRef = doc(db, 'import-configurations', validatedConfig.fileName);
+    const docRef = dbAdmin.collection('import-configurations').doc(validatedConfig.fileName);
     
-    await setDoc(docRef, {
+    await docRef.set({
       ...validatedConfig,
       updatedAt: Timestamp.now(),
     }, { merge: true });
