@@ -17,7 +17,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
-import { saveImportConfigFlow, type SheetConfig } from '@/ai/flows/save-import-config-flow';
+import { saveImportConfig, type SheetConfig } from '@/app/actions/save-import-config';
 
 
 const monthNames = [
@@ -295,7 +295,6 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 }
             });
             setColumnMapping(newMapping);
-            // Reset selected headers when sheet data changes
             setSelectedHeaders(new Set());
         } catch (error) {
             console.error("Error processing sheet:", error);
@@ -334,7 +333,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 columnMapping: columnMapping, // Assuming same mapping for all for now
             }));
 
-            const result = await saveImportConfigFlow({
+            const result = await saveImportConfig({
                 fileName: file.name,
                 configurations: configToSave,
             });
