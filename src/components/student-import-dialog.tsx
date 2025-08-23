@@ -80,8 +80,8 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             }
         }
     };
-
-    const handleParseFile = () => {
+    
+    const handleParseFile = useCallback(() => {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -90,16 +90,15 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                // The 'header' option in sheet_to_json expects a 0-indexed row number.
                 const json = XLSX.utils.sheet_to_json(worksheet, { header: headerRow - 1, defval: "" });
                 
                 if (json.length > 0) {
-                    // Since header is a number, keys will be column names from that row.
                     setSheetData(json);
                     setHeaders(Object.keys(json[0]));
-                    setStep(2);
                 } else {
                     toast({ variant: 'destructive', title: 'Planilha Vazia', description: 'A planilha selecionada não contém dados a partir da linha de cabeçalho especificada.' });
+                    setHeaders([]);
+                    setSheetData([]);
                 }
             } catch (error) {
                 console.error("Error parsing file:", error);
@@ -107,7 +106,22 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             }
         };
         reader.readAsBinaryString(file);
-    };
+    }, [file, headerRow, toast]);
+
+    const handleProceedToMapping = () => {
+        if (!file) {
+            toast({ variant: 'destructive', title: 'Nenhum arquivo selecionado', description: 'Por favor, carregue uma planilha para continuar.' });
+            return;
+        }
+        setStep(2);
+        handleParseFile();
+    }
+    
+    useEffect(() => {
+        if (step === 2) {
+            handleParseFile();
+        }
+    }, [headerRow, step, handleParseFile]);
 
     const handleMappingChange = (header: string, systemField: string) => {
         setColumnMapping(prev => ({ ...prev, [header]: systemField }));
@@ -205,7 +219,16 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                         </Label>
                          {file && <p className="text-sm text-muted-foreground mt-2">Arquivo selecionado: <span className="font-medium text-foreground">{file.name}</span></p>}
                     </div>
-                    <div>
+                </div>
+            )}
+            
+            {step === 2 && (
+                <div className="py-4">
+                    <Label className="block text-sm font-medium text-muted-foreground mb-2">
+                        Passo 2: Mapear Colunas da Planilha
+                    </Label>
+                    <p className="text-sm text-muted-foreground mb-4">Associe cada coluna da sua planilha ao campo correspondente no sistema.</p>
+                     <div className="mb-4">
                          <Label htmlFor="header-row">Linha do Cabeçalho</Label>
                         <Input 
                             id="header-row" 
@@ -215,17 +238,8 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                             min="1"
                             className="w-32 mt-1"
                         />
-                        <p className="text-xs text-muted-foreground mt-1">Informe o número da linha que contém os títulos das colunas (ex: 1).</p>
+                        <p className="text-xs text-muted-foreground mt-1">Informe o número da linha que contém os títulos das colunas.</p>
                     </div>
-                </div>
-            )}
-            
-            {step === 2 && (
-                <div className="py-4">
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">
-                        Passo 2: Mapear Colunas da Planilha
-                    </Label>
-                    <p className="text-sm text-muted-foreground mb-4">Associe cada coluna da sua planilha ao campo correspondente no sistema.</p>
                     <ScrollArea className="h-72 w-full pr-4">
                         <div className="space-y-4">
                             {headers.map(header => (
@@ -282,7 +296,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
 
             <DialogFooter>
                 {step === 1 && (
-                    <Button onClick={handleParseFile} disabled={!file}>
+                    <Button onClick={handleProceedToMapping} disabled={!file}>
                         Próximo <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                 )}
