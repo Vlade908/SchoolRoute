@@ -367,9 +367,16 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             if (student.souCardNumber) {
                 student.hasPass = 'Sim';
             }
+
+            // Default values for missing optional fields
+            if (!student.responsibleName) student.responsibleName = "Jon Due";
+            if (!student.contactPhone) student.contactPhone = "00000000000";
+            if (!student.contactEmail) student.contactEmail = "johndue0000@gmail.com";
+            if (!student.rg) student.rg = "000000000";
+            if (!student.rgIssueDate) student.rgIssueDate = "00/00/0000";
             
             return student;
-        }).filter(student => Object.keys(student).length > 0);
+        }).filter(student => Object.keys(student).length > 0 && student.name); // Ensure student has at least a name
 
         // Placeholder for more complex validation and summary
         const newSchools: Record<string, number> = {};
@@ -438,18 +445,18 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                 <ScrollArea className="w-full whitespace-nowrap">
                                     <div className="flex w-max space-x-1 border-b">
                                         {sheetNames.map((name) => (
-                                            <div key={name} className="flex items-center">
-                                                <button
-                                                    onClick={() => setSelectedSheet(name)}
-                                                    className={cn(
-                                                        "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
-                                                        selectedSheet === name
-                                                            ? "border-primary text-primary font-semibold"
-                                                            : "border-transparent text-muted-foreground hover:text-foreground"
-                                                    )}
-                                                >
-                                                    <FileSpreadsheet className="h-4 w-4" />
-                                                    <span className="whitespace-nowrap">{name}</span>
+                                          <div key={name} className="flex items-center">
+                                              <button
+                                                  onClick={() => setSelectedSheet(name)}
+                                                  className={cn(
+                                                      "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
+                                                      selectedSheet === name
+                                                          ? "border-primary text-primary font-semibold"
+                                                          : "border-transparent text-muted-foreground hover:text-foreground"
+                                                  )}
+                                              >
+                                                  <FileSpreadsheet className="h-4 w-4" />
+                                                  <span className="whitespace-nowrap">{name}</span>
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); handleTogglePrimarySheet(name); }} className="p-1 rounded-full hover:bg-muted">
                                                     <Star className={cn("h-4 w-4 text-muted-foreground", primarySheet === name && "fill-current text-yellow-500")} />
