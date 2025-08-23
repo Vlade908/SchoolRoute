@@ -13,7 +13,7 @@ import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { ScrollArea } from './ui/scroll-area';
+import { ScrollArea, ScrollBar } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { ArrowLeft, ArrowRight, Loader2, UploadCloud, Star, Search, GripVertical, FileSpreadsheet, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -55,8 +55,7 @@ function MappingTable({ headers, onMappingChange, initialMapping }: { headers: s
     return (
         <div>
              <div className="flex justify-between items-center mb-4">
-                 <div className="flex items-center gap-2">
-                 </div>
+                 <h3 className="text-lg font-semibold">Mapear Colunas</h3>
                  <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -69,10 +68,10 @@ function MappingTable({ headers, onMappingChange, initialMapping }: { headers: s
              </div>
             <ScrollArea className="h-72 w-full pr-4 border rounded-md">
                 <Table>
-                    <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                    <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm z-10">
                         <TableRow>
-                            <TableHead className="w-1/2">Coluna</TableHead>
-                            <TableHead className="w-1/2">Mapear Para Campo do Sistema</TableHead>
+                            <TableHead className="w-1/2">Coluna da Planilha</TableHead>
+                            <TableHead className="w-1/2">Campo no Sistema</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -111,7 +110,6 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
     const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
     const [sheetNames, setSheetNames] = useState<string[]>([]);
     const [selectedSheet, setSelectedSheet] = useState('');
-    const [primarySheet, setPrimarySheet] = useState('');
     const [sheetData, setSheetData] = useState<any[]>([]);
     const [headers, setHeaders] = useState<string[]>([]);
     const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
@@ -147,7 +145,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         }
     };
     
-    const parseAndSetWorkbook = (fileToParse: File) => {
+    const processWorkbookFromFile = (fileToParse: File) => {
         const reader = new FileReader();
         reader.onload = (e) => {
              try {
@@ -155,8 +153,9 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                 const wb = XLSX.read(data, { type: 'binary' });
                 setWorkbook(wb);
                 setSheetNames(wb.SheetNames);
-                setSelectedSheet(wb.SheetNames[0]);
-                setPrimarySheet(wb.SheetNames[0]);
+                if (wb.SheetNames.length > 0) {
+                    setSelectedSheet(wb.SheetNames[0]);
+                }
              } catch (error) {
                 console.error("Error parsing file:", error);
                 toast({ variant: 'destructive', title: 'Erro ao Ler Planilha', description: 'Não foi possível processar o arquivo. Verifique se o formato é válido.' });
@@ -171,22 +170,31 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             return;
         }
         setStep(2);
-        parseAndSetWorkbook(file);
+        processWorkbookFromFile(file);
     }
     
     const processSheetData = useCallback(() => {
         if (!workbook || !selectedSheet) return;
         try {
             const worksheet = workbook.Sheets[selectedSheet];
+            // header: A - 1 tells sheet_to_json to use row A as the header.
+            // Since our headerRow state is 1-based, we subtract 1.
             const json = XLSX.utils.sheet_to_json(worksheet, { header: headerRow - 1, defval: "" });
 
             if (json.length > 0) {
-                setSheetData(json);
-                const firstRow = json[0] as any;
+                // The first element is the actual data, starting from the row after the header
+                const dataRows = json.slice(1);
+                setSheetData(dataRows);
+                
+                // The keys of the first data object are our headers.
+                const firstRow = dataRows[0] as any;
                 if (firstRow) {
                     setHeaders(Object.keys(firstRow));
                 } else {
-                    setHeaders([]);
+                     // If there's only a header row but no data, get headers from the original json result
+                    const headerData = json[0] as any;
+                    setHeaders(Object.keys(headerData));
+                    setSheetData([]); // No data rows to process
                 }
             } else {
                 toast({ variant: 'destructive', title: 'Planilha Vazia', description: 'A planilha selecionada não contém dados a partir da linha de cabeçalho especificada.' });
@@ -304,42 +312,33 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             )}
             
             {step === 2 && workbook && (
-                <div className="py-4 space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
-                        <FileSpreadsheet className="mr-2 h-4 w-4"/>
-                        {file?.name}
-                      </Button>
-                       <Button variant="ghost" size="icon" className="h-8 w-8">
-                         <PlusCircle className="h-4 w-4" />
-                       </Button>
-                    </div>
-
-                    <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="flex w-max space-x-1 border-b">
-                            {sheetNames.map((name) => (
-                                <button
-                                    key={name}
-                                    onClick={() => setSelectedSheet(name)}
-                                    className={cn(
-                                        "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
-                                        selectedSheet === name 
-                                            ? "border-primary text-primary font-semibold" 
-                                            : "border-transparent text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <GripVertical className="h-4 w-4" />
-                                    <span className="whitespace-nowrap">{name}</span>
-                                    <button onClick={(e) => {e.stopPropagation(); setPrimarySheet(name);}}>
-                                      <Star className={cn("h-4 w-4 transition-colors", primarySheet === name ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground hover:text-yellow-400')}/>
+                <div className="py-4 space-y-6">
+                    <div className="space-y-2">
+                        <Label>Planilha</Label>
+                        <ScrollArea className="w-full whitespace-nowrap">
+                            <div className="flex w-max space-x-1 border-b">
+                                {sheetNames.map((name) => (
+                                    <button
+                                        key={name}
+                                        onClick={() => setSelectedSheet(name)}
+                                        className={cn(
+                                            "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
+                                            selectedSheet === name 
+                                                ? "border-primary text-primary font-semibold" 
+                                                : "border-transparent text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <FileSpreadsheet className="h-4 w-4" />
+                                        <span className="whitespace-nowrap">{name}</span>
                                     </button>
-                                </button>
-                            ))}
-                        </div>
-                    </ScrollArea>
+                                ))}
+                            </div>
+                            <ScrollBar orientation="horizontal" />
+                        </ScrollArea>
+                    </div>
                     
-                     <div className="flex items-center gap-2 pt-4">
-                        <Label htmlFor="header-row">Linha do Cabeçalho</Label>
+                     <div className="flex items-center gap-2">
+                        <Label htmlFor="header-row" className="whitespace-nowrap">Linha do Cabeçalho</Label>
                         <Input 
                             id="header-row" 
                             type="number"
@@ -356,18 +355,18 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             )}
             
             {step === 3 && importSummary && (
-                <div className="py-4">
+                <div className="py-4 space-y-4">
                      <Alert>
-                        <AlertTitle>Importação Concluída!</AlertTitle>
+                        <AlertTitle className="font-bold">Importação Concluída!</AlertTitle>
                         <AlertDescription>
-                            <p><Badge variant="default" className="bg-green-600">{importSummary.successCount}</Badge> alunos importados com sucesso.</p>
-                            <p><Badge variant="destructive">{importSummary.errorCount}</Badge> alunos não foram importados por falta de dados.</p>
+                            <p className="flex items-center"><Badge variant="default" className="bg-green-600 mr-2">{importSummary.successCount}</Badge> alunos importados com sucesso.</p>
+                            <p className="flex items-center mt-2"><Badge variant="destructive" className="mr-2">{importSummary.errorCount}</Badge> alunos não foram importados por falta de dados (ex: nome ou escola em branco).</p>
                         </AlertDescription>
                     </Alert>
                     
                     {Object.keys(importSummary.newSchools).length > 0 && (
-                        <Alert variant="destructive" className="mt-4">
-                            <AlertTitle>Ação Necessária: Novas Escolas Encontradas!</AlertTitle>
+                        <Alert variant="destructive">
+                            <AlertTitle className="font-bold">Ação Necessária: Novas Escolas Encontradas!</AlertTitle>
                             <AlertDescription>
                                 <p>Os seguintes alunos não foram importados porque as escolas deles não estão cadastradas. Por favor, cadastre estas escolas na aba 'Escolas' e importe a planilha novamente para estes alunos.</p>
                                 <ul className="mt-2 list-disc list-inside">
@@ -392,7 +391,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                          <Button variant="outline" onClick={() => setStep(1)}>
                             <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                         </Button>
-                        <Button onClick={handleImport} disabled={isProcessing}>
+                        <Button onClick={handleImport} disabled={isProcessing || headers.length === 0}>
                             {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : <>Importar Alunos</>}
                         </Button>
                     </div>
