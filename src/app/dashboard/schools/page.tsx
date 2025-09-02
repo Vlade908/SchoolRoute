@@ -29,33 +29,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, doc, updateDoc, onSnapshot, query, where, Timestamp, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, onSnapshot, query, Timestamp, deleteDoc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { AddressMap } from '@/components/address-map';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-
-
-type SchoolClass = {
-  name: string;
-  period: 'Manhã' | 'Tarde' | 'Noite' | 'Integral';
-};
-
-type SchoolGrade = {
-  name: string;
-  classes: SchoolClass[];
-};
-
-type School = {
-  id: string;
-  name: string;
-  address: string;
-  hash: string;
-  schoolType: 'MUNICIPAL' | 'ESTADUAL' | 'MUNICIPALIZADA';
-  status: 'Ativa' | 'Inativa';
-  grades?: SchoolGrade[];
-};
+import { School, SchoolGrade, SchoolClass } from '@/models/school';
+import { addSchool } from '@/app/actions/add-school';
 
 type Employee = {
     id: string;
@@ -146,10 +127,10 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
 }
 
 function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<School, 'id' | 'status'>) => void, onOpenChange: (open:boolean)=>void}) {
-  const [schoolData, setSchoolData] = useState({ name: '', address: '', hash: '', schoolType: '' as School['schoolType'] | '', grades: [] });
+  const [schoolData, setSchoolData] = useState<Omit<School, 'id' | 'status'>>({ name: '', address: '', hash: '', schoolType: 'MUNICIPAL', grades: [] });
   const { toast } = useToast();
 
-  const handleDataChange = (field: keyof typeof schoolData, value: string) => {
+  const handleDataChange = (field: keyof typeof schoolData, value: any) => {
     setSchoolData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -169,7 +150,7 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
       toast({ variant: 'destructive', title: "Erro de Validação", description: "Por favor, preencha todos os campos e gere uma chave." });
       return;
     }
-    onSave(schoolData as Omit<School, 'id' | 'status'>);
+    onSave(schoolData);
   }
 
   return (
@@ -191,7 +172,7 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
           <Label htmlFor="schoolType" className="sm:text-right">
             Tipo de Escola
           </Label>
-           <Select value={schoolData.schoolType} onValueChange={(value) => handleDataChange('schoolType', value)}>
+           <Select value={schoolData.schoolType} onValueChange={(value: School['schoolType']) => handleDataChange('schoolType', value)}>
                 <SelectTrigger id="schoolType" className="col-span-1 sm:col-span-3">
                     <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
@@ -565,7 +546,7 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
       }
     }
 
-    const handleEditChange = (field: keyof School, value: string) => {
+    const handleEditChange = (field: keyof School, value: any) => {
       setEditedSchool(prev => ({...prev, [field]: value}));
     }
 
@@ -651,7 +632,7 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                                 </div>
                                  <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-4">
                                     <Label htmlFor="schoolType-edit" className="sm:text-right">Tipo</Label>
-                                    <Select value={editedSchool.schoolType} onValueChange={(value) => handleEditChange('schoolType', value)}>
+                                    <Select value={editedSchool.schoolType} onValueChange={(value: School['schoolType']) => handleEditChange('schoolType', value)}>
                                         <SelectTrigger id="schoolType-edit" className="col-span-1 sm:col-span-3">
                                             <SelectValue />
                                         </SelectTrigger>
@@ -963,14 +944,16 @@ export default function SchoolsPage() {
 
     const handleSaveSchool = async (schoolData: Omit<School, 'id' | 'status'>) => {
         try {
-            const newSchoolData = { ...schoolData, status: 'Ativa' as const, createdAt: Timestamp.now() };
-            const encryptedSchool = encryptObjectValues(newSchoolData);
-            await addDoc(collection(db, "schools"), encryptedSchool);
+            const result = await addSchool(schoolData);
+            if (!result.success) {
+                throw new Error(result.message);
+            }
             setAddSchoolModalOpen(false);
             toast({ title: 'Sucesso!', description: 'Escola cadastrada com sucesso.'});
         } catch (error) {
             console.error("Error adding document: ", error);
-            toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível cadastrar a escola.'});
+            const errorMessage = error instanceof Error ? error.message : 'Não foi possível cadastrar a escola.';
+            toast({ variant: 'destructive', title: 'Erro!', description: errorMessage });
         }
     }
 
@@ -1077,6 +1060,4 @@ export default function SchoolsPage() {
     </>
   );
 }
-
-
 
