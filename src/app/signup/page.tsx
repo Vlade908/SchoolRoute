@@ -16,9 +16,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { createAdminUser } from '../actions/actions';
+import { collection, doc, getDocs, query, setDoc, Timestamp } from 'firebase/firestore';
+import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
 
 
 export default function SignupPage() {
@@ -34,31 +35,70 @@ export default function SignupPage() {
     setLoading(true);
     
     try {
-      const result = await createAdminUser({ name, email, password });
+        // 1. Check if an admin user already exists
+        const usersRef = collection(db, "users");
+        const querySnapshot = await getDocs(query(usersRef));
+        
+        let adminExists = false;
+        for (const doc of querySnapshot.docs) {
+            const decryptedData = decryptObjectValues(doc.data());
+            if (decryptedData && decryptedData.role === 3) {
+                adminExists = true;
+                break;
+            }
+        }
 
-      if (result.success) {
+        if (adminExists) {
+            toast({
+                variant: "destructive",
+                title: "Erro no Cadastro",
+                description: "Uma conta de administrador já existe.",
+            });
+            setLoading(false);
+            return;
+        }
+
+        // 2. Create user with Firebase Auth (Client SDK)
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // 3. Create user profile in Firestore
+        const userProfile = {
+            uid: user.uid,
+            name,
+            email,
+            hash: 'admin-seed',
+            role: 3, // Admin role
+            status: 'Ativo',
+            creationDate: Timestamp.now()
+        };
+
+        const encryptedProfile = encryptObjectValues(userProfile);
+        await setDoc(doc(db, "users", user.uid), encryptedProfile);
+
         toast({
             title: "Conta de Administrador Criada!",
             description: "Sua conta foi criada com sucesso. Fazendo login...",
         });
         
-        // Log the user in automatically after successful creation
         await signInWithEmailAndPassword(auth, email, password);
         router.push('/dashboard');
         
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Erro no Cadastro",
-          description: result.message,
-        });
-      }
     } catch (error: any) {
        console.error("Signup failed:", error);
+       let message = 'Ocorreu um erro desconhecido.';
+       if (error.code === 'auth/email-already-in-use') {
+         message = "Este e-mail já está em uso.";
+       } else if (error.code === 'auth/weak-password') {
+         message = 'A senha deve ter pelo menos 6 caracteres.';
+       } else if (error.code === 'permission-denied' || error.code === 'missing-permission') {
+           message = 'Permissões insuficientes para criar a conta. Verifique as regras de segurança do Firestore.';
+       }
+
        toast({
           variant: "destructive",
           title: "Erro no Cadastro",
-          description: error.message || "Ocorreu um erro desconhecido.",
+          description: message,
        });
     } finally {
         setLoading(false);
