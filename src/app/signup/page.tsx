@@ -42,9 +42,11 @@ export default function SignupPage() {
           description: "Sua conta foi criada com sucesso. Fazendo login...",
         });
         
+        // Log the user in after successful creation
         await signInWithEmailAndPassword(auth, email, password);
         router.push('/dashboard');
       } else {
+        // The server action returned an error
         throw new Error(result.message);
       }
         
