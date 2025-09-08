@@ -7,20 +7,27 @@
 'use server';
 
 import { z } from 'zod';
+<<<<<<< HEAD
 import { db } from '@/lib/firebase';
 import { Timestamp } from 'firebase/firestore';
 import type { ImportConfig } from '@/models/import-config';
 import { setDoc, doc } from 'firebase/firestore';
+=======
+import { dbAdmin } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
+>>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
 
 
 // Define the Zod schema for the flow's input payload.
 const ImportConfigSchema = z.object({
   fileName: z.string().describe('The name of the original spreadsheet file.'),
-  primarySheet: z.string().describe('The name of the primary worksheet (tab).'),
+  primarySheet: z.string().nullable().describe('The name of the primary worksheet (tab).'),
   headerRow: z.number().describe('The row number containing the headers.'),
   mapping: z.record(z.string()).describe('The mapping object from sheet columns to system fields.'),
 });
 
+// Export the inferred type for frontend use.
+export type ImportConfig = z.infer<typeof ImportConfigSchema>;
 
 /**
  * Saves a spreadsheet import configuration to Firestore using the Admin SDK.

@@ -18,10 +18,12 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { saveImportConfig } from '@/app/actions/save-import-config';
-import { getImportConfig } from '@/app/actions/get-import-config';
 import { db } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+<<<<<<< HEAD
 import type { ImportConfig } from '@/models/import-config';
+=======
+>>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
 import { decryptObjectValues } from '@/lib/crypto';
 
 
@@ -255,51 +257,33 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
         }
     };
 
-    const handleProceedToMapping = async () => {
+    const handleProceedToMapping = () => {
         if (!file) {
             toast({ variant: 'destructive', title: 'Nenhum arquivo selecionado' });
             return;
         }
         setIsProcessing(true);
-
-        try {
-            const savedConfig = await getImportConfig(file.name);
-            
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                 try {
-                    const data = e.target?.result;
-                    const wb = XLSX.read(data, { type: 'binary' });
-                    setWorkbook(wb);
-                    const allSheetNames = wb.SheetNames;
-                    setSheetNames(allSheetNames);
-
-                    if (savedConfig && savedConfig.primarySheet && allSheetNames.includes(savedConfig.primarySheet)) {
-                        setSelectedSheet(savedConfig.primarySheet);
-                        setPrimarySheet(savedConfig.primarySheet);
-                        setHeaderRow(savedConfig.headerRow || 1);
-                        setColumnMapping(savedConfig.mapping || {});
-                        setSelectedHeaders(new Set(Object.keys(savedConfig.mapping)));
-                        toast({ title: 'Configuração Carregada!', description: 'Um mapeamento salvo para este arquivo foi encontrado e aplicado.' });
-                    } else if (allSheetNames.length > 0) {
-                        const firstSheet = allSheetNames[0];
-                        setSelectedSheet(firstSheet);
-                        setPrimarySheet(firstSheet);
-                    }
-                    setStep(2);
-                 } catch (error) {
-                    console.error("Error parsing file:", error);
-                    toast({ variant: 'destructive', title: 'Erro ao Ler Planilha' });
-                 } finally {
-                    setIsProcessing(false);
-                 }
-            };
-            reader.readAsBinaryString(file);
-        } catch (error) {
-            console.error("Error fetching config:", error);
-            toast({ variant: 'destructive', title: 'Erro ao buscar configuração salva.' });
-            setIsProcessing(false);
-        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+             try {
+                const data = e.target?.result;
+                const wb = XLSX.read(data, { type: 'binary' });
+                setWorkbook(wb);
+                setSheetNames(wb.SheetNames);
+                if (wb.SheetNames.length > 0) {
+                    const firstSheet = wb.SheetNames[0];
+                    setSelectedSheet(firstSheet);
+                    setPrimarySheet(firstSheet);
+                }
+                setStep(2);
+             } catch (error) {
+                console.error("Error parsing file:", error);
+                toast({ variant: 'destructive', title: 'Erro ao Ler Planilha' });
+             } finally {
+                setIsProcessing(false);
+             }
+        };
+        reader.readAsBinaryString(file);
     };
 
     const processSheetData = useCallback(() => {
@@ -328,29 +312,25 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
             });
             setSheetData(jsonData);
 
-            // Do not auto-map or auto-select headers unless a config was loaded
-            if (Object.keys(columnMapping).length === 0) {
-                const newMapping: Record<string, string> = {};
-                extractedHeaders.forEach(header => {
-                    if(!header) return;
-                    const headerLower = header.toLowerCase().trim();
-                    const matchedField = studentSystemFields.find(field =>
-                        headerLower.includes(field.label.toLowerCase()) ||
-                        headerLower.includes(field.value.toLowerCase())
-                    );
-                    if (matchedField) {
-                        newMapping[header] = matchedField.value;
-                    }
-                });
-                setColumnMapping(newMapping);
-                setSelectedHeaders(new Set());
-            }
-
+            const newMapping: Record<string, string> = {};
+            extractedHeaders.forEach(header => {
+                if(!header) return;
+                const headerLower = header.toLowerCase().trim();
+                const matchedField = studentSystemFields.find(field =>
+                    headerLower.includes(field.label.toLowerCase()) ||
+                    headerLower.includes(field.value.toLowerCase())
+                );
+                if (matchedField) {
+                    newMapping[header] = matchedField.value;
+                }
+            });
+            setColumnMapping(newMapping);
+            setSelectedHeaders(new Set());
         } catch (error) {
             console.error("Error processing sheet:", error);
             toast({ variant: 'destructive', title: 'Erro ao processar a planilha' });
         }
-    }, [workbook, selectedSheet, headerRow, toast, columnMapping]);
+    }, [workbook, selectedSheet, headerRow, toast]);
 
     useEffect(() => {
         if (step === 2 && workbook) {
@@ -374,10 +354,10 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
 
         setIsProcessing(true);
         try {
-            const configToSave: ImportConfig = {
+            const configToSave = {
                 fileName: file.name,
-                primarySheet: primarySheet || '',
-                headerRow: headerRow,
+                primarySheet,
+                headerRow,
                 mapping: columnMapping,
             };
 
@@ -407,20 +387,16 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                     student[systemField] = row[header];
                 }
             }
-            
-            // Auto-set hasPass if souCardNumber is present
+
             if (student.souCardNumber) {
                 student.hasPass = 'Sim';
             }
 
-            // Set default values for missing optional fields
             if (!student.responsibleName) student.responsibleName = "Jon Due";
             if (!student.contactPhone) student.contactPhone = "00000000000";
             if (!student.contactEmail) student.contactEmail = "johndue0000@gmail.com";
             if (!student.rg) student.rg = "000000000";
             if (!student.rgIssueDate) student.rgIssueDate = "00/00/0000";
-
-            // Set default address if missing
             if (!student.address) {
                 const school = schools.find(s => s.name === student.schoolName || s.id === student.schoolId);
                 if (school) {
@@ -500,6 +476,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                     <div className="flex w-max space-x-1 border-b">
                                         {sheetNames.map((name) => (
                                           <div key={name} className="flex items-center">
+<<<<<<< HEAD
                                             <button
                                               onClick={() => setSelectedSheet(name)}
                                               className={cn(
@@ -516,6 +493,24 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                               <Star className={cn("h-4 w-4 text-muted-foreground", primarySheet === name && "fill-current text-yellow-500")} />
                                             </button>
                                           </div>
+=======
+                                              <button
+                                                  onClick={() => setSelectedSheet(name)}
+                                                  className={cn(
+                                                      "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
+                                                      selectedSheet === name
+                                                          ? "border-primary text-primary font-semibold"
+                                                          : "border-transparent text-muted-foreground hover:text-foreground"
+                                                  )}
+                                              >
+                                                  <FileSpreadsheet className="h-4 w-4" />
+                                                  <span className="whitespace-nowrap">{name}</span>
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleTogglePrimarySheet(name); }} className="p-1 rounded-full hover:bg-muted">
+                                                    <Star className={cn("h-4 w-4 text-muted-foreground", primarySheet === name && "fill-current text-yellow-500")} />
+                                                </button>
+                                            </div>
+>>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
                                         ))}
                                     </div>
                                     <ScrollBar orientation="horizontal" />
