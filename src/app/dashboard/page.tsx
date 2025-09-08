@@ -124,7 +124,7 @@ export default function DashboardPage() {
     return null;
   }
   
-  const welcomeMessage = `Bem-vindo(a) de volta, ${user.name.split(' ')[0]}!`;
+  const welcomeMessage = user.name ? `Bem-vindo(a) de volta, ${user.name.split(' ')[0]}!` : 'Bem-vindo(a) de volta!';
   
   const getActivityIcon = (href: string) => {
       if (href.includes('student')) return <Users className="h-6 w-6"/>;
