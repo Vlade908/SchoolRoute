@@ -16,10 +16,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
+import { createAdminUser } from '../actions/actions';
 
 
 export default function SignupPage() {
@@ -34,79 +33,32 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     
-    if (password.length < 6) {
-        toast({
-            variant: "destructive",
-            title: "Senha Fraca",
-            description: "A senha deve ter pelo menos 6 caracteres.",
-        });
-        setLoading(false);
-        return;
-    }
-    
     try {
-      // Check if an admin already exists by fetching all users and checking their role after decryption
-      const usersRef = collection(db, "users");
-      const q = query(usersRef);
-      const querySnapshot = await getDocs(q);
-      
-      let adminExists = false;
-      querySnapshot.forEach(doc => {
-          const userData = decryptObjectValues(doc.data());
-          if (userData && userData.role === 3) {
-              adminExists = true;
-          }
-      });
+      const result = await createAdminUser({ name, email, password });
 
-      if (adminExists) {
+      if (result.success) {
+        toast({
+            title: "Conta de Administrador Criada!",
+            description: "Sua conta foi criada com sucesso. Fazendo login...",
+        });
+        
+        // Log the user in automatically after successful creation
+        await signInWithEmailAndPassword(auth, email, password);
+        router.push('/dashboard');
+        
+      } else {
         toast({
           variant: "destructive",
-          title: "Erro",
-          description: "Uma conta de administrador já existe. Não é possível criar outra.",
+          title: "Erro no Cadastro",
+          description: result.message,
         });
-        setLoading(false);
-        return;
       }
-
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // Create admin user directly
-      const userProfile = {
-        uid: user.uid,
-        name: name,
-        email: email,
-        hash: 'admin-seed', // Use a placeholder hash
-        role: 3, 
-        status: 'Ativo',
-        creationDate: Timestamp.now()
-      };
-      
-      const encryptedProfile = encryptObjectValues(userProfile);
-      
-      await setDoc(doc(db, "users", user.uid), encryptedProfile);
-      
-      toast({
-          title: "Conta de Administrador Criada!",
-          description: "Sua conta foi criada com sucesso. Redirecionando...",
-      });
-      
-      router.push('/dashboard');
-
     } catch (error: any) {
        console.error("Signup failed:", error);
-       let description = "Não foi possível criar a conta. Verifique os dados.";
-       if (error.code === 'auth/email-already-in-use') {
-           description = "Este e-mail já está em uso.";
-       } else if (error.code === 'auth/weak-password') {
-           description = "A senha é muito fraca. Use pelo menos 6 caracteres.";
-       } else if (error.code === 'auth/invalid-email') {
-           description = "O e-mail fornecido não é válido.";
-       }
        toast({
           variant: "destructive",
           title: "Erro no Cadastro",
-          description: description,
+          description: error.message || "Ocorreu um erro desconhecido.",
        });
     } finally {
         setLoading(false);

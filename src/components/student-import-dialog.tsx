@@ -17,22 +17,9 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
-import { saveImportConfig } from '@/app/actions/save-import-config';
+import { saveImportConfig } from '@/app/actions/actions';
 import { db } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-import type { ImportConfig } from '@/models/import-config';
-=======
->>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
-=======
->>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
-=======
->>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
-=======
->>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
 import { decryptObjectValues } from '@/lib/crypto';
 
 
@@ -485,10 +472,6 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                     <div className="flex w-max space-x-1 border-b">
                                         {sheetNames.map((name) => (
                                           <div key={name} className="flex items-center">
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
                                             <button
                                               onClick={() => setSelectedSheet(name)}
                                               className={cn(
@@ -505,30 +488,6 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                               <Star className={cn("h-4 w-4 text-muted-foreground", primarySheet === name && "fill-current text-yellow-500")} />
                                             </button>
                                           </div>
-=======
-=======
->>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
-=======
->>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
-=======
->>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
-                                              <button
-                                                  onClick={() => setSelectedSheet(name)}
-                                                  className={cn(
-                                                      "flex flex-shrink-0 items-center gap-2 p-2 text-sm transition-colors border-b-2",
-                                                      selectedSheet === name
-                                                          ? "border-primary text-primary font-semibold"
-                                                          : "border-transparent text-muted-foreground hover:text-foreground"
-                                                  )}
-                                              >
-                                                  <FileSpreadsheet className="h-4 w-4" />
-                                                  <span className="whitespace-nowrap">{name}</span>
-                                                </button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleTogglePrimarySheet(name); }} className="p-1 rounded-full hover:bg-muted">
-                                                    <Star className={cn("h-4 w-4 text-muted-foreground", primarySheet === name && "fill-current text-yellow-500")} />
-                                                </button>
-                                            </div>
->>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
                                         ))}
                                     </div>
                                     <ScrollBar orientation="horizontal" />

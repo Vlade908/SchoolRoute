@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 
 const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
   ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
@@ -17,3 +18,4 @@ if (!admin.apps.length) {
 }
 
 export const dbAdmin = admin.firestore();
+export const auth = getAdminAuth();
