@@ -130,13 +130,14 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
   const [schoolData, setSchoolData] = useState<Omit<School, 'id' | 'status'>>({ name: '', address: '', hash: '', schoolType: 'MUNICIPAL', grades: [] });
   const { toast } = useToast();
 
-  const handleDataChange = (field: keyof typeof schoolData, value: any) => {
-    setSchoolData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const generateHash = () => {
+  useEffect(() => {
     const newHash = Array(16).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
     handleDataChange('hash', newHash);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleDataChange = (field: keyof typeof schoolData, value: any) => {
+    setSchoolData(prev => ({ ...prev, [field]: value }));
   };
   
   const copyToClipboard = () => {
@@ -201,8 +202,7 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
           </div>
         </div>
       </div>
-      <DialogFooter className="flex-col sm:flex-row gap-2">
-        <Button variant="outline" onClick={generateHash} className="w-full sm:w-auto">Gerar Chave</Button>
+      <DialogFooter className="flex-col sm:flex-row-reverse gap-2">
         <Button type="submit" onClick={handleSave} className="w-full sm:w-auto">Salvar Escola</Button>
       </DialogFooter>
     </DialogContent>
@@ -1060,4 +1060,5 @@ export default function SchoolsPage() {
     </>
   );
 }
+
 

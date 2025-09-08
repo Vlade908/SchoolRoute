@@ -140,10 +140,10 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Omi
     const [hash, setHash] = useState('');
     const { toast } = useToast();
 
-    const generateHash = () => {
+    useEffect(() => {
         const newHash = 'pm' + Array(8).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
         setHash(newHash);
-    };
+    }, []);
     
     const copyToClipboard = () => {
         if(!hash) return;
@@ -193,8 +193,7 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Omi
                     </div>
                 </div>
             </div>
-            <DialogFooter className="flex-col sm:flex-row gap-2">
-                <Button variant="outline" onClick={generateHash} className="w-full sm:w-auto">Gerar Chave</Button>
+            <DialogFooter className="flex-col sm:flex-row-reverse gap-2">
                 <Button onClick={handleSave} className="w-full sm:w-auto">Salvar Prefeitura</Button>
             </DialogFooter>
         </DialogContent>
