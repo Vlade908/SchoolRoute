@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { Timestamp, setDoc, doc, collection, getDocs, query } from 'firebase/firestore';
-import { auth as adminAuth, dbAdmin } from '@/lib/firebase-admin';
+import { auth, dbAdmin } from '@/lib/firebase-admin';
 import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
 
 
@@ -45,7 +45,7 @@ export async function createAdminUser(adminData: z.infer<typeof CreateAdminUserI
         }
 
         // 2. Create user with Firebase Admin Auth
-        const userRecord = await adminAuth.createUser({
+        const userRecord = await auth.createUser({
             email,
             password,
             displayName: name,

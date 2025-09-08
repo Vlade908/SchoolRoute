@@ -27,5 +27,7 @@ if (!admin.apps.length) {
   }
 }
 
-export const dbAdmin = admin.firestore();
-export const auth = getAdminAuth();
+const dbAdmin = admin.firestore();
+const auth = getAdminAuth();
+
+export { dbAdmin, auth };
