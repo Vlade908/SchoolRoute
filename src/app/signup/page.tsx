@@ -45,6 +45,21 @@ export default function SignupPage() {
     }
     
     try {
+      // Check if an admin already exists
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("hash", "==", "admin-seed"), where("role", "==", 3));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Uma conta de administrador já existe. Não é possível criar outra.",
+        });
+        setLoading(false);
+        return;
+      }
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
