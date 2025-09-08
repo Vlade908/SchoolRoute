@@ -19,7 +19,7 @@ import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
-import { encryptObjectValues } from '@/lib/crypto';
+import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 
 
 export default function SignupPage() {
@@ -45,12 +45,20 @@ export default function SignupPage() {
     }
     
     try {
-      // Check if an admin already exists
+      // Check if an admin already exists by fetching all users and checking their role after decryption
       const usersRef = collection(db, "users");
-      const q = query(usersRef, where("hash", "==", "admin-seed"), where("role", "==", 3));
+      const q = query(usersRef);
       const querySnapshot = await getDocs(q);
+      
+      let adminExists = false;
+      querySnapshot.forEach(doc => {
+          const userData = decryptObjectValues(doc.data());
+          if (userData && userData.role === 3) {
+              adminExists = true;
+          }
+      });
 
-      if (!querySnapshot.empty) {
+      if (adminExists) {
         toast({
           variant: "destructive",
           title: "Erro",
