@@ -17,26 +17,11 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, doc, getDocs, query, setDoc, Timestamp, where } from "firebase/firestore";
+import { doc, setDoc, Timestamp } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
-import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
+import { encryptObjectValues } from '@/lib/crypto';
+import { validateHash } from '@/app/actions/actions';
 
-async function validateHash(hash: string) {
-    if (!hash) return false;
-
-    const collectionsToSearch = ['schools', 'city-halls'];
-    for (const collectionName of collectionsToSearch) {
-        const q = query(collection(db, collectionName));
-        const snapshot = await getDocs(q);
-        for (const doc of snapshot.docs) {
-            const data = decryptObjectValues(doc.data());
-            if (data && data.hash === hash) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
 
 export default function SignupEmployeePage() {
   const router = useRouter();
@@ -61,6 +46,7 @@ export default function SignupEmployeePage() {
         return;
     }
     
+    // Use the server action to validate the hash
     const isHashValid = await validateHash(hash);
     if (!isHashValid) {
          toast({
@@ -88,6 +74,7 @@ export default function SignupEmployeePage() {
       
       const encryptedProfile = encryptObjectValues(userProfile);
       
+      // Use the client SDK to set the document for the newly created user
       await setDoc(doc(db, "users", user.uid), encryptedProfile);
       
       toast({

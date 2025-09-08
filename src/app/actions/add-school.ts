@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { db } from '@/lib/firebase';
+import { dbAdmin } from '@/lib/firebase-admin';
 import { Timestamp, addDoc, collection } from 'firebase/firestore';
 import { School } from '@/models/school';
 import { encryptObjectValues } from '@/lib/crypto';
@@ -25,7 +25,7 @@ export async function addSchool(schoolData: Omit<School, 'id' | 'status'>): Prom
     };
 
     const encryptedSchool = encryptObjectValues(dataToSave);
-    await addDoc(collection(db, "schools"), encryptedSchool);
+    await addDoc(collection(dbAdmin, "schools"), encryptedSchool);
 
     return { success: true, message: 'Escola cadastrada com sucesso.' };
   } catch (error) {

@@ -1,8 +1,10 @@
 import 'dotenv/config';
 import CryptoJS from 'crypto-js';
 
+// This will ensure that the .env file is loaded when this module is imported.
 const secretKey = process.env.ENCRYPTION_SECRET_KEY;
-if (!secretKey) {
+if (!secretKey && typeof window === 'undefined') {
+  // Only log the error on the server side to avoid exposing this in client bundles
   console.error("A CHAVE DE CRIPTOGRAFIA NÃO FOI DEFINIDA. Defina ENCRYPTION_SECRET_KEY no seu arquivo .env");
 }
 
@@ -18,8 +20,6 @@ export const encryptData = <T extends object>(data: T): string => {
 // Função para descriptografar uma string para um objeto
 export const decryptData = <T extends object>(encryptedData: string): T | null => {
   if (!secretKey) {
-    // No lado do cliente, a chave pode não estar disponível.
-    // A lógica deve ser estruturada para evitar a descriptografia no cliente quando a chave é necessária.
     console.warn("Chave de descriptografia não disponível no contexto atual (provavelmente no cliente).");
     return null;
   }
@@ -27,7 +27,7 @@ export const decryptData = <T extends object>(encryptedData: string): T | null =
     const bytes = CryptoJS.AES.decrypt(encryptedData, secretKey);
     const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
     if (!decryptedString) {
-        return null; // Retorna nulo se a descriptografia falhar
+        return null; 
     }
     return JSON.parse(decryptedString) as T;
   } catch (error) {
@@ -36,20 +36,20 @@ export const decryptData = <T extends object>(encryptedData: string): T | null =
   }
 };
 
-// Função para criptografar um objeto inteiro dentro de um campo 'encryptedData'
+
 export const encryptObjectValues = (obj: Record<string, any>): Record<string, any> => {
     return { 'encryptedData': encryptData(obj) };
 };
 
-// Função para descriptografar os campos de um objeto
+
 export const decryptObjectValues = (encryptedObj: Record<string, any>): Record<string, any> | null => {
     if (!encryptedObj || !encryptedObj.encryptedData || typeof encryptedObj.encryptedData !== 'string') {
-       return encryptedObj; // Retorna o objeto original se não tiver o campo encryptedData
+       return encryptedObj; 
     }
 
      if (!secretKey) {
         console.error("Nenhuma chave de descriptografia disponível. Certifique-se de que a ENCRYPTION_SECRET_KEY está definida.");
-        return encryptedObj; // Retorna o objeto original se não houver chave
+        return encryptedObj;
     }
 
     try {
@@ -59,13 +59,13 @@ export const decryptObjectValues = (encryptedObj: Record<string, any>): Record<s
             return encryptedObj;
         }
         const decryptedPayload = JSON.parse(decryptedString);
-        // Combina o payload descriptografado com quaisquer campos não criptografados (como IDs)
+
         const finalObject = { ...encryptedObj, ...decryptedPayload };
-        delete finalObject.encryptedData; // Remove o campo de dados criptografados
+        delete finalObject.encryptedData; 
         return finalObject;
 
     } catch (error) {
         console.error("Erro ao descriptografar objeto:", error);
-        return encryptedObj; // Em caso de erro, retorna o objeto original
+        return encryptedObj; 
     }
 };

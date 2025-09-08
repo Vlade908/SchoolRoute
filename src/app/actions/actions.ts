@@ -4,9 +4,8 @@
 'use server';
 
 import { z } from 'zod';
-import { db } from '@/lib/firebase';
 import { Timestamp, setDoc, doc, collection, getDocs, query } from 'firebase/firestore';
-import { auth as adminAuth } from '@/lib/firebase-admin';
+import { auth as adminAuth, dbAdmin } from '@/lib/firebase-admin';
 import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
 
 
@@ -28,7 +27,7 @@ export async function createAdminUser(adminData: z.infer<typeof CreateAdminUserI
         const { name, email, password } = CreateAdminUserInputSchema.parse(adminData);
 
         // 1. Check if an admin user already exists using the Admin SDK
-        const usersRef = collection(db, "users");
+        const usersRef = collection(dbAdmin, "users");
         const q = query(usersRef);
         const querySnapshot = await getDocs(q);
         
@@ -64,7 +63,7 @@ export async function createAdminUser(adminData: z.infer<typeof CreateAdminUserI
         };
 
         const encryptedProfile = encryptObjectValues(userProfile);
-        await setDoc(doc(db, "users", userRecord.uid), encryptedProfile);
+        await setDoc(doc(dbAdmin, "users", userRecord.uid), encryptedProfile);
 
         return { success: true, message: 'Conta de administrador criada com sucesso.', uid: userRecord.uid };
 
@@ -82,4 +81,34 @@ export async function createAdminUser(adminData: z.infer<typeof CreateAdminUserI
         }
         return { success: false, message };
     }
+}
+
+/**
+ * Validates if a given hash exists in the 'schools' or 'city-halls' collections.
+ * This is a server action to be called securely from the client.
+ * @param {string} hash - The hash to validate.
+ * @returns {Promise<boolean>} True if the hash is valid, false otherwise.
+ */
+export async function validateHash(hash: string): Promise<boolean> {
+    if (!hash) return false;
+
+    try {
+        const collectionsToSearch = ['schools', 'city-halls'];
+        for (const collectionName of collectionsToSearch) {
+            const q = query(collection(dbAdmin, collectionName));
+            const snapshot = await getDocs(q);
+            for (const doc of snapshot.docs) {
+                const data = decryptObjectValues(doc.data());
+                if (data && data.hash === hash) {
+                    return true;
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Error validating hash on server:", error);
+        // Return false on error to be safe
+        return false;
+    }
+
+    return false;
 }
