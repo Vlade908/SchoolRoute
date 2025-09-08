@@ -147,10 +147,6 @@ function AddSchoolDialog({ onSave, onOpenChange }: { onSave: (school: Omit<Schoo
   }
 
   const handleSave = () => {
-    if (!schoolData.name || !schoolData.address || !schoolData.schoolType || !schoolData.hash) {
-      toast({ variant: 'destructive', title: "Erro de Validação", description: "Por favor, preencha todos os campos e gere uma chave." });
-      return;
-    }
     onSave(schoolData);
   }
 

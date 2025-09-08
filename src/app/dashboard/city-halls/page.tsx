@@ -152,10 +152,6 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Omi
     }
 
     const handleSave = () => {
-        if (!name || !cnpj || !city || !state || !hash) {
-            alert('Por favor, preencha todos os campos e gere uma chave hash.');
-            return;
-        }
         const newCityHall = { name, cnpj, city, state, hash };
         onSave(newCityHall);
     }
