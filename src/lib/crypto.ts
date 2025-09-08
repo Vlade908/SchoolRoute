@@ -2,8 +2,9 @@ import 'dotenv/config';
 import CryptoJS from 'crypto-js';
 
 const secretKey = process.env.ENCRYPTION_SECRET_KEY;
-const publicKey = process.env.NEXT_PUBLIC_CRYPTO_SECRET_KEY;
-
+if (!secretKey) {
+  console.error("A CHAVE DE CRIPTOGRAFIA NÃO FOI DEFINIDA. Defina ENCRYPTION_SECRET_KEY no seu arquivo .env");
+}
 
 // Função para criptografar um objeto
 export const encryptData = <T extends object>(data: T): string => {
@@ -16,16 +17,14 @@ export const encryptData = <T extends object>(data: T): string => {
 
 // Função para descriptografar uma string para um objeto
 export const decryptData = <T extends object>(encryptedData: string): T | null => {
-  const key = secretKey || publicKey;
-  if (!key) {
-    // This part is tricky because the key exists on server but not client.
-    // The logic should be structured to only call decrypt on the client with the public key
-    // if that's the intended pattern. For now, we prioritize server-side decryption.
-    console.warn("Chave de descriptografia não disponível no contexto atual.");
+  if (!secretKey) {
+    // No lado do cliente, a chave pode não estar disponível.
+    // A lógica deve ser estruturada para evitar a descriptografia no cliente quando a chave é necessária.
+    console.warn("Chave de descriptografia não disponível no contexto atual (provavelmente no cliente).");
     return null;
   }
   try {
-    const bytes = CryptoJS.AES.decrypt(encryptedData, key);
+    const bytes = CryptoJS.AES.decrypt(encryptedData, secretKey);
     const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
     if (!decryptedString) {
         return null; // Retorna nulo se a descriptografia falhar
@@ -48,14 +47,13 @@ export const decryptObjectValues = (encryptedObj: Record<string, any>): Record<s
        return encryptedObj; // Retorna o objeto original se não tiver o campo encryptedData
     }
 
-    const key = secretKey || publicKey;
-     if (!key) {
-        console.error("Nenhuma chave de descriptografia disponível.");
+     if (!secretKey) {
+        console.error("Nenhuma chave de descriptografia disponível. Certifique-se de que a ENCRYPTION_SECRET_KEY está definida.");
         return encryptedObj; // Retorna o objeto original se não houver chave
     }
 
     try {
-        const bytes = CryptoJS.AES.decrypt(encryptedObj.encryptedData, key);
+        const bytes = CryptoJS.AES.decrypt(encryptedObj.encryptedData, secretKey);
         const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
         if (!decryptedString) {
             return encryptedObj;

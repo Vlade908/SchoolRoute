@@ -1,19 +1,29 @@
 import * as admin from 'firebase-admin';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
+import 'dotenv/config';
 
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-  : undefined;
-
+// Verifica se o SDK já foi inicializado
 if (!admin.apps.length) {
-  if (serviceAccount) {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
+  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+
+  if (serviceAccountKey) {
+    try {
+      const serviceAccount = JSON.parse(serviceAccountKey);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+       console.log("Firebase Admin SDK inicializado com sucesso.");
+    } catch (error) {
+      console.error("Erro ao fazer parse da FIREBASE_SERVICE_ACCOUNT_KEY:", error);
+      // Fallback para Application Default Credentials se o parse falhar
+      admin.initializeApp();
+      console.log("Firebase Admin SDK inicializado com Application Default Credentials (fallback).");
+    }
   } else {
-    // For local development without service account key
-    // This will use Application Default Credentials
+    // Se a variável de ambiente não estiver definida, use Application Default Credentials
+    // Isso é útil para ambientes como Google Cloud Run/Functions
     admin.initializeApp();
+    console.log("Firebase Admin SDK inicializado com Application Default Credentials.");
   }
 }
 
