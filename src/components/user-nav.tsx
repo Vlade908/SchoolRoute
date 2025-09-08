@@ -21,6 +21,7 @@ export function UserNav() {
   if (!user) return null;
 
   const getInitials = (name: string) => {
+    if (!name) return '';
     const names = name.split(' ');
     if (names.length > 1) {
       return `${names[0][0]}${names[names.length - 1][0]}`;
