@@ -221,8 +221,7 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
             const querySnapshot = await getDocs(q);
             const cityHallEmployees: Employee[] = [];
             querySnapshot.forEach((doc) => {
-                const encryptedData = doc.data() as any;
-                const data = decryptObjectValues(encryptedData) as any;
+                const data = decryptObjectValues(doc.data()) as any;
                 
                 if (data && data.hash === cityHall.hash) {
                     cityHallEmployees.push({
@@ -447,8 +446,7 @@ export default function CityHallsPage() {
         const unsubscribe = onSnapshot(collection(db, "city-halls"), (snapshot) => {
             const halls: CityHall[] = [];
             snapshot.forEach((doc) => {
-                const encryptedData = doc.data();
-                const data = decryptObjectValues(encryptedData) as any;
+                const data = decryptObjectValues(doc.data()) as any;
                 if(data) {
                     halls.push({ id: doc.id, ...data } as CityHall);
                 }

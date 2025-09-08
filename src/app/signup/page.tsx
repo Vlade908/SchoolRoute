@@ -59,10 +59,9 @@ export default function SignupPage() {
         creationDate: Timestamp.now()
       };
       
-      // A criptografia deve ser feita no servidor, mas para o primeiro usuário admin,
-      // podemos salvar sem criptografia ou usar uma server action.
-      // O ideal seria ter uma função de setup na nuvem para isso.
-      await setDoc(doc(db, "users", user.uid), userProfile);
+      const encryptedProfile = encryptObjectValues(userProfile);
+      
+      await setDoc(doc(db, "users", user.uid), encryptedProfile);
       
       toast({
           title: "Conta de Administrador Criada!",
