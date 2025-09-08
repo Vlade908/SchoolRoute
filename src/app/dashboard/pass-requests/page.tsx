@@ -233,12 +233,12 @@ export default function PassRequestsPage() {
                     distance: 'N/A',
                  };
 
-                 const encryptedRequest = encryptObjectValues(requestData);
-                 
-                 await addDoc(collection(db, "transport-requests"), {
-                    ...encryptedRequest,
+                 const encryptedRequest = {
+                    ...encryptObjectValues(requestData),
                     studentUid: student.id 
-                 });
+                 };
+                 
+                 await addDoc(collection(db, "transport-requests"), encryptedRequest);
             }
     
             toast({

@@ -214,9 +214,7 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
         const fetchEmployees = async () => {
           try {
             const usersRef = collection(db, "users");
-            // This query might require a composite index on (encryptedData.hash, encryptedData.status)
-            // Firestore will provide a link in the console error to create it if needed.
-            let q = query(usersRef);
+            const q = query(usersRef);
 
             const querySnapshot = await getDocs(q);
             const cityHallEmployees: Employee[] = [];
@@ -272,7 +270,7 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
         const employeeDoc = await getDoc(employeeDocRef);
         if (!employeeDoc.exists()) throw new Error("Funcionário não encontrado.");
         
-        const currentData = decryptObjectValues(employeeDoc.data());
+        const currentData = employeeDoc.data();
         if(!currentData) throw new Error("Falha ao descriptografar dados do funcionário.");
           
         const roleString = updatedEmployee.role;

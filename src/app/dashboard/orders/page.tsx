@@ -549,7 +549,7 @@ export default function OrdersPage() {
       const currentDoc = await getDoc(orderDocRef);
       if(!currentDoc.exists()) throw new Error("Pedido não encontrado.");
 
-      const decryptedData = decryptObjectValues(currentDoc.data());
+      const decryptedData = currentDoc.data();
       if(!decryptedData) throw new Error("Falha ao descriptografar os dados do pedido.");
 
       const dataToUpdate = { ...decryptedData, status: newStatus };
@@ -751,5 +751,6 @@ export default function OrdersPage() {
     </>
   );
 }
+
 
 

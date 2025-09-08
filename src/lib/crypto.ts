@@ -3,12 +3,12 @@ import CryptoJS from 'crypto-js';
 const secretKey = process.env.ENCRYPTION_SECRET_KEY;
 const publicKey = process.env.NEXT_PUBLIC_CRYPTO_SECRET_KEY;
 
-if (!secretKey) {
-  throw new Error("Nenhuma chave de criptografia foi definida. Defina ENCRYPTION_SECRET_KEY.");
-}
 
 // Função para criptografar um objeto
 export const encryptData = <T extends object>(data: T): string => {
+  if (!secretKey) {
+    throw new Error("Nenhuma chave de criptografia foi definida. Defina ENCRYPTION_SECRET_KEY.");
+  }
   const dataString = JSON.stringify(data);
   return CryptoJS.AES.encrypt(dataString, secretKey).toString();
 };
@@ -38,9 +38,6 @@ export const decryptData = <T extends object>(encryptedData: string): T | null =
 
 // Função para criptografar um objeto inteiro dentro de um campo 'encryptedData'
 export const encryptObjectValues = (obj: Record<string, any>): Record<string, any> => {
-    if(!secretKey) {
-        throw new Error("A chave de criptografia do servidor não está disponível para encryptObjectValues.");
-    }
     return { 'encryptedData': encryptData(obj) };
 };
 

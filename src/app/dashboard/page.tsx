@@ -15,7 +15,6 @@ import Link from 'next/link';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
-import { decryptObjectValues } from '@/lib/crypto';
 
 
 type ChartData = {
@@ -65,7 +64,7 @@ export default function DashboardPage() {
         const currentMonth = new Date().getMonth();
 
         snapshot.forEach((doc) => {
-            const data = decryptObjectValues(doc.data());
+            const data = doc.data();
             if (data && data.date && data.totalValue && data.status !== 'Excluído') {
                 const orderDate = new Date(data.date);
                 const month = orderDate.getMonth();

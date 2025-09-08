@@ -249,7 +249,7 @@ export default function TransportPage() {
         const requestDoc = await getDoc(requestDocRef);
         if (!requestDoc.exists()) throw new Error("Solicitação não encontrada.");
         
-        const currentData = decryptObjectValues(requestDoc.data());
+        const currentData = requestDoc.data();
         if(!currentData) throw new Error("Não foi possível ler os dados da solicitação.");
         
         const dataToUpdate = { 
@@ -258,12 +258,12 @@ export default function TransportPage() {
             updatedAt: Timestamp.now()
         };
 
-        const encryptedUpdate = encryptObjectValues(dataToUpdate);
+        const encryptedUpdate = {
+            ...encryptObjectValues(dataToUpdate),
+            studentUid: selectedRequest.studentUid, // Ensure non-encrypted field is preserved
+        }
         
-        await updateDoc(requestDocRef, {
-             ...encryptedUpdate,
-             studentUid: selectedRequest.studentUid, // Ensure non-encrypted field is preserved
-        });
+        await updateDoc(requestDocRef, encryptedUpdate);
         
         toast({
             title: "Alterações Salvas!",
