@@ -1,7 +1,6 @@
 
 'use server';
 
-import 'dotenv/config';
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
 import { Timestamp, addDoc, collection } from 'firebase/firestore';
