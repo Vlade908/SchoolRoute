@@ -23,7 +23,10 @@ import { collection, getDocs } from 'firebase/firestore';
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 import type { ImportConfig } from '@/models/import-config';
+=======
+>>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
 =======
 >>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
 =======
@@ -485,6 +488,7 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                                             <button
                                               onClick={() => setSelectedSheet(name)}
                                               className={cn(
@@ -502,6 +506,8 @@ export function StudentImportDialog({ onOpenChange, onSuccess }: { onOpenChange:
                                             </button>
                                           </div>
 =======
+=======
+>>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
 =======
 >>>>>>> parent of 65d614d (ai faça com que ao carregar algum arquivo na aplicação, verifique se já)
 =======
