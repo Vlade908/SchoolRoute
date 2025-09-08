@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useUser } from '@/contexts/user-context';
-import { Activity, Users, School, UserCheck, Bus, FileText, History, LayoutDashboard } from 'lucide-react';
+import { Activity, Users, School, UserCheck, Bus, FileText, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
@@ -33,9 +33,11 @@ type DashboardData = {
 };
 
 type RecentActivity = {
-    href: string;
-    label: string;
-    date: string;
+    id: string;
+    type: 'user' | 'transport';
+    description: string;
+    date: Timestamp;
+    link: string;
 };
 
 export default function DashboardPage() {
@@ -50,12 +52,6 @@ export default function DashboardPage() {
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
 
   useEffect(() => {
-    // Load recent activities from localStorage
-    if (typeof window !== 'undefined') {
-        const storedActivities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
-        setRecentActivities(storedActivities);
-    }
-
     // Listener for orders (for chart and monthly orders card)
     const ordersUnsubscribe = onSnapshot(collection(db, "orders"), (snapshot) => {
         const monthlyTotals: { [key: number]: number } = {};
@@ -111,6 +107,41 @@ export default function DashboardPage() {
     const transportUnsubscribe = onSnapshot(query(collection(db, "transport-requests"), where("status", "==", "Pendente")), (snapshot) => {
         setDashboardData(prev => ({...prev, pendingRequests: snapshot.size}));
     });
+    
+    // Listener for recent activities
+    const usersUnsubscribe = onSnapshot(query(collection(db, "users"), where("status", "==", "Pendente")), (snapshot) => {
+        const userActivities: RecentActivity[] = [];
+        snapshot.forEach(doc => {
+            const data = decryptObjectValues(doc.data());
+            if (data) {
+                userActivities.push({
+                    id: doc.id,
+                    type: 'user',
+                    description: `Novo funcionário '${data.name}' aguarda aprovação.`,
+                    date: data.creationDate,
+                    link: '/dashboard/employees'
+                });
+            }
+        });
+        setRecentActivities(prev => [...userActivities, ...prev.filter(a => a.type !== 'user')].sort((a,b) => b.date.toMillis() - a.date.toMillis()).slice(0,5));
+    });
+    
+     const transportActivitiesUnsubscribe = onSnapshot(query(collection(db, "transport-requests"), where("status", "==", "Pendente")), (snapshot) => {
+        const transportActivities: RecentActivity[] = [];
+        snapshot.forEach(doc => {
+            const data = decryptObjectValues(doc.data());
+            if (data) {
+                transportActivities.push({
+                    id: doc.id,
+                    type: 'transport',
+                    description: `Aluno '${data.studentName}' solicitou transporte.`,
+                    date: data.createdAt,
+                    link: '/dashboard/transport'
+                });
+            }
+        });
+       setRecentActivities(prev => [...transportActivities, ...prev.filter(a => a.type !== 'transport')].sort((a,b) => b.date.toMillis() - a.date.toMillis()).slice(0,5));
+    });
 
 
     return () => {
@@ -118,6 +149,8 @@ export default function DashboardPage() {
         studentsUnsubscribe();
         schoolsUnsubscribe();
         transportUnsubscribe();
+        usersUnsubscribe();
+        transportActivitiesUnsubscribe();
     };
   }, []);
 
@@ -127,13 +160,12 @@ export default function DashboardPage() {
   
   const welcomeMessage = user?.name ? `Bem-vindo(a) de volta, ${user.name.split(' ')[0]}!` : 'Bem-vindo(a) de volta!';
   
-  const getActivityIcon = (href: string) => {
-      if (href.includes('student')) return <Users className="h-6 w-6"/>;
-      if (href.includes('school')) return <School className="h-6 w-6"/>;
-      if (href.includes('order')) return <FileText className="h-6 w-6"/>;
-      if (href.includes('transport')) return <Bus className="h-6 w-6"/>;
-      if (href.includes('dashboard')) return <LayoutDashboard className="h-6 w-6"/>;
-      return <History className="h-6 w-6"/>;
+  const renderActivityIcon = (type: 'user' | 'transport') => {
+      switch(type) {
+          case 'user': return <UserCheck className="h-6 w-6"/>;
+          case 'transport': return <Bus className="h-6 w-6"/>;
+          default: return <Activity className="h-6 w-6"/>;
+      }
   }
 
   return (
@@ -228,31 +260,31 @@ export default function DashboardPage() {
           </Card>
           <Card className="col-span-4 md:col-span-3">
               <CardHeader>
-                <CardTitle>Acessados Recentemente</CardTitle>
+                <CardTitle>Atividades Recentes</CardTitle>
                 <CardDescription>
-                  Suas últimas páginas visitadas para acesso rápido.
+                  Últimas solicitações e cadastros pendentes de aprovação.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4">
                 {recentActivities.length > 0 ? (
                     recentActivities.map(activity => (
-                         <div key={activity.href} className="flex items-center space-x-4">
-                            {getActivityIcon(activity.href)}
+                         <div key={activity.id} className="flex items-center space-x-4">
+                            {renderActivityIcon(activity.type)}
                             <div className="flex-1 space-y-1">
                                 <p className="text-sm font-medium leading-none">
-                                    {activity.label}
+                                    {activity.type === 'user' ? 'Aprovação de Cadastro' : 'Solicitação de Transporte'}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                    Acessado em {new Date(activity.date).toLocaleDateString('pt-BR')}
+                                    {activity.description}
                                 </p>
                             </div>
                             <Button variant="outline" size="sm" asChild>
-                                <Link href={activity.href}>Acessar</Link>
+                                <Link href={activity.link}>Ver</Link>
                             </Button>
                         </div>
                     ))
                 ) : (
-                    <p className="text-sm text-muted-foreground text-center">Nenhuma atividade recente.</p>
+                    <p className="text-sm text-muted-foreground text-center">Nenhuma atividade pendente.</p>
                 )}
               </CardContent>
             </Card>
@@ -260,3 +292,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
