@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { decryptObjectValues } from '@/lib/crypto';
 
 
 type User = {
@@ -53,8 +54,7 @@ function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
   if (!user) return null;
   
   const navLinks = navLinksConfig
-   .filter(link => user.role >= link.minRole)
-   .filter((link, index, self) => index === self.findIndex((l) => l.href === link.href)); // Remove duplicates
+   .filter(link => user.role >= link.minRole);
 
 
   return (
@@ -182,7 +182,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const userDocRef = doc(db, 'users', firebaseUser.uid);
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
-                const userData = userDoc.data();
+                const userData = decryptObjectValues(userDoc.data());
                 if(!userData) {
                    console.error("Failed to decrypt user data. Signing out.");
                    await auth.signOut();
@@ -197,7 +197,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     const schoolDocRef = doc(db, 'schools', userData.schoolId);
                     const schoolDoc = await getDoc(schoolDocRef);
                     if(schoolDoc.exists()){
-                        const schoolData = schoolDoc.data();
+                        const schoolData = decryptObjectValues(schoolDoc.data());
                         schoolName = schoolData?.name || null;
                     }
                 }
