@@ -24,15 +24,18 @@ export function UserNav() {
     if (!name) return '';
     const names = name.split(' ');
     if (names.length > 1) {
-      return `${names[0][0]}${names[names.length - 1][0]}`;
+      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
     }
-    return names[0].substring(0, 2);
+    return name.substring(0, 2).toUpperCase();
   };
   
   const getRoleName = (role: number) => {
-    if (role === 3) return "Secretaria";
-    if (role === 2) return "Funcionário (Nível 2)";
-    return "Funcionário (Nível 1)";
+    switch(role) {
+        case 3: return "Administrador";
+        case 2: return "Funcionário (Nível 2)";
+        case 1: return "Funcionário (Nível 1)";
+        default: return "Pendente";
+    }
   }
 
   return (
@@ -40,7 +43,6 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            
             <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
           </Avatar>
         </Button>

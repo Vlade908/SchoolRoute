@@ -37,6 +37,7 @@ import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
+import { cn } from '@/lib/utils';
 
 
 type CityHall = {
@@ -54,7 +55,7 @@ type Employee = {
     email: string;
     hash: string;
     role: number | string;
-    status: string;
+    status: 'Ativo' | 'Inativo' | 'Pendente';
     uid: string;
     creationDate?: string;
     cityHallId?: string;
@@ -74,12 +75,12 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
     if (typeof role === 'string' && role.startsWith('Nível')) {
       return role.split(' ')[1];
     }
-    return role;
+    return role.toString();
   }
   
   const setRoleValue = (value: string) => {
     const numericValue = parseInt(value, 10);
-    setCurrentEmployee(e => ({...e, role: `Nível ${numericValue}`}));
+    setCurrentEmployee(e => ({...e, role: numericValue}));
   }
 
   return (
@@ -111,7 +112,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
             <Label htmlFor="status" className="whitespace-nowrap">Status</Label>
              <Select
                 value={currentEmployee.status}
-                onValueChange={(value) => setCurrentEmployee(e => ({...e, status: value as 'Ativo' | 'Inativo' | 'Pendente' }))}
+                onValueChange={(value) => setCurrentEmployee(e => ({...e, status: value as Employee['status'] }))}
              >
                 <SelectTrigger id="status">
                     <SelectValue placeholder="Selecione o status" />
@@ -152,8 +153,7 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Omi
     }
 
     const handleSave = () => {
-        const newCityHall = { name, cnpj, city, state, hash };
-        onSave(newCityHall);
+        onSave({ name, cnpj, city, state, hash });
     }
 
     return (
@@ -190,7 +190,7 @@ function AddCityHallDialog({ onSave, onOpenChange }: { onSave: (newCityHall: Omi
                 </div>
             </div>
             <DialogFooter className="flex-col sm:flex-row-reverse gap-2">
-                <Button onClick={handleSave} className="w-full sm:w-auto">Salvar Prefeitura</Button>
+                 <Button onClick={handleSave} className="w-full sm:w-auto">Salvar Prefeitura</Button>
             </DialogFooter>
         </DialogContent>
     );
@@ -209,30 +209,33 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
         const fetchEmployees = async () => {
           try {
             const usersRef = collection(db, "users");
-            const q = query(usersRef);
+            const q = query(usersRef, where("hash", "==", cityHall.hash));
 
-            const querySnapshot = await getDocs(q);
-            const cityHallEmployees: Employee[] = [];
-            querySnapshot.forEach((doc) => {
-                const data = decryptObjectValues(doc.data()) as any;
-                
-                if (data && data.hash === cityHall.hash) {
-                    cityHallEmployees.push({
-                        id: doc.id,
-                        uid: data.uid,
-                        name: data.name,
-                        email: data.email,
-                        role: data.role,
-                        status: data.status,
-                        hash: data.hash,
-                        creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
-                    });
-                }
+            const unsubscribe = onSnapshot(q, (querySnapshot) => {
+                const cityHallEmployees: Employee[] = [];
+                querySnapshot.forEach((doc) => {
+                    const data = decryptObjectValues(doc.data()) as any;
+                    
+                    if (data) {
+                        cityHallEmployees.push({
+                            id: doc.id,
+                            uid: data.uid,
+                            name: data.name,
+                            email: data.email,
+                            role: data.role,
+                            status: data.status,
+                            hash: data.hash,
+                            creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                        });
+                    }
+                });
+                setEmployees(cityHallEmployees);
             });
-            setEmployees(cityHallEmployees);
+            return () => unsubscribe();
+
           } catch(e) {
             console.error("Error fetching employees:", e);
-            toast({ variant: "destructive", title: "Erro", description: "Não foi possível carregar os funcionários. Verifique o console para mais detalhes." });
+            toast({ variant: "destructive", title: "Erro", description: "Não foi possível carregar os funcionários." });
           }
         };
 
@@ -243,7 +246,7 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
         let filtered = employees;
 
         if (statusFilter !== 'todos') {
-            filtered = filtered.filter(emp => emp.status.toLowerCase() === statusFilter);
+            filtered = filtered.filter(emp => emp.status.toLowerCase() === statusFilter.toLowerCase());
         }
 
         if (searchTerm) {
@@ -265,23 +268,19 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
         const employeeDoc = await getDoc(employeeDocRef);
         if (!employeeDoc.exists()) throw new Error("Funcionário não encontrado.");
         
-        const currentData = employeeDoc.data();
-        if(!currentData) throw new Error("Falha ao descriptografar dados do funcionário.");
+        const currentData = decryptObjectValues(employeeDoc.data() || {});
+        if(!currentData) throw new Error("Falha ao ler dados do funcionário.");
           
-        const roleString = updatedEmployee.role;
-        const roleNumber = typeof roleString === 'string' && roleString.startsWith('Nível') ? parseInt(roleString.split(' ')[1], 10) : updatedEmployee.role;
-        
         const dataToUpdate = {
             ...currentData,
             status: updatedEmployee.status,
-            role: roleNumber,
+            role: updatedEmployee.role,
         };
 
         const encryptedUpdate = encryptObjectValues(dataToUpdate);
         await updateDoc(employeeDocRef, encryptedUpdate);
 
         toast({ title: 'Sucesso!', description: 'Funcionário atualizado.'});
-        setEmployees(prev => prev.map(e => e.uid === updatedEmployee.uid ? { ...e, status: updatedEmployee.status, role: roleNumber } : e));
       } catch(error) {
         console.error("Error updating employee:", error);
         toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível atualizar o funcionário.'});
@@ -290,11 +289,11 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
     }
     
     const getRoleName = (role: number | string) => {
-        if (typeof role === 'string' && role.startsWith('Nível')) return role;
+        if (typeof role === 'string') return role;
         switch(role) {
             case 1: return 'Nível 1';
             case 2: return 'Nível 2';
-            case 3: return 'Nível 3';
+            case 3: return 'Nível 3 (Admin)';
             default: return 'Pendente';
         }
     }
@@ -375,11 +374,11 @@ function CityHallDetailsDialog({ cityHall }: { cityHall: CityHall }) {
                                                     <TableCell className="hidden sm:table-cell">{employee.email}</TableCell>
                                                     <TableCell>
                                                         <Badge variant={employee.status === 'Ativo' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
-                                                             className={
-                                                                employee.status === 'Ativo' ? 'bg-green-600' : 
-                                                                employee.status === 'Pendente' ? 'bg-orange-500' :
-                                                                'bg-red-600'
-                                                             }>
+                                                             className={cn(
+                                                                employee.status === 'Ativo' && 'bg-green-600',
+                                                                employee.status === 'Pendente' && 'bg-orange-500',
+                                                                employee.status === 'Inativo' && 'bg-red-600'
+                                                             )}>
                                                             {employee.status}
                                                         </Badge>
                                                     </TableCell>

@@ -59,9 +59,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, query, updateDoc, where, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, updateDoc, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
+import { cn } from '@/lib/utils';
 
 type Employee = {
     id: string; // Firestore document ID
@@ -69,8 +70,9 @@ type Employee = {
     name: string;
     email: string;
     role: number;
-    status: 'Aprovado' | 'Pendente' | 'Inativo';
-    schoolName?: string; // Might need to fetch this based on hash
+    status: 'Ativo' | 'Inativo' | 'Pendente';
+    hash: string;
+    origin?: string; // Might need to fetch this based on hash
 };
 
 function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Employee, onSave: (employee: Employee) => void, onOpenChange: (open:boolean) => void }) {
@@ -80,6 +82,8 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
     onSave(currentEmployee);
     onOpenChange(false);
   }
+  
+  const isSecretary = employee.hash.startsWith('pm');
 
   return (
     <DialogContent>
@@ -90,7 +94,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
       <div className="grid gap-4 py-4">
         <p><strong>Nome:</strong> {employee.name}</p>
         <p><strong>Email:</strong> {employee.email}</p>
-        <p><strong>Escola/Secretaria:</strong> {employee.schoolName || 'N/A'}</p>
+        <p><strong>Instituição:</strong> {employee.origin || 'N/A'}</p>
         <div className="grid md:grid-cols-2 gap-4 items-center">
           <Label htmlFor="role" className="whitespace-nowrap">Nível de Privilégio</Label>
           <Select 
@@ -101,9 +105,18 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
               <SelectValue placeholder="Selecione o nível" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">Nível 1 (Visualizar)</SelectItem>
-              <SelectItem value="2">Nível 2 (Cadastrar Alunos)</SelectItem>
-              <SelectItem value="3">Nível 3 (Admin)</SelectItem>
+                {isSecretary ? (
+                     <>
+                        <SelectItem value="1">Nível 1 (Visualizar)</SelectItem>
+                        <SelectItem value="2">Nível 2 (Cadastrar Alunos)</SelectItem>
+                        <SelectItem value="3">Nível 3 (Admin)</SelectItem>
+                     </>
+                ) : (
+                     <>
+                        <SelectItem value="1">Nível 1 (Visualizar)</SelectItem>
+                        <SelectItem value="2">Nível 2 (Cadastrar Alunos)</SelectItem>
+                     </>
+                )}
             </SelectContent>
           </Select>
         </div>
@@ -117,7 +130,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
               <SelectValue placeholder="Selecione o status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Aprovado">Aprovado</SelectItem>
+              <SelectItem value="Ativo">Ativo</SelectItem>
               <SelectItem value="Pendente">Pendente</SelectItem>
               <SelectItem value="Inativo">Inativo</SelectItem>
             </SelectContent>
@@ -147,12 +160,26 @@ export default function EmployeesPage() {
             return;
         }
 
-        const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
+        const unsubscribe = onSnapshot(collection(db, "users"), async (snapshot) => {
             const usersData: Employee[] = [];
+            const institutions = new Map<string, string>();
+
+            // Pre-fetch all schools and city halls to map hash to name
+            const schoolsSnapshot = await getDocs(collection(db, "schools"));
+            schoolsSnapshot.forEach(doc => {
+                const data = decryptObjectValues(doc.data()) as any;
+                if(data?.hash) institutions.set(data.hash, data.name);
+            });
+            const cityHallsSnapshot = await getDocs(collection(db, "city-halls"));
+            cityHallsSnapshot.forEach(doc => {
+                const data = decryptObjectValues(doc.data()) as any;
+                if(data?.hash) institutions.set(data.hash, data.name);
+            });
+
             snapshot.forEach(doc => {
                 const data = decryptObjectValues(doc.data()) as any;
 
-                if (data) {
+                if (data && data.role !== 3) { // Exclude the main admin
                     usersData.push({
                         id: doc.id,
                         uid: data.uid,
@@ -160,7 +187,8 @@ export default function EmployeesPage() {
                         email: data.email,
                         role: data.role,
                         status: data.status,
-                        schoolName: data.hash.startsWith('pm') ? 'Secretaria' : 'Escola'
+                        hash: data.hash,
+                        origin: institutions.get(data.hash) || 'Instituição Desconhecida'
                     });
                 }
             });
@@ -183,7 +211,7 @@ export default function EmployeesPage() {
             if (!currentDoc.exists()) throw new Error("Funcionário não encontrado.");
             
             const currentData = decryptObjectValues(currentDoc.data());
-            if(!currentData) throw new Error("Falha ao descriptografar dados do funcionário.");
+            if(!currentData) throw new Error("Falha ao ler os dados do funcionário.");
             
             const dataToUpdate = {
                 ...currentData,
@@ -204,26 +232,29 @@ export default function EmployeesPage() {
         }
     }
     
-    const handleDeactivate = async (employeeId: string) => {
-        const employeeToUpdate = employees.find(emp => emp.id === employeeId);
-        if (!employeeToUpdate?.id) return;
-
+    const handleEmployeeAction = async (employee: Employee, action: 'deactivate' | 'delete') => {
         try {
-            const employeeDocRef = doc(db, 'users', employeeToUpdate.id);
-            const currentDoc = await getDoc(employeeDocRef);
-            if (!currentDoc.exists()) throw new Error("Funcionário não encontrado.");
+            if (action === 'delete') {
+                 await deleteDoc(doc(db, "users", employee.id));
+                 // Note: This does not delete the user from Firebase Auth.
+                 // That would require a server-side function with admin privileges.
+                 toast({ title: "Funcionário Excluído", description: "O registro do funcionário foi removido do banco de dados." });
+            } else {
+                 const employeeDocRef = doc(db, 'users', employee.id);
+                 const currentDoc = await getDoc(employeeDocRef);
+                 if (!currentDoc.exists()) throw new Error("Funcionário não encontrado.");
+                 const currentData = decryptObjectValues(currentDoc.data());
+                 if(!currentData) throw new Error("Falha ao ler os dados do funcionário.");
 
-            const currentData = decryptObjectValues(currentDoc.data());
-            if(!currentData) throw new Error("Falha ao descriptografar dados do funcionário.");
-            
-            const dataToUpdate = { ...currentData, status: 'Inativo' };
-            const encryptedUpdate = encryptObjectValues(dataToUpdate);
+                 const dataToUpdate = { ...currentData, status: 'Inativo' };
+                 const encryptedUpdate = encryptObjectValues(dataToUpdate);
 
-            await updateDoc(employeeDocRef, encryptedUpdate);
-            toast({ title: "Funcionário Desativado", description: "O acesso do funcionário foi revogado." });
+                 await updateDoc(employeeDocRef, encryptedUpdate);
+                 toast({ title: "Funcionário Desativado", description: "O acesso do funcionário foi revogado." });
+            }
         } catch (error) {
-             console.error("Failed to deactivate employee:", error);
-             toast({ variant: 'destructive', title: "Erro!", description: "Não foi possível desativar o funcionário." });
+             console.error(`Failed to ${action} employee:`, error);
+             toast({ variant: 'destructive', title: "Erro!", description: `Não foi possível ${action === 'delete' ? 'excluir' : 'desativar'} o funcionário.` });
         }
     }
     
@@ -261,7 +292,7 @@ export default function EmployeesPage() {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="hidden sm:table-cell">Escola/Secretaria</TableHead>
+                  <TableHead className="hidden sm:table-cell">Instituição</TableHead>
                   <TableHead className="hidden md:table-cell">Nível</TableHead>
                   <TableHead>
                     <span className="sr-only">Ações</span>
@@ -273,24 +304,22 @@ export default function EmployeesPage() {
                   <TableRow key={employee.id}>
                     <TableCell className="font-medium">{employee.name}</TableCell>
                     <TableCell>
-                      <Badge variant={employee.status === 'Aprovado' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
-                             className={
-                                employee.status === 'Aprovado' ? 'bg-green-600' : 
-                                employee.status === 'Pendente' ? 'bg-orange-500' :
-                                'bg-red-600'
-                             }>
+                      <Badge variant={employee.status === 'Ativo' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
+                             className={cn(
+                                employee.status === 'Ativo' && 'bg-green-600',
+                                employee.status === 'Pendente' && 'bg-orange-500',
+                                employee.status === 'Inativo' && 'bg-red-600'
+                             )}>
                         {employee.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">{employee.schoolName}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{employee.origin}</TableCell>
                     <TableCell className="hidden md:table-cell">{getRoleName(employee.role)}</TableCell>
                     <TableCell>
                      <Dialog open={isManageDialogOpen && selectedEmployee?.id === employee.id} onOpenChange={(isOpen) => {
                          if(!isOpen) {
                              setSelectedEmployee(null);
                              setIsManageDialogOpen(false);
-                         } else {
-                             openManageDialog(employee)
                          }
                      }}>
                         <AlertDialog>
@@ -303,17 +332,15 @@ export default function EmployeesPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                <DialogTrigger asChild>
-                                  <DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => openManageDialog(employee)}>
                                     {employee.status === 'Pendente' ? 'Aprovar/Rejeitar' : 'Editar Permissões'}
                                   </DropdownMenuItem>
-                                </DialogTrigger>
                                  {employee.status !== 'Pendente' && (
                                     <>
                                      <DropdownMenuSeparator />
                                      <AlertDialogTrigger asChild>
                                         <DropdownMenuItem className="text-red-500">
-                                            {employee.status === 'Inativo' ? 'Excluir' : 'Desativar'}
+                                            {employee.status === 'Inativo' ? 'Excluir Registro' : 'Desativar'}
                                         </DropdownMenuItem>
                                      </AlertDialogTrigger>
                                     </>
@@ -324,16 +351,21 @@ export default function EmployeesPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Esta ação irá {employee.status === 'Inativo' ? 'excluir permanentemente' : 'desativar'} o funcionário '{employee.name}'. 
-                                  {employee.status !== 'Inativo' && ' Ele não terá mais acesso ao sistema.'}
+                                  {employee.status === 'Inativo' 
+                                    ? `Esta ação excluirá permanentemente o registro do funcionário '${employee.name}' do banco de dados.`
+                                    : `Esta ação desativará o funcionário '${employee.name}'. Ele não terá mais acesso ao sistema.`
+                                  }
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeactivate(employee.id)}>Confirmar</AlertDialogAction>
+                                <AlertDialogAction onClick={() => handleEmployeeAction(employee, employee.status === 'Inativo' ? 'delete' : 'deactivate')}>Confirmar</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
+                         <DialogTrigger asChild>
+                            <span></span>
+                        </DialogTrigger>
                         {selectedEmployee && <ManageEmployeeDialog employee={selectedEmployee} onSave={handleSaveEmployee} onOpenChange={setIsManageDialogOpen} />}
                       </Dialog>
                     </TableCell>

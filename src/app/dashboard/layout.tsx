@@ -13,7 +13,6 @@ import {
   FileText,
   PanelLeft,
   Building,
-  History,
 } from 'lucide-react';
 import { useUser, UserProvider } from '@/contexts/user-context';
 import { Button } from '@/components/ui/button';
@@ -55,7 +54,6 @@ function MainNav({ className }: React.HTMLAttributes<HTMLElement>) {
   
   const navLinks = navLinksConfig
    .filter(link => user.role >= link.minRole);
-
 
   return (
     <nav className={cn('flex flex-col gap-2', className)}>
@@ -193,10 +191,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }
 
                 let schoolName = null;
-                if(userData.schoolId) {
-                    const schoolDocRef = doc(db, 'schools', userData.schoolId);
-                    const schoolDoc = await getDoc(schoolDocRef);
-                    if(schoolDoc.exists()){
+                if(userData.hash && !userData.hash.startsWith('pm')) { // School users have a non-prefixed hash
+                    const schoolsRef = collection(db, 'schools');
+                    const q = query(schoolsRef, where("hash", "==", userData.hash));
+                    const schoolSnapshot = await getDocs(q);
+                    if (!schoolSnapshot.empty) {
+                        const schoolDoc = schoolSnapshot.docs[0];
                         const schoolData = decryptObjectValues(schoolDoc.data());
                         schoolName = schoolData?.name || null;
                     }
@@ -213,8 +213,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 setUser(userProfile);
 
             } else {
-               // This case might happen if user exists in Auth but not in Firestore
-               // Instead of throwing an error, we sign out and redirect.
                console.error("User profile not found in Firestore. Signing out.");
                await auth.signOut();
                setUser(null);
@@ -222,7 +220,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             }
         } catch (error) {
             console.error("Error fetching user profile:", error);
-            await auth.signOut(); // Sign out to prevent inconsistent state
+            await auth.signOut(); 
             setUser(null);
             router.push('/');
         }

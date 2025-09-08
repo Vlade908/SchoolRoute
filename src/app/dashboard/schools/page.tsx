@@ -29,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, updateDoc, onSnapshot, query, Timestamp, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, onSnapshot, query, Timestamp, deleteDoc, getDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { encryptObjectValues, decryptObjectValues } from '@/lib/crypto';
 import { AddressMap } from '@/components/address-map';
@@ -37,6 +37,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { School, SchoolGrade, SchoolClass } from '@/models/school';
 import { addSchool } from '@/app/actions/add-school';
+import { cn } from '@/lib/utils';
 
 type Employee = {
     id: string;
@@ -45,7 +46,7 @@ type Employee = {
     email: string;
     hash: string;
     role: number | string; // Can be number (1, 2) or string 'Aguardando'
-    status: string;
+    status: 'Ativo' | 'Inativo' | 'Pendente';
     creationDate?: string;
 };
 
@@ -69,12 +70,12 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
     if (typeof role === 'string' && role.startsWith('Nível')) {
         return role.split(' ')[1];
     }
-    return role;
+    return role.toString();
   }
 
   const setRoleValue = (value: string) => {
       const numericValue = parseInt(value, 10);
-      setCurrentEmployee(e => ({...e, role: `Nível ${numericValue}`}));
+      setCurrentEmployee(e => ({...e, role: numericValue }));
   }
 
   return (
@@ -105,7 +106,7 @@ function ManageEmployeeDialog({ employee, onSave, onOpenChange }: { employee: Em
             <Label htmlFor="status" className="whitespace-nowrap">Status</Label>
              <Select
                 value={currentEmployee.status}
-                onValueChange={(value) => setCurrentEmployee(e => ({...e, status: value as 'Ativo' | 'Inativo' }))}
+                onValueChange={(value) => setCurrentEmployee(e => ({...e, status: value as Employee['status'] }))}
              >
                 <SelectTrigger id="status">
                     <SelectValue placeholder="Selecione o status" />
@@ -384,13 +385,13 @@ function ClassStudentsDialog({ isOpen, onOpenChange, schoolId, gradeName, classN
         const fetchStudents = async () => {
             setLoading(true);
             const studentsRef = collection(db, "students");
-            const q = query(studentsRef);
+            const q = query(studentsRef, where("schoolId", "==", schoolId), where("grade", "==", gradeName), where("className", "==", className));
             
             const querySnapshot = await getDocs(q);
             const classStudents: Student[] = [];
             querySnapshot.forEach(doc => {
                 const decryptedData = decryptObjectValues(doc.data()) as any;
-                if(decryptedData && decryptedData.schoolId === schoolId && decryptedData.grade === gradeName && decryptedData.className === className) {
+                if(decryptedData) {
                     classStudents.push({
                         id: doc.id,
                         name: decryptedData.name,
@@ -467,30 +468,28 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
       const fetchEmployees = async () => {
         try {
           const usersRef = collection(db, "users");
-          // This query will be slow if there are many users.
-          // A better approach would be to have a 'schoolHash' field to query directly.
-          // Assuming 'hash' field exists inside encryptedData.
-          const q = query(usersRef);
+          const q = query(usersRef, where("hash", "==", school.hash));
           
-          const querySnapshot = await getDocs(q);
-          const schoolEmployees: Employee[] = [];
-          querySnapshot.forEach((doc) => {
-              const encryptedData = doc.data();
-              const data = decryptObjectValues(encryptedData) as any;
-              if (data && data.hash === school.hash) {
-                  schoolEmployees.push({
-                      id: doc.id,
-                      uid: data.uid,
-                      name: data.name,
-                      email: data.email,
-                      role: data.role,
-                      status: data.status,
-                      hash: data.hash,
-                      creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
-                  });
-              }
+          const unsubscribe = onSnapshot(q, (querySnapshot) => {
+              const schoolEmployees: Employee[] = [];
+              querySnapshot.forEach((doc) => {
+                  const data = decryptObjectValues(doc.data()) as any;
+                  if (data) {
+                      schoolEmployees.push({
+                          id: doc.id,
+                          uid: data.uid,
+                          name: data.name,
+                          email: data.email,
+                          role: data.role,
+                          status: data.status,
+                          hash: data.hash,
+                          creationDate: data.creationDate?.toDate().toLocaleDateString('pt-BR') ?? 'N/A'
+                      });
+                  }
+              });
+              setEmployees(schoolEmployees);
           });
-          setEmployees(schoolEmployees);
+          return () => unsubscribe();
         } catch (e) {
           console.error("Error fetching employees:", e);
           toast({ variant: "destructive", title: "Erro", description: "Não foi possível carregar os funcionários." });
@@ -504,7 +503,7 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
         let filtered = employees;
 
         if (statusFilter !== 'todos') {
-            filtered = filtered.filter(emp => emp.status.toLowerCase() === statusFilter);
+            filtered = filtered.filter(emp => emp.status.toLowerCase() === statusFilter.toLowerCase());
         }
 
         if (searchTerm) {
@@ -524,9 +523,8 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
         const schoolDoc = await getDoc(schoolDocRef);
         if (!schoolDoc.exists()) throw new Error("Escola não encontrada.");
 
-        const encryptedData = schoolDoc.data();
-        const decryptedData = decryptObjectValues(encryptedData);
-        if(!decryptedData) throw new Error("Falha ao descriptografar dados da escola.");
+        const decryptedData = decryptObjectValues(schoolDoc.data());
+        if(!decryptedData) throw new Error("Falha ao ler os dados da escola.");
 
         const finalData = { ...decryptedData, ...dataToUpdate };
         const encryptedUpdate = encryptObjectValues(finalData);
@@ -555,15 +553,13 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
         if (!updatedEmployee.uid) return;
         try {
           const employeeDocRef = doc(db, 'users', updatedEmployee.uid);
-          const roleString = updatedEmployee.role;
-          const roleNumber = typeof roleString === 'string' && roleString.startsWith('Nível') ? parseInt(roleString.split(' ')[1], 10) : updatedEmployee.role;
+          const roleNumber = typeof updatedEmployee.role === 'string' ? parseInt(updatedEmployee.role, 10) : updatedEmployee.role;
 
           const employeeDoc = await getDoc(employeeDocRef);
           if (!employeeDoc.exists()) throw new Error("Funcionário não encontrado.");
           
-          const encryptedData = employeeDoc.data();
-          const decryptedData = decryptObjectValues(encryptedData);
-          if(!decryptedData) throw new Error("Falha ao descriptografar dados do funcionário.");
+          const decryptedData = decryptObjectValues(employeeDoc.data() || {});
+          if(!decryptedData) throw new Error("Falha ao ler os dados do funcionário.");
           
           const dataToUpdate = {
               ...decryptedData,
@@ -575,7 +571,6 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
 
           await updateDoc(employeeDocRef, encryptedUpdate);
           toast({ title: 'Sucesso!', description: 'Funcionário atualizado.'});
-          setEmployees(prev => prev.map(e => e.uid === updatedEmployee.uid ? {...e, status: updatedEmployee.status, role: roleNumber } : e))
         } catch(error) {
           console.error("Error updating employee:", error);
           toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível atualizar o funcionário.'});
@@ -584,8 +579,7 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
     }
     
     const getRoleName = (role: number | string) => {
-        if (typeof role === 'string' && role.startsWith('Nível')) return role;
-        if (role === 'Aguardando') return 'Aguardando';
+        if (typeof role === 'string') return role;
         switch(role) {
             case 1: return 'Nível 1';
             case 2: return 'Nível 2';
@@ -727,11 +721,11 @@ function SchoolDetailsDialog({ school, onClose }: { school: School, onClose: () 
                                                 <TableCell className="hidden sm:table-cell">{employee.email}</TableCell>
                                                 <TableCell>
                                                      <Badge variant={employee.status === 'Ativo' ? 'default' : employee.status === 'Pendente' ? 'secondary' : 'destructive'} 
-                                                         className={
-                                                            employee.status === 'Ativo' ? 'bg-green-600' : 
-                                                            employee.status === 'Pendente' ? 'bg-orange-500' :
-                                                            'bg-red-600'
-                                                         }>
+                                                         className={cn(
+                                                            employee.status === 'Ativo' && 'bg-green-600',
+                                                            employee.status === 'Pendente' && 'bg-orange-500',
+                                                            employee.status === 'Inativo' && 'bg-red-600'
+                                                         )}>
                                                         {employee.status}
                                                     </Badge>
                                                 </TableCell>
@@ -788,16 +782,9 @@ function ActionsDropdown({ school }: { school: School }) {
     useEffect(() => {
         const checkStudents = async () => {
             if (!school.id) return;
-            const q = query(collection(db, "students"));
+            const q = query(collection(db, "students"), where("schoolId", "==", school.id));
             const querySnapshot = await getDocs(q);
-            let count = 0;
-            querySnapshot.forEach(doc => {
-                const decryptedData = decryptObjectValues(doc.data());
-                if (decryptedData && decryptedData.schoolId === school.id) {
-                    count++;
-                }
-            });
-            setStudentCount(count);
+            setStudentCount(querySnapshot.size);
         };
         checkStudents();
     }, [school.id]);
@@ -809,7 +796,7 @@ function ActionsDropdown({ school }: { school: School }) {
             if (!schoolDoc.exists()) throw new Error("Escola não encontrada.");
 
             const decryptedData = decryptObjectValues(schoolDoc.data());
-            if (!decryptedData) throw new Error("Falha ao descriptografar dados da escola.");
+            if (!decryptedData) throw new Error("Falha ao ler dados da escola.");
 
             const updatedData = { ...decryptedData, status, updatedAt: Timestamp.now() };
             const encryptedUpdate = encryptObjectValues(updatedData);
@@ -1033,7 +1020,7 @@ export default function SchoolsPage() {
                 <TableCell className="hidden sm:table-cell">{school.schoolType}</TableCell>
                 <TableCell className="hidden md:table-cell">{school.address}</TableCell>
                 <TableCell>
-                  <Badge variant={school.status === 'Ativa' ? 'default' : 'secondary'} className={school.status === 'Ativa' ? 'bg-green-600' : ''}>
+                  <Badge variant={school.status === 'Ativa' ? 'default' : 'secondary'} className={cn(school.status === 'Ativa' ? 'bg-green-600' : 'bg-red-600')}>
                     {school.status}
                   </Badge>
                 </TableCell>
@@ -1056,5 +1043,3 @@ export default function SchoolsPage() {
     </>
   );
 }
-
-

@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
-import { Timestamp, setDoc, doc, collection, getDocs } from 'firebase/firestore';
+import { Timestamp, setDoc, doc, collection, getDocs, query } from 'firebase/firestore';
 import type { ImportConfig } from '@/models/import-config';
 import { auth as adminAuth } from '@/lib/firebase-admin';
 import { decryptObjectValues, encryptObjectValues } from '@/lib/crypto';
@@ -63,7 +63,9 @@ export async function createAdminUser(adminData: z.infer<typeof CreateAdminUserI
 
         // 1. Check if an admin user already exists using the Admin SDK
         const usersRef = collection(db, "users");
-        const querySnapshot = await getDocs(usersRef);
+        const q = query(usersRef);
+        const querySnapshot = await getDocs(q);
+        
         let adminExists = false;
         for (const docSnap of querySnapshot.docs) {
             const userData = decryptObjectValues(docSnap.data());
@@ -107,6 +109,8 @@ export async function createAdminUser(adminData: z.infer<typeof CreateAdminUserI
             message = "Este e-mail já está em uso.";
         } else if (error.code === 'auth/invalid-password') {
              message = 'A senha fornecida é inválida. Deve ter pelo menos 6 caracteres.';
+        } else if (error.code === 'auth/insufficient-permission'){
+            message = 'Permissões insuficientes para criar um usuário. Verifique as credenciais do Admin SDK.';
         }
         return { success: false, message };
     }

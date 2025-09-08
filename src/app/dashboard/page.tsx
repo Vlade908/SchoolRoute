@@ -62,24 +62,25 @@ export default function DashboardPage() {
         let currentMonthOrdersCount = 0;
         let currentMonthTotalValue = 0;
         const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
 
         snapshot.forEach((doc) => {
             const data = doc.data();
             if (data && data.date && data.totalValue && data.status !== 'Excluído') {
                 const orderDate = new Date(data.date);
-                const month = orderDate.getMonth();
+                const orderYear = orderDate.getFullYear();
+
                 const valueString = data.totalValue.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
                 const value = parseFloat(valueString);
                 
                 if (!isNaN(value)) {
-                    // For chart
-                    if (monthlyTotals[month]) {
-                        monthlyTotals[month] += value;
-                    } else {
-                        monthlyTotals[month] = value;
+                    // For chart (only for current year)
+                    if (orderYear === currentYear) {
+                       const month = orderDate.getMonth();
+                       monthlyTotals[month] = (monthlyTotals[month] || 0) + value;
                     }
                     // For card
-                    if (month === currentMonth) {
+                    if (orderDate.getMonth() === currentMonth && orderYear === currentYear) {
                         currentMonthOrdersCount++;
                         currentMonthTotalValue += value;
                     }
@@ -124,7 +125,7 @@ export default function DashboardPage() {
     return null;
   }
   
-  const welcomeMessage = user.name ? `Bem-vindo(a) de volta, ${user.name.split(' ')[0]}!` : 'Bem-vindo(a) de volta!';
+  const welcomeMessage = user?.name ? `Bem-vindo(a) de volta, ${user.name.split(' ')[0]}!` : 'Bem-vindo(a) de volta!';
   
   const getActivityIcon = (href: string) => {
       if (href.includes('student')) return <Users className="h-6 w-6"/>;
@@ -191,7 +192,7 @@ export default function DashboardPage() {
         <Card className="col-span-4">
             <CardHeader>
               <CardTitle>Visão Geral de Despesas com Passes</CardTitle>
-              <CardDescription>Total gasto por mês em passes estudantis.</CardDescription>
+              <CardDescription>Total gasto por mês em passes estudantis no ano corrente.</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
             <ResponsiveContainer width="100%" height={350}>
